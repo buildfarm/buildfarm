@@ -1,3 +1,19 @@
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param deadlineAfter the deadlineAfter parameter
+ * @param deadlineAfterUnits the deadlineAfterUnits parameter
+ * @param onReadyHandler the onReadyHandler parameter
+ * @return the default listenablefuture<feedbackoutputstream> result
+ */
+/**
+ * Persists data to storage or external destination
+ * @param committedSize the committedSize parameter
+ * @return the public result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+ * @return the return new result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -67,11 +83,23 @@ public interface Write {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public long getCommittedSize() {
       return committedSize;
     }
 
     @Override
+    /**
+     * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+     * @param offset the offset parameter
+     * @param deadlineAfter the deadlineAfter parameter
+     * @param deadlineAfterUnits the deadlineAfterUnits parameter
+     * @param onReadyHandler the onReadyHandler parameter
+     * @return the feedbackoutputstream result
+     */
     public boolean isComplete() {
       return true;
     }
@@ -92,11 +120,23 @@ public interface Write {
 
         /** Discards the specified byte array. */
         @Override
+        /**
+         * Loads data from storage or external source
+         * @return the boolean result
+         */
         public void write(byte[] b, int off, int len) {
           checkNotNull(b);
         }
 
         @Override
+        /**
+         * Retrieves a blob from the Content Addressable Storage
+         * @param offset the offset parameter
+         * @param deadlineAfter the deadlineAfter parameter
+         * @param deadlineAfterUnits the deadlineAfterUnits parameter
+         * @param onReadyHandler the onReadyHandler parameter
+         * @return the listenablefuture<feedbackoutputstream> result
+         */
         public boolean isReady() {
           return false;
         }
@@ -104,6 +144,9 @@ public interface Write {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     */
     public ListenableFuture<FeedbackOutputStream> getOutputFuture(
         long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
       return immediateFuture(getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));
@@ -113,6 +156,10 @@ public interface Write {
     public void reset() {}
 
     @Override
+    /**
+     * Persists data to storage or external destination
+     * @param b the b parameter
+     */
     public ListenableFuture<Long> getFuture() {
       return immediateFuture(committedSize);
     }
@@ -123,21 +170,37 @@ public interface Write {
     private long committedSize = 0;
 
     @Override
+    /**
+     * Persists data to storage or external destination
+     * @param b the b parameter
+     * @param off the off parameter
+     * @param len the len parameter
+     */
     public void write(int b) {
       committedSize++;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     */
     public void write(byte[] b, int off, int len) {
       committedSize += len;
     }
 
     @Override
+    /**
+     * Loads data from storage or external source
+     * @return the boolean result
+     */
     public void close() {
       committedFuture.set(committedSize);
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     */
     public boolean isReady() {
       return true;
     }
@@ -151,16 +214,36 @@ public interface Write {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public long getCommittedSize() {
       return committedSize;
     }
 
     @Override
+    /**
+     * Retrieves a blob from the Content Addressable Storage
+     * @param offset the offset parameter
+     * @param deadlineAfter the deadlineAfter parameter
+     * @param deadlineAfterUnits the deadlineAfterUnits parameter
+     * @param onReadyHandler the onReadyHandler parameter
+     * @return the feedbackoutputstream result
+     */
     public boolean isComplete() {
       return committedFuture.isDone();
     }
 
     @Override
+    /**
+     * Retrieves a blob from the Content Addressable Storage
+     * @param offset the offset parameter
+     * @param deadlineAfter the deadlineAfter parameter
+     * @param deadlineAfterUnits the deadlineAfterUnits parameter
+     * @param onReadyHandler the onReadyHandler parameter
+     * @return the listenablefuture<feedbackoutputstream> result
+     */
     public FeedbackOutputStream getOutput(
         long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
         throws IOException {

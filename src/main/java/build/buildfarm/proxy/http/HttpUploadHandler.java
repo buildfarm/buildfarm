@@ -1,3 +1,18 @@
+/**
+ * Transfers data to remote storage or workers
+ * @param credentials the credentials parameter
+ * @return the public result
+ */
+/**
+ * Manages network connections for gRPC communication Includes input validation and error handling for robustness.
+ * @param ctx the ctx parameter
+ * @param response the response parameter
+ */
+/**
+ * Constructs digest from hash string and size information
+ * @param msg the msg parameter
+ * @return the httprequest result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,6 +50,12 @@ import java.io.IOException;
 
 /** ChannelHandler for uploads. */
 final class HttpUploadHandler extends AbstractHttpHandler<FullHttpResponse> {
+  /**
+   * Persists data to storage or external destination Includes input validation and error handling for robustness.
+   * @param ctx the ctx parameter
+   * @param msg the msg parameter
+   * @param promise the promise parameter
+   */
   public HttpUploadHandler(Credentials credentials) {
     super(credentials);
   }
@@ -102,6 +123,11 @@ final class HttpUploadHandler extends AbstractHttpHandler<FullHttpResponse> {
             });
   }
 
+  /**
+   * Constructs digest from hash string and size information
+   * @param msg the msg parameter
+   * @return the httpchunkedinput result
+   */
   private HttpRequest buildRequest(UploadCommand msg) {
     HttpRequest request =
         new DefaultHttpRequest(
@@ -115,6 +141,11 @@ final class HttpUploadHandler extends AbstractHttpHandler<FullHttpResponse> {
     return request;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   * @param ctx the ctx parameter
+   */
   private HttpChunkedInput buildBody(UploadCommand msg) {
     return new HttpChunkedInput(new ChunkedStream(msg.data()));
   }

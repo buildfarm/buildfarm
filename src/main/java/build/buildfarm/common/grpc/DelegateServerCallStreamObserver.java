@@ -1,3 +1,8 @@
+/**
+ * Handles streaming responses from gRPC calls
+ * @param delegate the delegate parameter
+ * @return the public result
+ */
 package build.buildfarm.common.grpc;
 
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -14,8 +19,15 @@ public abstract class DelegateServerCallStreamObserver<T, U> extends ServerCallS
   private final SettableFuture<Void> cancelledFuture = SettableFuture.create();
 
   @GuardedBy("this")
+  /**
+   * Loads data from storage or external source Performs side effects including logging and state modifications.
+   */
   private final List<Runnable> readyHandlers = new LinkedList<>();
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public DelegateServerCallStreamObserver(ServerCallStreamObserver<U> delegate) {
     this.delegate = delegate;
     // make the handlers re-registerable, with exceptional behaviors resulting in ejection
@@ -35,36 +47,63 @@ public abstract class DelegateServerCallStreamObserver<T, U> extends ServerCallS
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param compression the compression parameter
+   */
   public boolean isCancelled() {
     return delegate.isCancelled();
   }
 
   @Override
+  /**
+   * Processes the operation according to configured logic
+   * @param onCancelHandler the onCancelHandler parameter
+   */
   public void setCompression(String compression) {
     delegate.setCompression(compression);
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void setOnCancelHandler(Runnable onCancelHandler) {
     cancelledFuture.addListener(onCancelHandler, directExecutor());
   }
 
   @Override
+  /**
+   * Loads data from storage or external source
+   * @return the boolean result
+   */
   public void disableAutoInboundFlowControl() {
     delegate.disableAutoInboundFlowControl();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param count the count parameter
+   */
   public boolean isReady() {
     return delegate.isReady();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param enable the enable parameter
+   */
   public void request(int count) {
     delegate.request(count);
   }
 
   @Override
+  /**
+   * Processes the operation according to configured logic
+   * @param onReadyHandler the onReadyHandler parameter
+   */
   public void setMessageCompression(boolean enable) {
     delegate.setMessageCompression(enable);
   }

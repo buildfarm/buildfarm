@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param url the url parameter
+ * @return the public result
+ */
 // Copyright 2022 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +30,10 @@ public class URL {
     this.url = url;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the urlconnection result
+   */
   public String getHost() {
     return url.getHost();
   }

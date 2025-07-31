@@ -1,3 +1,8 @@
+/**
+ * Asynchronous computation result handler
+ * @param watcher the watcher parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,6 +26,10 @@ import com.google.longrunning.Operation;
 public abstract class WatchFuture extends AbstractFuture<Void> {
   private final Watcher watcher;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   */
   public WatchFuture(Watcher watcher) {
     this.watcher = watcher;
   }
@@ -36,6 +45,9 @@ public abstract class WatchFuture extends AbstractFuture<Void> {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   protected abstract void unwatch();
 
   @Override

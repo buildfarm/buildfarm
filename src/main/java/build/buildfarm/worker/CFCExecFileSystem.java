@@ -1,3 +1,35 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param root the root parameter
+ * @param fileCache the fileCache parameter
+ * @param owners the owners parameter
+ * @param allowSymlinkTargetAbsolute the allowSymlinkTargetAbsolute parameter
+ * @param removeDirectoryService the removeDirectoryService parameter
+ * @param accessRecorder the accessRecorder parameter
+ * @param fetchService the fetchService parameter
+ * @return the initialized with start
+
+  public result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param dirents the dirents parameter
+ * @return the only valid path under root is cache result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param IOException the IOException parameter
+ * @return the return result
+ */
+/**
+ * Asynchronous computation result handler
+ * @return the iterable<listenablefuture<void>> result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the unlikely, but worth guarding result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,6 +58,11 @@ import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param command the command parameter
+ * @return the outputdirectory result
+ */
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 import build.bazel.remote.execution.v2.Action;
@@ -68,6 +105,16 @@ import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
+/**
+ * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+ * @param onDigests the onDigests parameter
+ * @param skipLoad the skipLoad parameter
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param name the name parameter
+ * @return the userprincipal result
+ */
 public class CFCExecFileSystem implements ExecFileSystem {
   private final Path root;
   protected final CASFileCache fileCache;
@@ -78,7 +125,28 @@ public class CFCExecFileSystem implements ExecFileSystem {
 
   protected final ExecutorService fetchService;
   protected final ExecutorService removeDirectoryService;
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param digest the digest parameter
+   * @param root the root parameter
+   * @param path the path parameter
+   * @param isExecutable the isExecutable parameter
+   * @return the listenablefuture<pathresult> result
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param digest the digest parameter
+   * @param path the path parameter
+   * @param isExecutable the isExecutable parameter
+   * @return the listenablefuture<pathresult> result
+   */
   private final ExecutorService accessRecorder;
+  /**
+   * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param symlinkPath the symlinkPath parameter
+   * @param target the target parameter
+   * @return the listenablefuture<void> result
+   */
   protected FileStore fileStore; // initialized with start
 
   public CFCExecFileSystem(
@@ -99,12 +167,26 @@ public class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   public UserPrincipal getOwner(String name) {
     return owners.get(name);
   }
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param offset the offset parameter
+   * @return the inputstream result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the path result
+   */
   public void start(Consumer<List<Digest>> onDigests, boolean skipLoad)
       throws IOException, InterruptedException {
     fileStore = Files.getFileStore(root);
@@ -166,11 +248,23 @@ public class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param dir the dir parameter
+   * @param attrs the attrs parameter
+   * @return the filevisitresult result
+   */
   public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
       throws IOException {
     return fileCache.newInput(compressor, digest, offset);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param future the future parameter
+   * @param onIOError the onIOError parameter
+   * @return the listenablefuture<v> result
+   */
   protected ListenableFuture<Void> putSymlink(Path symlinkPath, String target) {
     Path relativeTargetPath = symlinkPath.getFileSystem().getPath(target);
     // FIXME check that this makes any sense - not sure why we want to use getFileSytem() here...
@@ -184,6 +278,11 @@ public class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @SuppressWarnings("ConstantConditions")
+  /**
+   * Validates input parameters and state consistency Includes input validation and error handling for robustness.
+   * @param path the path parameter
+   * @param errors the errors parameter
+   */
   private ListenableFuture<PathResult> put(Digest digest, Path path, boolean isExecutable) {
     if (digest.getSize() == 0) {
       return listeningDecorator(fetchService)
@@ -260,6 +359,10 @@ public class CFCExecFileSystem implements ExecFileSystem {
   class ExecFileVisitor implements FileVisitor<Path> {
     protected final List<ListenableFuture<Void>> futures = new ArrayList<>();
     protected Path root = null;
+    /**
+     * Loads data from storage or external source Provides thread-safe access through synchronization mechanisms.
+     * @param size the size parameter
+     */
     protected final WorkerExecutedMetadata.Builder workerExecutedMetadata;
 
     ExecFileVisitor(WorkerExecutedMetadata.Builder workerExecutedMetadata) {
@@ -271,6 +374,12 @@ public class CFCExecFileSystem implements ExecFileSystem {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param dir the dir parameter
+     * @param exc the exc parameter
+     * @return the filevisitresult result
+     */
     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
         throws IOException {
       if (root == null) {
@@ -282,6 +391,12 @@ public class CFCExecFileSystem implements ExecFileSystem {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+     * @param file the file parameter
+     * @param attrs the attrs parameter
+     * @return the filevisitresult result
+     */
     public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
       return FileVisitResult.CONTINUE;
     }
@@ -293,6 +408,12 @@ public class CFCExecFileSystem implements ExecFileSystem {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param file the file parameter
+     * @param exc the exc parameter
+     * @return the filevisitresult result
+     */
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
       ListenableFuture<Void> populate;
       boolean terminate = false;
@@ -321,12 +442,27 @@ public class CFCExecFileSystem implements ExecFileSystem {
     }
 
     @Override
+    /**
+     * Creates and initializes a new instance Implements complex logic with 7 conditional branches and 1 iterative operations. Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+     * @param operationName the operationName parameter
+     * @param directoriesIndex the directoriesIndex parameter
+     * @param digestFunction the digestFunction parameter
+     * @param action the action parameter
+     * @param command the command parameter
+     * @param owner the owner parameter
+     * @param workerExecutedMetadata the workerExecutedMetadata parameter
+     * @return the path result
+     */
     public FileVisitResult visitFileFailed(Path file, IOException exc) {
       return FileVisitResult.CONTINUE;
     }
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param execDir the execDir parameter
+   */
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,

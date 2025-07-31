@@ -1,3 +1,13 @@
+/**
+ * Transforms data between different representations
+ * @param result the result parameter
+ * @return the iterable<t> result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param size the size parameter
+ * @return the advance to the next page if we have exhausted this one result
+ */
 package build.buildfarm.common.redis;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -10,6 +20,12 @@ import java.util.ArrayList;
 import java.util.List;
 import redis.clients.jedis.resps.ScanResult;
 
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches and 1 iterative operations. Includes input validation and error handling for robustness.
+ * @param offsetCursor the offsetCursor parameter
+ * @param count the count parameter
+ * @return the scanresult<t> result
+ */
 public abstract class OffsetScanner<T> {
   protected abstract ScanResult<T> scan(String cursor, int remaining);
 

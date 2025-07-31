@@ -1,3 +1,17 @@
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 3 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+ * @return the infiniteloopstatement result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the update worker list result
+ */
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+ * @param workers the workers parameter
+ * @return the add new registered workers and profile result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +28,11 @@
 
 package build.buildfarm.tools;
 
+/**
+ * Performs specialized operation based on method logic
+ * @param worker the worker parameter
+ * @param response the response parameter
+ */
 import static build.buildfarm.common.grpc.Channels.createChannel;
 
 import build.buildfarm.common.config.BuildfarmConfigs;
@@ -56,6 +75,11 @@ class WorkerProfile {
         + worker.split(":")[1];
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   * @param args the args parameter
+   * @return the set<string> result
+   */
   private static void analyzeMessage(String worker, WorkerProfileMessage response) {
     System.out.println("\nWorkerProfile:");
     System.out.println(worker);
@@ -94,6 +118,12 @@ class WorkerProfile {
   }
 
   @SuppressWarnings("ConstantConditions")
+  /**
+   * Loads data from storage or external source
+   * @param jedis the jedis parameter
+   * @param now the now parameter
+   * @return the set<string> result
+   */
   private static Set<String> getWorkers(String[] args) throws ConfigurationException, IOException {
     OptionsParser parser = OptionsParser.newOptionsParser(ShardWorkerOptions.class);
     parser.parseAndExitUponError(args);
@@ -110,6 +140,10 @@ class WorkerProfile {
     return client.call(jedis -> fetchWorkers(jedis, System.currentTimeMillis()));
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 4 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param args the args parameter
+   */
   private static Set<String> fetchWorkers(UnifiedJedis jedis, long now) {
     Set<String> workers = Sets.newConcurrentHashSet();
     for (Map.Entry<String, String> entry :
@@ -132,6 +166,10 @@ class WorkerProfile {
   }
 
   @SuppressWarnings("BusyWait")
+  /**
+   * Performs specialized operation based on method logic
+   * @param args the args parameter
+   */
   private static void workerProfile(String[] args) throws IOException {
     Set<String> workers = null;
     WorkerProfileMessage currentWorkerMessage;

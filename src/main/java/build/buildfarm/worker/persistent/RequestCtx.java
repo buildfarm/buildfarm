@@ -1,3 +1,11 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param request the request parameter
+ * @param ctx the ctx parameter
+ * @param workFiles the workFiles parameter
+ * @param timeout the timeout parameter
+ * @return the public result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

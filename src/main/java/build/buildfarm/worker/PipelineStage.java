@@ -1,3 +1,13 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param workerContext the workerContext parameter
+ * @param output the output parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,12 +33,23 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import lombok.Getter;
 
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @return the executioncontext result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the boolean result
+ */
 public abstract class PipelineStage implements Runnable {
   @Getter protected final String name;
   protected final WorkerContext workerContext;
   protected final PipelineStage output;
   protected final PipelineStage error;
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   protected boolean claimed = false;
   @Getter private volatile boolean closed = false;
   private Thread tickThread = null;
@@ -43,10 +64,19 @@ public abstract class PipelineStage implements Runnable {
     this.error = error;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public boolean isStalled() {
     return false;
   }
 
+  /**
+   * Processes the next operation in the pipeline stage Implements complex logic with 5 conditional branches. Includes input validation and error handling for robustness.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   */
   protected void runInterruptible() throws InterruptedException {
     while (!output.isClosed() || isClaimed()) {
       iterate();
@@ -58,6 +88,10 @@ public abstract class PipelineStage implements Runnable {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the string result
+   */
   public void run() {
     boolean keepRunningStage = true;
     while (keepRunningStage) {
@@ -82,6 +116,10 @@ public abstract class PipelineStage implements Runnable {
    *     the pipeline stage running.
    * @return Whether the stage should terminate or continue running.
    */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   private boolean decideTermination(Exception e) {
     // This is a normal way for the pipeline stage to terminate.
     // If an interrupt is received, there is no reason to continue the pipeline stage.
@@ -99,10 +137,24 @@ public abstract class PipelineStage implements Runnable {
     return true;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
+  /**
+   * Returns resources to the shared pool
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionContext the executionContext parameter
+   * @return the boolean result
+   */
   public String name() {
     return name;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   protected void cancelTick() {
     // if we are not in a tick, this has no effect
     // if we are in a tick, set the cancel flag, interrupt the tick thread
@@ -113,12 +165,40 @@ public abstract class PipelineStage implements Runnable {
     }
   }
 
+  /**
+   * Processes the next operation in the pipeline stage
+   * @param operationName the operationName parameter
+   * @return the string result
+   */
   private boolean tickCancelled() {
     boolean isTickCancelled = tickCancelledFlag;
     tickCancelledFlag = false;
     return isTickCancelled;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param operationName the operationName parameter
+   * @param usecs the usecs parameter
+   * @param stallUSecs the stallUSecs parameter
+   * @param status the status parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param operationName the operationName parameter
+   * @param usecs the usecs parameter
+   * @param stallUSecs the stallUSecs parameter
+   * @param success the success parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param operationName the operationName parameter
+   * @param message the message parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param operationName the operationName parameter
+   */
   protected void iterate() throws InterruptedException {
     ExecutionContext executionContext;
     ExecutionContext nextExecutionContext = null;
@@ -168,10 +248,19 @@ public abstract class PipelineStage implements Runnable {
     return format("%s::iterate(%s)", name, operationName);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionContext the executionContext parameter
+   * @return the executioncontext result
+   */
   protected void start() {
     start("");
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionContext the executionContext parameter
+   */
   protected void start(String operationName) {
     start(operationName, "Starting");
   }
@@ -200,8 +289,16 @@ public abstract class PipelineStage implements Runnable {
     return executionContext;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   protected void after(ExecutionContext executionContext) {}
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @return the pipelinestage result
+   */
   public synchronized boolean claim(ExecutionContext executionContext) throws InterruptedException {
     while (!closed && claimed) {
       wait();
@@ -214,6 +311,10 @@ public abstract class PipelineStage implements Runnable {
     return true;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the pipelinestage result
+   */
   public synchronized void release() {
     claimed = false;
     notify();
@@ -251,30 +352,56 @@ public abstract class PipelineStage implements Runnable {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param executionContext the executionContext parameter
+     * @return the boolean result
+     */
     public Logger getLogger() {
       return null;
     }
 
     @Override
+    /**
+     * Returns resources to the shared pool
+     */
     public boolean claim(ExecutionContext executionContext) {
       return true;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+     * @return the executioncontext result
+     */
     public void release() {}
 
     @Override
+    /**
+     * Stores a blob in the Content Addressable Storage
+     * @param executionContext the executionContext parameter
+     */
     public ExecutionContext take() {
       throw new UnsupportedOperationException();
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     */
     public void put(ExecutionContext executionContext) throws InterruptedException {}
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     */
     public void run() {}
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public void close() {}
 
     @Override

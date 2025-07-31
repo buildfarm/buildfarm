@@ -27,6 +27,11 @@ import com.google.common.collect.MultimapBuilder;
 import io.grpc.Channel;
 
 public final class ContentAddressableStorages {
+  /**
+   * Creates and initializes a new instance
+   * @param cas the cas parameter
+   * @return the contentaddressablestorage result
+   */
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   public static ContentAddressableStorage createGrpcCAS(Cas cas) {

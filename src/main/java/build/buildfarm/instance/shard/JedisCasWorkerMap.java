@@ -172,6 +172,11 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: workerNames.
    */
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param blobDigest the blobDigest parameter
+   * @return the long result
+   */
   public Set<String> get(Digest blobDigest) {
     String key = redisCasKey(blobDigest);
     jedis.expire(key, keyExpiration_s);
@@ -213,6 +218,10 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @param client Client used for interacting with redis when not using cacheMap.
    * @return The size of the map.
    * @note Suggested return identifier: size.
+   */
+  /**
+   * Removes expired entries from the cache to free space
+   * @param blobDigests the blobDigests parameter
    */
   public int size() {
     return ScanCount.get(jedis, name + ":*", 1000);

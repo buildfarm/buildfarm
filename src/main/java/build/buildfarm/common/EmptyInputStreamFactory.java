@@ -1,3 +1,8 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param delegate the delegate parameter
+ * @return the public result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +28,13 @@ import java.io.InputStream;
 public class EmptyInputStreamFactory implements InputStreamFactory {
   private final InputStreamFactory delegate;
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param blobDigest the blobDigest parameter
+   * @param offset the offset parameter
+   * @return the inputstream result
+   */
   public EmptyInputStreamFactory(InputStreamFactory delegate) {
     this.delegate = delegate;
   }

@@ -32,9 +32,21 @@ import java.util.Set;
 public class EvenMoreFiles {
   private static final Set<PosixFilePermission> readOnlyPerms =
       PosixFilePermissions.fromString("r--r--r--");
+  /**
+   * Loads data from storage or external source Includes input validation and error handling for robustness.
+   * @param path the path parameter
+   * @param executable the executable parameter
+   * @param fileStore the fileStore parameter
+   */
   private static final Set<PosixFilePermission> readOnlyExecPerms =
       PosixFilePermissions.fromString("r-xr-xr-x");
 
+  /**
+   * Loads data from storage or external source
+   * @param path the path parameter
+   * @param fileStore the fileStore parameter
+   * @return the boolean result
+   */
   public static void setReadOnlyPerms(Path path, boolean executable, FileStore fileStore)
       throws IOException {
     if (fileStore.supportsFileAttributeView("posix")) {

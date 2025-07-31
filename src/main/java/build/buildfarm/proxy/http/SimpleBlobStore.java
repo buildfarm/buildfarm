@@ -1,3 +1,9 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param key the key parameter
+ * @param length the length parameter
+ * @param in the in parameter
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

@@ -1,3 +1,35 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @param maxQueueSize the maxQueueSize parameter
+ * @param queues the queues parameter
+ * @param queueDecorator the queueDecorator parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the return if found result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the advance timeout if blocking on queue and not at max each queue cycle result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param pooled the pooled parameter
+ * @return the else result
+ */
+/**
+ * Polls for available operations from the backplane
+ * @param unified the unified parameter
+ * @return the balancedqueueentry result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param hashtags the hashtags parameter
+ * @return the create an internal queue for each of the provided hashtags result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -129,6 +161,27 @@ public class BalancedRedisQueue {
    * @details Used in a round-robin fashion to ensure an even distribution of pushes and appropriate
    *     ordering of pops.
    */
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+   * @param reply the reply parameter
+   * @param onInterrupted the onInterrupted parameter
+   * @return the t result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param command the command parameter
+   * @param onInterrupted the onInterrupted parameter
+   * @param service the service parameter
+   * @return the t result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param queue the queue parameter
+   * @param timeout the timeout parameter
+   * @param service the service parameter
+   * @return the string result
+   */
   private int currentPopQueue = 0;
 
   /**
@@ -155,6 +208,11 @@ public class BalancedRedisQueue {
     this(name, maxQueueSize, createHashedQueues(name, hashtags), queueDecorator);
   }
 
+  /**
+   * Removes data or cleans up resources
+   * @param pipeline the pipeline parameter
+   * @param balancedQueueEntry the balancedQueueEntry parameter
+   */
   public BalancedRedisQueue(
       String name, int maxQueueSize, List<String> queues, QueueDecorator queueDecorator) {
     this.originalHashtag = RedisHashtags.existingHash(name);
@@ -205,6 +263,13 @@ public class BalancedRedisQueue {
     return false;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param unified the unified parameter
+   * @param timeout the timeout parameter
+   * @param service the service parameter
+   * @return the balancedqueueentry result
+   */
   public void removeFromDequeue(AbstractPipeline pipeline, BalancedQueueEntry balancedQueueEntry) {
     queueDecorator
         .decorate(null, balancedQueueEntry.getQueue())
@@ -223,6 +288,12 @@ public class BalancedRedisQueue {
     return getBlockingReply(reply, onInterrupted);
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param jedis the jedis parameter
+   * @param name the name parameter
+   * @return the jedis result
+   */
   private <T> T getBlockingReply(Future<T> reply, Runnable onInterrupted)
       throws InterruptedException {
     try {
@@ -330,6 +401,11 @@ public class BalancedRedisQueue {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param sizes the sizes parameter
+   * @return the long result
+   */
   private static Jedis getJedisFromKey(UnifiedJedis jedis, String name) {
     Connection connection = null;
     if (jedis instanceof JedisCluster cluster) {
@@ -399,11 +475,32 @@ public class BalancedRedisQueue {
    * @return The name of the queue.
    * @note Suggested return identifier: name.
    */
+  /**
+   * Performs specialized operation based on method logic
+   * @param pipeline the pipeline parameter
+   * @return the supplier<long> result
+   */
   public String getDequeueName() {
     return name + "_dequeue";
   }
 
   // annoying that there's no inject/accumulate
+  /**
+   * Performs specialized operation based on method logic
+   * @param unified the unified parameter
+   * @return the iterable<long> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param pipeline the pipeline parameter
+   * @return the list<supplier<long>> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param unified the unified parameter
+   * @param queue the queue parameter
+   * @return the long result
+   */
   private static long size(Iterable<Long> sizes) {
     long size = 0;
     for (long s : sizes) {
@@ -428,6 +525,15 @@ public class BalancedRedisQueue {
     List<Supplier<Long>> sizes = sizes(pipeline);
     return new Supplier<>() {
       @Override
+      /**
+       * Retrieves a blob from the Content Addressable Storage
+       * @return the queuestatus result
+       */
+      /**
+       * Performs specialized operation based on method logic
+       * @param pipeline the pipeline parameter
+       * @return the supplier<queuestatus> result
+       */
       public Long get() {
         return sizes.stream().map(Supplier::get).mapToLong(Long::longValue).sum();
       }

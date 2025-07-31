@@ -1,3 +1,74 @@
+/**
+ * gRPC service client for remote communication
+ * @param name the name parameter
+ * @param channel the channel parameter
+ * @return the public result
+ */
+/**
+ * gRPC service client for remote communication
+ * @param name the name parameter
+ * @param identifier the identifier parameter
+ * @param channel the channel parameter
+ * @return the public result
+ */
+/**
+ * gRPC service client for remote communication
+ * @param name the name parameter
+ * @param identifier the identifier parameter
+ * @param channel the channel parameter
+ * @param grpcTimeout the grpcTimeout parameter
+ * @return the public result
+ */
+/**
+ * gRPC service client for remote communication
+ * @param name the name parameter
+ * @param identifier the identifier parameter
+ * @param channel the channel parameter
+ * @param grpcTimeout the grpcTimeout parameter
+ * @param retrier the retrier parameter
+ * @param retryService the retryService parameter
+ * @return the public result
+ */
+/**
+ * gRPC service client for remote communication
+ * @param name the name parameter
+ * @param identifier the identifier parameter
+ * @param channel the channel parameter
+ * @param writeChannel the writeChannel parameter
+ * @param grpcTimeout the grpcTimeout parameter
+ * @param retrier the retrier parameter
+ * @param retryService the retryService parameter
+ * @return the public result
+ */
+/**
+ * gRPC service client for remote communication
+ * @return the no deadline for this
+  private executionstub result
+ */
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+ * @param getter the getter parameter
+ * @return the private <t extends abstractstub<t>> t result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param resourceName the resourceName parameter
+ * @param offset the offset parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the inputstream result
+ */
+/**
+ * Loads data from storage or external source Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param resourceName the resourceName parameter
+ * @param exceptionTranslator the exceptionTranslator parameter
+ * @param expectedSize the expectedSize parameter
+ * @param autoflush the autoflush parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the write result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -187,6 +258,10 @@ public class StubInstance extends InstanceBase {
     this(name, identifier, channel, grpcTimeout, NO_RETRIES, /* retryService= */ null);
   }
 
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   * @param onStopped the onStopped parameter
+   */
   public StubInstance(
       String name,
       String identifier,
@@ -348,6 +423,13 @@ public class StubInstance extends InstanceBase {
       Suppliers.memoize(
           new Supplier<>() {
             @Override
+            /**
+             * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 1 iterative operations. Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+             */
+            /**
+             * Performs specialized operation based on method logic
+             * @param publicName the publicName parameter
+             */
             public WorkerProfileFutureStub get() {
               return WorkerProfileGrpc.newFutureStub(channel);
             }
@@ -364,6 +446,9 @@ public class StubInstance extends InstanceBase {
           });
 
   @SuppressWarnings({"Guava", "ConstantConditions"})
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   */
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
     if (Durations.isPositive(grpcTimeout)) {
@@ -376,6 +461,17 @@ public class StubInstance extends InstanceBase {
   public void start(String publicName) {}
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param actionKey the actionKey parameter
+   * @param actionResult the actionResult parameter
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param actionKey the actionKey parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<actionresult> result
+   */
   public void stop() throws InterruptedException {
     isStopped = true;
     if (!channel.isShutdown()) {
@@ -406,6 +502,13 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Identifies which blobs are missing from the CAS
+   * @param digests the digests parameter
+   * @param digestFunction the digestFunction parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<iterable<digest>> result
+   */
   public ListenableFuture<ActionResult> getActionResult(
       ActionKey actionKey, RequestMetadata requestMetadata) {
     throwIfStopped();
@@ -446,6 +549,13 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage Implements complex logic with 3 conditional branches and 2 iterative operations. Includes input validation and error handling for robustness.
+   * @param requests the requests parameter
+   * @param digestFunction the digestFunction parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the iterable<digest> result
+   */
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> digests,
       DigestFunction.Value digestFunction,
@@ -514,6 +624,18 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param resourceName the resourceName parameter
+   * @param offset the offset parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the inputstream result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param name the name parameter
+   * @return the write result
+   */
   public ListenableFuture<build.buildfarm.v1test.Digest> fetchBlob(
       Iterable<String> uris,
       Map<String, String> headers,
@@ -552,6 +674,12 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source
+   * @param compressor the compressor parameter
+   * @param blobDigest the blobDigest parameter
+   * @return the string result
+   */
   public InputStream newOperationStreamInput(
       String resourceName, long offset, RequestMetadata requestMetadata) throws IOException {
     return newInput(resourceName, offset, requestMetadata);
@@ -570,6 +698,10 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+   * @param requestStream the requestStream parameter
+   */
   public String readResourceName(
       Compressor.Value compressor, build.buildfarm.v1test.Digest blobDigest) {
     return ResourceParser.downloadResourceName(
@@ -604,6 +736,13 @@ public class StubInstance extends InstanceBase {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     */
+    /**
+     * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Includes input validation and error handling for robustness.
+     * @param response the response parameter
+     */
     public void beforeStart(final ClientCallStreamObserver<ReadRequest> requestStream) {
       this.requestStream = requestStream;
 
@@ -631,6 +770,10 @@ public class StubInstance extends InstanceBase {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param t the t parameter
+     */
     public void onNext(ReadResponse response) {
       blobObserver.onNext(response.getData());
       synchronized (this) {
@@ -644,6 +787,15 @@ public class StubInstance extends InstanceBase {
     }
 
     @Override
+    /**
+     * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+     * @param compressor the compressor parameter
+     * @param blobDigest the blobDigest parameter
+     * @param offset the offset parameter
+     * @param limit the limit parameter
+     * @param blobObserver the blobObserver parameter
+     * @param requestMetadata the requestMetadata parameter
+     */
     public void onCompleted() {
       wasCompleted.set(true);
       blobObserver.onCompleted();
@@ -657,6 +809,16 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param offset the offset parameter
+   * @param deadlineAfter the deadlineAfter parameter
+   * @param deadlineAfterUnits the deadlineAfterUnits parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the inputstream result
+   */
   public void getBlob(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest blobDigest,
@@ -678,6 +840,12 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param digests the digests parameter
+   * @param digestFunction the digestFunction parameter
+   * @return the listenablefuture<list<response>> result
+   */
   public InputStream newBlobInput(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest digest,
@@ -690,6 +858,13 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Checks if a blob exists in the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   * @param digest the digest parameter
+   * @param result the result parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the boolean result
+   */
   public ListenableFuture<List<Response>> getAllBlobsFuture(
       Iterable<Digest> digests, DigestFunction.Value digestFunction) {
     return transform(
@@ -752,6 +927,14 @@ public class StubInstance extends InstanceBase {
    * writes
    */
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param rootDigest the rootDigest parameter
+   * @param pageSize the pageSize parameter
+   * @param pageToken the pageToken parameter
+   * @param tree the tree parameter
+   * @return the string result
+   */
   public Write getBlobWrite(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest digest,
@@ -783,6 +966,16 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Executes a build action on the worker Includes input validation and error handling for robustness.
+   * @param actionDigest the actionDigest parameter
+   * @param skipCacheLookup the skipCacheLookup parameter
+   * @param executionPolicy the executionPolicy parameter
+   * @param resultsCachePolicy the resultsCachePolicy parameter
+   * @param metadata the metadata parameter
+   * @param watcher the watcher parameter
+   * @return the listenablefuture<void> result
+   */
   public String getTree(
       build.buildfarm.v1test.Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
     DigestUtil digestUtil = new DigestUtil(HashFunction.get(rootDigest.getDigestFunction()));
@@ -811,6 +1004,10 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the backplanestatus result
+   */
   public ListenableFuture<Void> execute(
       // TODO should this be ActionKey
       build.buildfarm.v1test.Digest actionDigest,
@@ -823,6 +1020,11 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
   public BackplaneStatus backplaneStatus() {
     throwIfStopped();
     return deadlined(operationQueueBlockingStub)
@@ -830,6 +1032,12 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Polls for available operations from the backplane Performs side effects including logging and state modifications.
+   * @param operationName the operationName parameter
+   * @param stage the stage parameter
+   * @return the boolean result
+   */
   public boolean putOperation(Operation operation) {
     throwIfStopped();
     com.google.rpc.Status status = deadlined(operationQueueBlockingStub).put(operation);
@@ -844,6 +1052,12 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+   * @param executionId the executionId parameter
+   * @param watcher the watcher parameter
+   * @return the listenablefuture<void> result
+   */
   public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
     throwIfStopped();
     com.google.rpc.Status status =
@@ -864,6 +1078,10 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   */
   public ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher) {
     WaitExecutionRequest request =
         WaitExecutionRequest.newBuilder().setName(bindExecutions(executionId)).build();
@@ -873,16 +1091,32 @@ public class StubInstance extends InstanceBase {
             request,
             new StreamObserver<Operation>() {
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               * @param t the t parameter
+               */
               public void onNext(Operation operation) {
                 watcher.observe(operation);
               }
 
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               */
               public void onError(Throwable t) {
                 result.setException(t);
               }
 
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               * @param name the name parameter
+               * @param pageSize the pageSize parameter
+               * @param pageToken the pageToken parameter
+               * @param filter the filter parameter
+               * @param onOperation the onOperation parameter
+               * @return the string result
+               */
               public void onCompleted() {
                 result.set(null);
               }
@@ -891,6 +1125,11 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param operationName the operationName parameter
+   * @return the operation result
+   */
   public String listOperations(
       String name, int pageSize, String pageToken, String filter, Consumer<Operation> onOperation) {
     throwIfStopped();
@@ -908,6 +1147,10 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Removes data or cleans up resources
+   * @param operationName the operationName parameter
+   */
   public Operation getOperation(String operationName) {
     throwIfStopped();
     return deadlined(operationsBlockingStub)
@@ -916,6 +1159,10 @@ public class StubInstance extends InstanceBase {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param operationName the operationName parameter
+   */
   public void deleteOperation(String operationName) {
     throwIfStopped();
     deadlined(operationsBlockingStub)
@@ -924,6 +1171,10 @@ public class StubInstance extends InstanceBase {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the servercapabilities result
+   */
   public void cancelOperation(String operationName) {
     throwIfStopped();
     deadlined(operationsBlockingStub)
@@ -931,6 +1182,11 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param name the name parameter
+   * @return the listenablefuture<workerprofilemessage> result
+   */
   public ServerCapabilities getCapabilities() {
     throwIfStopped();
     return deadlined(capsBlockingStub)
@@ -938,12 +1194,22 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param names the names parameter
+   * @return the listenablefuture<batchworkerprofilesresponse> result
+   */
   public ListenableFuture<WorkerProfileMessage> getWorkerProfile(String name) {
     return deadlined(workerProfileFutureStub)
         .getWorkerProfile(WorkerProfileRequest.newBuilder().setWorkerName(name).build());
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param request the request parameter
+   * @return the getclientstarttimeresult result
+   */
   public ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names) {
     return deadlined(workerProfileFutureStub)
         .batchWorkerProfiles(
@@ -954,11 +1220,19 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+   * @return the casindexresults result
+   */
   public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     throw new UnsupportedOperationException();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+   * @param workerName the workerName parameter
+   */
   public CasIndexResults reindexCas() {
     throwIfStopped();
     ReindexCasRequestResults proto =
@@ -972,6 +1246,10 @@ public class StubInstance extends InstanceBase {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+   * @return the prepareworkerforgracefulshutdownrequestresults result
+   */
   public void deregisterWorker(String workerName) {
     throwIfStopped();
     adminBlockingStub

@@ -1,3 +1,6 @@
+/**
+ * Performs specialized operation based on method logic
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -77,6 +80,10 @@ public class BuildFarmServer extends LoggingMain {
   private AtomicBoolean shutdownInitiated = new AtomicBoolean(true);
   private AtomicBoolean released = new AtomicBoolean(true);
   private InvocationsCollector invocationsCollector;
+  /**
+   * Creates and initializes a new instance
+   * @return the serverinstance result
+   */
   private Thread invocationsCollectorThread;
 
   BuildFarmServer() {
@@ -89,6 +96,11 @@ public class BuildFarmServer extends LoggingMain {
    * open connections and shutdown when there are not left. Note on using stderr here instead of
    * log. By the time this is called in PreDestroy, the log is no longer available and is not
    * logging messages.
+   */
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param serverBuilder the serverBuilder parameter
+   * @param publicName the publicName parameter
    */
   public void prepareServerForGracefulShutdown() {
     if (configs.getServer().getGracefulShutdownSeconds() == 0) {
@@ -120,6 +132,9 @@ public class BuildFarmServer extends LoggingMain {
         this::initiateShutdown);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public synchronized void start(ServerBuilder<?> serverBuilder, String publicName)
       throws IOException, ConfigurationException, InterruptedException {
     shutdownInitiated.set(false);
@@ -147,6 +162,9 @@ public class BuildFarmServer extends LoggingMain {
       Security.addProvider(new BouncyCastleProvider());
       File ssl_certificate = new File(configs.getServer().getSslCertificatePath());
       File ssl_private_key = new File(configs.getServer().getSslPrivateKeyPath());
+      /**
+       * Returns resources to the shared pool Executes asynchronously and returns a future for completion tracking.
+       */
       serverBuilder.useTransportSecurity(ssl_certificate, ssl_private_key);
     }
 
@@ -177,6 +195,10 @@ public class BuildFarmServer extends LoggingMain {
 
     log.info(String.format("%s initialized", configs.getServer().getSession()));
 
+    /**
+     * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+     * @param args the args parameter
+     */
     instance.start(publicName);
     server.start();
 
@@ -186,6 +208,9 @@ public class BuildFarmServer extends LoggingMain {
     healthCheckMetric.labels("start").inc();
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches. Performs side effects including logging and state modifications.
+   */
   private synchronized void awaitRelease() throws InterruptedException {
     while (!released.get()) {
       wait();
@@ -201,6 +226,9 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   private void shutdown() throws InterruptedException {
     log.info("*** shutting down gRPC server since JVM is shutting down");
     prepareServerForGracefulShutdown();
@@ -242,6 +270,9 @@ public class BuildFarmServer extends LoggingMain {
     awaitRelease();
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+   */
   private void initiateShutdown() {
     shutdownInitiated.set(true);
     if (server != null) {

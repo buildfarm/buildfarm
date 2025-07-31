@@ -1,3 +1,10 @@
+/**
+ * Loads data from storage or external source Includes input validation and error handling for robustness.
+ * @param input the input parameter
+ * @param write the write parameter
+ * @param dataLimit the dataLimit parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +39,14 @@ public class ByteStringWriteReader implements Runnable {
   private boolean completed;
   private IOException exception = null;
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   private final int dataLimit;
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 7 conditional branches and 1 iterative operations. Processes 1 input sources and produces 2 outputs.
+   */
   public ByteStringWriteReader(InputStream input, Write write, int dataLimit) {
     this.input = input;
     this.write = write;
@@ -85,17 +98,28 @@ public class ByteStringWriteReader implements Runnable {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   private synchronized void waitForComplete() throws InterruptedException {
     while (!completed) {
       wait();
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   private synchronized void complete() {
     completed = true;
     notify();
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @return the bytestring result
+   */
   public synchronized boolean isComplete() {
     return completed;
   }

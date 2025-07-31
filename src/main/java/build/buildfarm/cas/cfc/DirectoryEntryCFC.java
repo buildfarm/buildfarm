@@ -1,3 +1,30 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param root the root parameter
+ * @param maxSizeInBytes the maxSizeInBytes parameter
+ * @param maxEntrySizeInBytes the maxEntrySizeInBytes parameter
+ * @param hexBucketLevels the hexBucketLevels parameter
+ * @param expireService the expireService parameter
+ * @param accessRecorder the accessRecorder parameter
+ * @param storage the storage parameter
+ * @param zstdBufferPool the zstdBufferPool parameter
+ * @param onPut the onPut parameter
+ * @param onExpire the onExpire parameter
+ * @param delegate the delegate parameter
+ * @param delegateSkipLoad the delegateSkipLoad parameter
+ * @param externalInputStreamFactory the externalInputStreamFactory parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+ * @param 0 the 0 parameter
+ * @return the this is now a little gross result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param cacheScanResults the cacheScanResults parameter
+ * @return the list<path> result
+ */
 // Copyright 2024 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -66,8 +93,19 @@ import lombok.extern.java.Log;
 
 @Log
 public class DirectoryEntryCFC extends CASFileCache {
+  /**
+   * Stores a blob in the Content Addressable Storage Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications.
+   * @param path the path parameter
+   * @param invalidDirectories the invalidDirectories parameter
+   */
   private final Cache<Digest, ListenableFuture<Void>> fetchers = CacheBuilder.newBuilder().build();
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param file the file parameter
+   * @param attrs the attrs parameter
+   * @return the filevisitresult result
+   */
   public DirectoryEntryCFC(
       Path root,
       long maxSizeInBytes,
@@ -100,6 +138,12 @@ public class DirectoryEntryCFC extends CASFileCache {
 
   // needs to delete directories which have multiple references (link count > 1)
 
+  /**
+   * Updates reference counts for cache entry lifecycle
+   * @param dst the dst parameter
+   * @param src the src parameter
+   * @param isExecutable the isExecutable parameter
+   */
   private void computeDirectory(Path path, ImmutableList.Builder<Path> invalidDirectories) {
     String key = path.getFileName().toString();
     try {
@@ -108,6 +152,13 @@ public class DirectoryEntryCFC extends CASFileCache {
           path,
           new SimpleFileVisitor<>() {
             @Override
+            /**
+             * Stores a blob in the Content Addressable Storage Implements complex logic with 5 conditional branches and 1 iterative operations. Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 5 outputs. Includes input validation and error handling for robustness.
+             * @param digest the digest parameter
+             * @param directoriesIndex the directoriesIndex parameter
+             * @param service the service parameter
+             * @return the listenablefuture<pathresult> result
+             */
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
               // a bold option here: if we're dealing with a Legacy multi-link directory
               // there will never be an overcharge on the committed size, and this directory
@@ -142,6 +193,10 @@ public class DirectoryEntryCFC extends CASFileCache {
   }
 
   @Override
+  /**
+   * Removes expired entries from the cache to free space Performs side effects including logging and state modifications.
+   * @param expiredKey the expiredKey parameter
+   */
   protected List<Path> computeDirectories(CacheScanResults cacheScanResults)
       throws InterruptedException {
     // create thread pool
@@ -169,6 +224,11 @@ public class DirectoryEntryCFC extends CASFileCache {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+   * @param future the future parameter
+   * @return the t result
+   */
   private void copyLocalFileAndDereference(Path dst, Path src, boolean isExecutable)
       throws IOException {
     // consider charging here, maybe we deserve a digest size...
@@ -182,6 +242,14 @@ public class DirectoryEntryCFC extends CASFileCache {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param path the path parameter
+   * @param digest the digest parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param service the service parameter
+   * @return the listenablefuture<void> result
+   */
   private <T> T getCompleted(ListenableFuture<? extends T> future) {
     checkState(future.isDone());
     try {
@@ -194,6 +262,14 @@ public class DirectoryEntryCFC extends CASFileCache {
     }
   }
 
+  /**
+   * Loads data from storage or external source Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 3 outputs.
+   * @param path the path parameter
+   * @param digest the digest parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param service the service parameter
+   * @return the listenablefuture<long> result
+   */
   private ListenableFuture<Void> add(
       Path path,
       Digest digest,
@@ -304,6 +380,12 @@ public class DirectoryEntryCFC extends CASFileCache {
         service);
   }
 
+  /**
+   * Updates reference counts for cache entry lifecycle
+   * @param inputFiles the inputFiles parameter
+   * @param inputDirectories the inputDirectories parameter
+   * @param digestFunction the digestFunction parameter
+   */
   public ListenableFuture<PathResult> putDirectory(
       Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
@@ -378,6 +460,12 @@ public class DirectoryEntryCFC extends CASFileCache {
       notify();
     }
     // this is very funky as is, it smells like something we should elevate to parent
+    /**
+     * Removes expired entries from the cache to free space Performs side effects including logging and state modifications.
+     * @param entry the entry parameter
+     * @param service the service parameter
+     * @return the list<listenablefuture<void>> result
+     */
     // even funkier with the synchronized requirement
   }
 

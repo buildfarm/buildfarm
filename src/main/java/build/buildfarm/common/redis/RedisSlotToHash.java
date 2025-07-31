@@ -85,6 +85,12 @@ public class RedisSlotToHash {
    * @return The string value to be used in a key's hashtag.
    * @note Suggested return identifier: hashtag.
    */
+  /**
+   * Checks if a blob exists in the Content Addressable Storage
+   * @param slotRanges the slotRanges parameter
+   * @param slot the slot parameter
+   * @return the boolean result
+   */
   public static String correlateRangesWithPrefix(Iterable<List<Long>> slotRanges, String prefix) {
     Preconditions.checkState(
         all(slotRanges, slotRange -> slotRange.size() == 2)

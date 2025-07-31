@@ -1,3 +1,18 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param bsBlockingStub the bsBlockingStub parameter
+ * @param bsStub the bsStub parameter
+ * @param resourceName the resourceName parameter
+ * @param exceptionTranslator the exceptionTranslator parameter
+ * @param expectedSize the expectedSize parameter
+ * @param autoflush the autoflush parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the expect that we are completed in this case result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,6 +66,10 @@ import lombok.extern.java.Log;
 /** This object cannot be reused beyond a single stream error. */
 @Log
 public class StubWriteOutputStream extends FeedbackOutputStream implements Write {
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+   * @return the querywritestatusresponse result
+   */
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
 
   private static final int CHUNK_SIZE = 16 * 1024;
@@ -73,6 +92,11 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private boolean wasReset = false;
 
   @SuppressWarnings("Guava")
+  /**
+   * Performs specialized operation based on method logic
+   * @param expectedSize the expectedSize parameter
+   * @return the int result
+   */
   private final Supplier<QueryWriteStatusResponse> writeStatus =
       Suppliers.memoize(
           new Supplier<>() {
@@ -115,6 +139,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private TimeUnit deadlineAfterUnits = null;
   private Runnable onReadyHandler = null;
 
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Includes input validation and error handling for robustness.
+   * @param finishWrite the finishWrite parameter
+   */
   private static int chunkSize(long expectedSize) {
     if (expectedSize == COMPRESSED_EXPECTED_SIZE) {
       return CHUNK_SIZE;
@@ -123,6 +151,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @SuppressWarnings("Guava")
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   */
   public StubWriteOutputStream(
       Supplier<ByteStreamBlockingStub> bsBlockingStub,
       Supplier<ByteStreamStub> bsStub,
@@ -140,6 +171,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void close() throws IOException {
     StreamObserver<WriteRequest> finishedWriteObserver;
     boolean cancelled = false;
@@ -165,6 +199,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     }
   }
 
+  /**
+   * Validates input parameters and state consistency Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 2 outputs. Includes input validation and error handling for robustness.
+   * @return the boolean result
+   */
   private void flushSome(boolean finishWrite) {
     WriteRequest.Builder request =
         WriteRequest.newBuilder()
@@ -190,6 +228,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param requestStream the requestStream parameter
+   */
   public void flush() throws IOException {
     if (!checkComplete() && bufferOffset != 0) {
       initiateWrite();
@@ -197,6 +239,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     }
   }
 
+  /**
+   * Persists data to storage or external destination Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   */
   private boolean checkComplete() throws IOException {
     try {
       if (writeFuture.isDone()) {
@@ -226,6 +271,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
               .write(
                   new ClientResponseObserver<WriteRequest, WriteResponse>() {
                     @Override
+                    /**
+                     * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+                     * @param response the response parameter
+                     */
                     public void beforeStart(ClientCallStreamObserver<WriteRequest> requestStream) {
                       requestStream.setOnReadyHandler(
                           () -> {
@@ -236,6 +285,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
                     }
 
                     @Override
+                    /**
+                     * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+                     * @param t the t parameter
+                     */
                     public void onNext(WriteResponse response) {
                       long committedSize = response.getCommittedSize();
                       if (expectedSize != UNLIMITED_EXPECTED_SIZE
@@ -251,6 +304,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
                     }
 
                     @Override
+                    /**
+                     * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+                     */
                     public void onError(Throwable t) {
                       if (Status.fromThrowable(t).getCode() != Code.CANCELLED) {
                         log.log(
@@ -266,6 +322,12 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
                     }
 
                     @Override
+                    /**
+                     * Persists data to storage or external destination Implements complex logic with 4 conditional branches and 1 iterative operations. Includes input validation and error handling for robustness.
+                     * @param b the b parameter
+                     * @param off the off parameter
+                     * @param len the len parameter
+                     */
                     public void onCompleted() {
                       synchronized (StubWriteOutputStream.this) {
                         writeObserver = null;
@@ -276,6 +338,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination Includes input validation and error handling for robustness.
+   * @param b the b parameter
+   */
   public void write(byte[] b, int off, int len) throws IOException {
     if (isComplete()) {
       throw new WriteCompleteException();
@@ -311,6 +377,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
+  /**
+   * Loads data from storage or external source Includes input validation and error handling for robustness.
+   * @return the boolean result
+   */
   public void write(int b) throws IOException {
     if (isComplete()) {
       throw new WriteCompleteException();
@@ -324,6 +394,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 2 input sources and produces 3 outputs. Includes input validation and error handling for robustness.
+   * @return the long result
+   */
   public synchronized boolean isReady() {
     checkNotNull(writeObserver);
     ClientCallStreamObserver<WriteRequest> clientCallStreamObserver =
@@ -334,6 +408,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   // Write methods
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public long getCommittedSize() {
     try {
       if (checkComplete()) {
@@ -355,6 +433,14 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param offset the offset parameter
+   * @param deadlineAfter the deadlineAfter parameter
+   * @param deadlineAfterUnits the deadlineAfterUnits parameter
+   * @param onReadyHandler the onReadyHandler parameter
+   * @return the feedbackoutputstream result
+   */
   public boolean isComplete() {
     try {
       return checkComplete();
@@ -365,6 +451,14 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param offset the offset parameter
+   * @param deadlineAfter the deadlineAfter parameter
+   * @param deadlineAfterUnits the deadlineAfterUnits parameter
+   * @param onReadyHandler the onReadyHandler parameter
+   * @return the listenablefuture<feedbackoutputstream> result
+   */
   public FeedbackOutputStream getOutput(
       long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     // should we be exclusive on return here?
@@ -381,6 +475,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public ListenableFuture<FeedbackOutputStream> getOutputFuture(
       long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     return immediateFuture(getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));

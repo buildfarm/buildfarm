@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,13 +30,29 @@ import com.google.rpc.Status;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
 
+/**
+ * Performs specialized operation based on method logic
+ * @param actionDigest the actionDigest parameter
+ * @return the string result
+ */
 public final class Actions {
   private Actions() {}
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionDigest the actionDigest parameter
+   * @param failure the failure parameter
+   * @return the string result
+   */
   public static String invalidActionMessage(Digest actionDigest) {
     return format("Action %s is invalid", DigestUtil.toString(actionDigest));
   }
 
+  /**
+   * Validates input parameters and state consistency
+   * @param actionDigest the actionDigest parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
   public static String invalidActionVerboseMessage(
       Digest actionDigest, PreconditionFailure failure) {
     // if the list of violations get very long, display 3 at most
@@ -48,6 +68,11 @@ public final class Actions {
     return format(format, DigestUtil.toString(actionDigest), String.join("; ", errorMessages));
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   * @return the status result
+   */
   public static void checkPreconditionFailure(
       Digest actionDigest, PreconditionFailure preconditionFailure) throws StatusException {
     if (preconditionFailure.getViolationsCount() != 0) {
@@ -60,6 +85,11 @@ public final class Actions {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 2 iterative operations.
+   * @param status the status parameter
+   * @return the boolean result
+   */
   public static Status asExecutionStatus(Throwable t) {
     Status.Builder status = Status.newBuilder();
     io.grpc.Status grpcStatus = io.grpc.Status.fromThrowable(t);

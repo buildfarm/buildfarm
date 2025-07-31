@@ -1,3 +1,8 @@
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param name the name parameter
+ * @return the userprincipal result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,16 +50,28 @@ class FuseExecFileSystem implements ExecFileSystem {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param onDigests the onDigests parameter
+   * @param skipLoad the skipLoad parameter
+   */
   public UserPrincipal getOwner(String name) {
     return null;
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void start(Consumer<List<Digest>> onDigests, boolean skipLoad) {
     // onDigests.accept(storage.getAllDigests());
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the path result
+   */
   public void stop() {
     fuseCAS.stop();
   }
@@ -65,17 +82,39 @@ class FuseExecFileSystem implements ExecFileSystem {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param offset the offset parameter
+   * @return the inputstream result
+   */
   public ContentAddressableStorage getStorage() {
     return storage;
   }
 
   @Override
+  /**
+   * Creates and initializes a new instance
+   * @param operationName the operationName parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param digestFunction the digestFunction parameter
+   * @param action the action parameter
+   * @param command the command parameter
+   * @param owner the owner parameter
+   * @param workerExecutedMetadata the workerExecutedMetadata parameter
+   * @return the path result
+   */
   public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
       throws IOException {
     return storage.newInput(compressor, digest, offset);
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionRoot the actionRoot parameter
+   */
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,

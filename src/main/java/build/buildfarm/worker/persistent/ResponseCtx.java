@@ -1,3 +1,9 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param response the response parameter
+ * @param errorString the errorString parameter
+ * @return the public result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

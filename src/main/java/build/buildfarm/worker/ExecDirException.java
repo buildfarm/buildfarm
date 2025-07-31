@@ -1,3 +1,22 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param digest the digest parameter
+ * @param path the path parameter
+ * @param isExecutable the isExecutable parameter
+ * @param cause the cause parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param path the path parameter
+ * @param exceptions the exceptions parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param putDirException the putDirException parameter
+ * @return the else result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,13 +56,30 @@ import lombok.extern.java.Log;
 @Log
 public class ExecDirException extends IOException {
   private final Path path;
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param path the path parameter
+   * @param isExecutable the isExecutable parameter
+   * @return the string result
+   */
   private final List<Throwable> exceptions;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param violation the violation parameter
+   * @param cause the cause parameter
+   * @param path the path parameter
+   * @param isExecutable the isExecutable parameter
+   */
   public static class ViolationException extends Exception {
     private final Digest digest;
     private final Path path;
     private final boolean isExecutable;
 
+    /**
+     * Retrieves a blob from the Content Addressable Storage
+     * @return the violation result
+     */
     public ViolationException(Digest digest, Path path, boolean isExecutable, Throwable cause) {
       super(cause);
       this.digest = digest;
@@ -58,6 +94,12 @@ public class ExecDirException extends IOException {
       return MISSING_INPUT;
     }
 
+    /**
+     * Retrieves a blob from the Content Addressable Storage
+     * @param path the path parameter
+     * @param exceptions the exceptions parameter
+     * @return the string result
+     */
     static void toViolation(
         Violation.Builder violation, Throwable cause, Path path, boolean isExecutable) {
       if (cause instanceof NoSuchFileException || cause instanceof BlobNotFoundException) {

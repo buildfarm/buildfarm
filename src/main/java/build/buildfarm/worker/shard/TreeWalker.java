@@ -1,3 +1,25 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param fileNode the fileNode parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param directoryNode the directoryNode parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param symlinkNode the symlinkNode parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the directory result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param file the file parameter
+ * @param attrs the attrs parameter
+ * @return the filevisitresult result
+ */
 // Copyright 2024 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -79,6 +101,10 @@ class TreeWalker extends SimpleFileVisitor<Path> {
   private Tree.Builder treeBuilder = null;
   private OutputDirectoryContext currentDirectory = null;
   private Tree tree = null;
+  /**
+   * Performs specialized operation based on method logic
+   * @param file the file parameter
+   */
   private Path root = null;
 
   TreeWalker(
@@ -94,6 +120,12 @@ class TreeWalker extends SimpleFileVisitor<Path> {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param dir the dir parameter
+   * @param attrs the attrs parameter
+   * @return the filevisitresult result
+   */
   public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
     if (createSymlinkOutputs && attrs.isSymbolicLink()) {
       visitSymbolicLink(file);
@@ -103,6 +135,10 @@ class TreeWalker extends SimpleFileVisitor<Path> {
     return FileVisitResult.CONTINUE;
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param file the file parameter
+   */
   private void visitSymbolicLink(Path file) throws IOException {
     // TODO convert symlinks with absolute targets within execution root to relative ones
     currentDirectory.addSymlink(
@@ -143,6 +179,12 @@ class TreeWalker extends SimpleFileVisitor<Path> {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param dir the dir parameter
+   * @param exc the exc parameter
+   * @return the filevisitresult result
+   */
   public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
     path.push(currentDirectory);
     if (currentDirectory == null) {

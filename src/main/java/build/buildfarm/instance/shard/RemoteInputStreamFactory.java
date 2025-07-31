@@ -1,3 +1,17 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param publicName the publicName parameter
+ * @param backplane the backplane parameter
+ * @param rand the rand parameter
+ * @param workerStubs the workerStubs parameter
+ * @param onUnavailable the onUnavailable parameter
+ * @return the public result
+ */
+/**
+ * Completion handler for asynchronous operations Executes asynchronously and returns a future for completion tracking.
+ * @return the populatedworkerlistfuture,
+        new result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -66,6 +80,22 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
   private final Backplane backplane;
   private final Random rand;
   private final LoadingCache<String, StubInstance> workerStubs;
+  /**
+   * Loads data from storage or external source Implements complex logic with 6 conditional branches and 1 iterative operations. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param compressor the compressor parameter
+   * @param blobDigest the blobDigest parameter
+   * @param workers the workers parameter
+   * @param offset the offset parameter
+   * @param deadlineAfter the deadlineAfter parameter
+   * @param deadlineAfterUnits the deadlineAfterUnits parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the inputstream result
+   */
+  /**
+   * gRPC service client for remote communication Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param worker the worker parameter
+   * @return the instance result
+   */
   private final UnavailableConsumer onUnavailable;
 
   RemoteInputStreamFactory(
@@ -83,6 +113,23 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
       Random rand,
       LoadingCache<String, StubInstance> workerStubs,
       UnavailableConsumer onUnavailable) {
+    /**
+     * Stores a blob in the Content Addressable Storage Implements complex logic with 7 conditional branches and 1 iterative operations. Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 2 outputs. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+     * @param compressor the compressor parameter
+     * @param blobDigest the blobDigest parameter
+     * @param offset the offset parameter
+     * @param deadlineAfter the deadlineAfter parameter
+     * @param deadlineAfterUnits the deadlineAfterUnits parameter
+     * @param requestMetadata the requestMetadata parameter
+     * @return the inputstream result
+     */
+    /**
+     * Stores a blob in the Content Addressable Storage
+     * @param compressor the compressor parameter
+     * @param blobDigest the blobDigest parameter
+     * @param offset the offset parameter
+     * @return the inputstream result
+     */
     this.publicName = publicName;
     this.backplane = backplane;
     this.rand = rand;
@@ -177,6 +224,10 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     }
 
     if (publicName != null && locationSet.remove(publicName)) {
+      /**
+       * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+       * @param workers the workers parameter
+       */
       backplane.removeBlobLocation(blobDigest, publicName);
     }
     List<String> workersList = new ArrayList<>(locationSet);
@@ -208,6 +259,10 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
           boolean triedCheck = emptyWorkerList;
 
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param t the t parameter
+           */
           public void onQueue(Deque<String> workers) {
             Set<String> locationSet = Sets.newHashSet(workers);
             boolean complete = false;

@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +26,11 @@ import com.google.common.collect.MultimapBuilder;
 
 public final class ExecutionPolicies {
   private static final String EXECUTION_POLICY_PROPERTY_NAME = "execution-policy";
+  /**
+   * Performs specialized operation based on method logic
+   * @param policies the policies parameter
+   * @return the listmultimap<string, executionpolicy> result
+   */
   private static final String DEFAULT_EXECUTION_POLICY_NAME = "";
 
   private ExecutionPolicies() {}
@@ -31,6 +40,12 @@ public final class ExecutionPolicies {
     Iterable<ExecutionPolicy> get(String name);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param platform the platform parameter
+   * @param policiesIndex the policiesIndex parameter
+   * @return the iterable<executionpolicy> result
+   */
   public static ListMultimap<String, ExecutionPolicy> toMultimap(
       Iterable<ExecutionPolicy> policies) {
     ListMultimap<String, ExecutionPolicy> multimap =
@@ -41,6 +56,12 @@ public final class ExecutionPolicies {
     return multimap;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param platform the platform parameter
+   * @param policies the policies parameter
+   * @return the platform result
+   */
   public static Iterable<ExecutionPolicy> forPlatform(
       Platform platform, ExecutionPoliciesIndex policiesIndex) {
     ImmutableList.Builder<ExecutionPolicy> policies = ImmutableList.builder();

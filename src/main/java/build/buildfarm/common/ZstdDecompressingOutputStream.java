@@ -1,3 +1,33 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param capacity the capacity parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param pool the pool parameter
+ * @return the public result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage Processes 1 input sources and produces 1 outputs.
+ * @param out the out parameter
+ * @param pool the pool parameter
+ /**
+  * Performs specialized operation based on method logic
+  * @param buffer the buffer parameter
+  * @return the pooledobject<bytebuffer> result
+  */
+ /**
+  * Creates and initializes a new instance
+  * @return the bytebuffer result
+  */
+ * @return the public result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage Processes 1 input sources and produces 1 outputs.
+ * @param InputStream( the InputStream( parameter
+ * @return the new result
+ */
 // Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +46,11 @@
 package build.buildfarm.common;
 
 import static com.google.common.base.Preconditions.checkState;
+/**
+ * Creates and initializes a new instance
+ * @param capacity the capacity parameter
+ * @return the genericobjectpoolconfig<bytebuffer> result
+ */
 import static com.google.common.base.Throwables.throwIfUnchecked;
 
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -63,6 +98,11 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
       return poolConfig;
     }
 
+    /**
+     * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+     * @param bufferSize the bufferSize parameter
+     * @return the bytebuffer result
+     */
     public FixedBufferPool(int capacity) {
       super(new ZstdDInBufferFactory(), createPoolConfig(capacity));
     }
@@ -76,6 +116,10 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
     }
 
     @Override
+    /**
+     * Returns resources to the shared pool Includes input validation and error handling for robustness.
+     * @param buffer the buffer parameter
+     */
     public ByteBuffer get(int bufferSize) {
       // guaranteed through final
       checkState(bufferSize > 0 && bufferSize <= ZstdDInBufferFactory.getBufferSize());
@@ -98,17 +142,32 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
     }
   }
 
+  /**
+   * Loads data from storage or external source Processes 1 input sources and produces 1 outputs.
+   * @return the int result
+   */
   public ZstdDecompressingOutputStream(OutputStream out, FixedBufferPool pool) throws IOException {
     this.out = out;
     zis =
         new ZstdInputStreamNoFinalizer(
                 new InputStream() {
                   @Override
+                  /**
+                   * Loads data from storage or external source Processes 1 input sources and produces 1 outputs.
+                   * @param b the b parameter
+                   * @param off the off parameter
+                   * @param len the len parameter
+                   * @return the int result
+                   */
                   public int read() {
                     return inner.read();
                   }
 
                   @Override
+                  /**
+                   * Persists data to storage or external destination
+                   * @param b the b parameter
+                   */
                   public int read(byte[] b, int off, int len) {
                     return inner.read(b, off, len);
                   }
@@ -118,16 +177,29 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination
+   * @param b the b parameter
+   */
   public void write(int b) throws IOException {
     write(new byte[] {(byte) b}, 0, 1);
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination Processes 1 input sources and produces 1 outputs.
+   * @param b the b parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   */
   public void write(byte[] b) throws IOException {
     write(b, 0, b.length);
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void write(byte[] b, int off, int len) throws IOException {
     inner = new ByteArrayInputStream(b, off, len);
     byte[] data = ByteString.readFrom(zis).toByteArray();
@@ -135,6 +207,10 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source
+   * @return the boolean result
+   */
   public void close() throws IOException {
     zis.close();
     out.close();

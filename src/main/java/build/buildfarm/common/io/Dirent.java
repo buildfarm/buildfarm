@@ -44,6 +44,11 @@ public final class Dirent implements Serializable, Comparable<Dirent> {
   @EqualsAndHashCode.Exclude @ToString.Exclude @Nullable private final FileStatus stat;
 
   /** Creates a new dirent with the given name and type, both of which must be non-null. */
+  /**
+   * Performs specialized operation based on method logic
+   * @param other the other parameter
+   * @return the int result
+   */
   public Dirent(String name, Type type, @Nullable FileStatus stat) {
     this.name = checkNotNull(name);
     this.type = checkNotNull(type);

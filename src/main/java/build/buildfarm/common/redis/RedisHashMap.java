@@ -1,3 +1,16 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param jedis the jedis parameter
+ * @param hashCursor the hashCursor parameter
+ * @param count the count parameter
+ * @return the string>> result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param cursor the cursor parameter
+ * @param remaining the remaining parameter
+ * @return the string>> result
+ */
 // Copyright 2022 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,6 +73,13 @@ public class RedisHashMap {
    * @return Whether a new key was inserted. If a key is overwritten with a new value, this would be
    *     false.
    */
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param key the key parameter
+   * @param value the value parameter
+   * @return the response<long> result
+   */
   public boolean insert(UnifiedJedis jedis, String key, String value) {
     return jedis.hset(name, key, value) == 1;
   }
@@ -107,6 +127,11 @@ public class RedisHashMap {
    * @details Deletes the key/value pairs.
    * @param jedis Jedis cluster client.
    * @param key The names of the keys.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param pipeline the pipeline parameter
+   * @return the response<long> result
    */
   public void remove(UnifiedJedis jedis, Iterable<String> keys) {
     try (AbstractPipeline p = jedis.pipelined()) {

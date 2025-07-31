@@ -1,3 +1,54 @@
+/**
+ * Handles streaming responses from gRPC calls
+ * @param instance the instance parameter
+ * @param deadlineAfter the deadlineAfter parameter
+ * @param deadlineAfterUnits the deadlineAfterUnits parameter
+ * @param requestNext the requestNext parameter
+ * @param responseObserver the responseObserver parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param request the request parameter
+ */
+/**
+ * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+ * @param committedSize the committedSize parameter
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param committedSize the committedSize parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param committedSize the committedSize parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param Compressor.Value.IDENTITY the Compressor.Value.IDENTITY parameter
+ * @return the is always uncompressed, per both the document above and client upload resumption result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param Compressor.Value.IDENTITY the Compressor.Value.IDENTITY parameter
+ * @return the for compressed here result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param Write.COMPRESSED_EXPECTED_SIZE the Write.COMPRESSED_EXPECTED_SIZE parameter
+ * @return the relying on other threads to close us out if the compressed stream has been closed early result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param Compressor.Value.IDENTITY the Compressor.Value.IDENTITY parameter
+ * @return the sequence result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the we were already cancelled in this case result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -53,6 +104,10 @@ import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
 
 @Log
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param request the request parameter
+ */
 public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Histogram ioMetric =
       Histogram.build()
@@ -85,6 +140,11 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private long requestCount = 0;
   private long requestBytes = 0;
   private long initialWriteOffset = 0;
+  /**
+   * Retrieves a blob from the Content Addressable Storage Implements complex logic with 4 conditional branches and 1 iterative operations.
+   * @param resourceName the resourceName parameter
+   * @return the write result
+   */
   private Compressor.Value compressor;
 
   public WriteStreamObserver(
@@ -102,6 +162,18 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param committedSize the committedSize parameter
+   */
+  /**
+   * Thread-safe access to shared resources Implements complex logic with 4 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param committedSize the committedSize parameter
+   */
   public synchronized void onNext(WriteRequest request) {
     if (!committed) {
       try {
@@ -130,6 +202,10 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches and 1 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param request the request parameter
+   */
   private Write getWrite(String resourceName)
       throws EntryLimitException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
@@ -202,6 +278,22 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
+  /**
+   * Persists data to storage or external destination Performs side effects including logging and state modifications.
+   * @param request the request parameter
+   * @param e the e parameter
+   */
+  /**
+   * Persists data to storage or external destination Performs side effects including logging and state modifications.
+   * @param level the level parameter
+   * @param activity the activity parameter
+   * @param t the t parameter
+   */
+  /**
+   * Persists data to storage or external destination
+   * @param activity the activity parameter
+   * @param t the t parameter
+   */
   private void initialize(WriteRequest request) throws InvalidResourceNameException {
     String resourceName = request.getResourceName();
     if (resourceName.isEmpty()) {
@@ -231,6 +323,10 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
               @SuppressWarnings("NullableProblems")
               @Override
+              /**
+               * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+               * @param t the t parameter
+               */
               public void onFailure(Throwable t) {
                 if (errorResponse(t)) {
                   logWriteActivity("completing", t);
@@ -252,6 +348,11 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 1 iterative operations. Performs side effects including logging and state modifications.
+   * @param t the t parameter
+   * @return the boolean result
+   */
   private void logWriteActivity(String activity, Throwable t) {
     logWriteActivity(Level.SEVERE, activity, t);
   }
@@ -283,6 +384,15 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
         e);
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param offset the offset parameter
+   * @return the long result
+   */
+  /**
+   * Processes the operation according to configured logic
+   * @param request the request parameter
+   */
   private boolean errorResponse(Throwable t) {
     if (exception.compareAndSet(null, t)) {
       if (Status.fromThrowable(t).getCode() == Status.Code.CANCELLED
@@ -320,6 +430,13 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
+  /**
+   * Processes the operation according to configured logic Implements complex logic with 14 conditional branches and 4 iterative operations. Performs side effects including logging and state modifications.
+   * @param resourceName the resourceName parameter
+   * @param offset the offset parameter
+   * @param data the data parameter
+   * @param finishWrite the finishWrite parameter
+   */
   private void handleRequest(WriteRequest request) throws EntryLimitException {
     String resourceName = request.getResourceName();
     if (resourceName.isEmpty()) {
@@ -354,6 +471,9 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   private void handleWrite(String resourceName, long offset, ByteString data, boolean finishWrite)
       throws EntryLimitException {
     long committedSize;
@@ -435,6 +555,11 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
+  /**
+   * Persists data to storage or external destination Performs side effects including logging and state modifications.
+   * @param offset the offset parameter
+   * @param data the data parameter
+   */
   private void close() {
     log.log(Level.FINEST, format("closing stream due to finishWrite for %s", name));
     try {
@@ -453,6 +578,13 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
+  /**
+   * Loads data from storage or external source
+   * @param out the out parameter
+   */
+  /**
+   * Creates and initializes a new instance
+   */
   private void writeData(long offset, ByteString data) throws EntryLimitException {
     try {
       data.writeTo(getOutput(offset));
@@ -469,6 +601,9 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
+  /**
+   * Loads data from storage or external source Performs side effects including logging and state modifications.
+   */
   private void onNewlyReadyRequestNext() {
     if (wasReady.compareAndSet(false, true)) {
       requestNext.run();
@@ -484,6 +619,11 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
+  /**
+   * Retrieves a blob from the Content Addressable Storage Implements complex logic with 5 conditional branches and 1 iterative operations. Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param offset the offset parameter
+   * @return the feedbackoutputstream result
+   */
   private void requestNextIfReady() {
     try {
       requestNextIfReady(getOutput(earliestOffset));
@@ -526,6 +666,9 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   public void onError(Throwable t) {
     log.log(Level.FINER, format("write error for %s", name), t);
   }

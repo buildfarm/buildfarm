@@ -1,3 +1,9 @@
+/**
+ * Matches worker capabilities with operation requirements
+ * @param actual the actual parameter
+ * @param expected the expected parameter
+ * @return the public result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

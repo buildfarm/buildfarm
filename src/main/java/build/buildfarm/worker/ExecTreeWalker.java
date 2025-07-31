@@ -1,3 +1,42 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param type the type parameter
+ * @param path the path parameter
+ * @param attributes the attributes parameter
+ * @param ioe the ioe parameter
+ * @return the private result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param type the type parameter
+ * @param path the path parameter
+ * @param attributes the attributes parameter
+ * @return the private result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param path the path parameter
+ * @param attributes the attributes parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param file the file parameter
+ * @param digest the digest parameter
+ * @return the event result
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches and 2 iterative operations.
+ * @return the event result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the creating corresponding event result
+ */
 package build.buildfarm.worker;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -52,6 +91,9 @@ class ExecTreeWalker implements Closeable {
     private final Path path;
     private final BasicFileAttributes attributes;
 
+    /**
+     * Performs specialized operation based on method logic
+     */
     public Entry(Path path, BasicFileAttributes attributes) {
       this.path = checkNotNull(path);
       this.attributes = checkNotNull(attributes);
@@ -81,6 +123,11 @@ class ExecTreeWalker implements Closeable {
   private final Map<Digest, Directory> index;
   private final DigestFunction.Value digestFunction;
   private final ArrayDeque<DirectoryNode> stack = new ArrayDeque<>();
+  /**
+   * Performs specialized operation based on method logic
+   * @param entry the entry parameter
+   * @return the event result
+   */
   private boolean closed;
 
   ExecTreeWalker(Map<Digest, Directory> index, DigestFunction.Value digestFunction) {

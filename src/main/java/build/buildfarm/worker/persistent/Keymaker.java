@@ -1,3 +1,27 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param opRoot the opRoot parameter
+ * @param workRootsDir the workRootsDir parameter
+ * @param workerInitCmd the workerInitCmd parameter
+ * @param workerInitArgs the workerInitArgs parameter
+ * @param workerEnv the workerEnv parameter
+ * @param executionName the executionName parameter
+ * @param workerFiles the workerFiles parameter
+ * @return the constructs a key with its worker tool input files being relative paths
+  public static workerkey result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param workRootsDir the workRootsDir parameter
+ * @param workerInitCmd the workerInitCmd parameter
+ * @param workerInitArgs the workerInitArgs parameter
+ * @param workerEnv the workerEnv parameter
+ * @param executionName the executionName parameter
+ * @param sandboxed the sandboxed parameter
+ * @param cancellable the cancellable parameter
+ * @return the hash of a subset of the workerkey
+  private static path result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -70,6 +94,11 @@ public class Keymaker {
   }
 
   // Hash of a subset of the WorkerKey
+  /**
+   * Performs specialized operation based on method logic
+   * @param workerFiles the workerFiles parameter
+   * @return the immutablesortedmap<path, hashcode> result
+   */
   private static Path calculateWorkRoot(
       Path workRootsDir,
       ImmutableList<String> workerInitCmd,
@@ -83,6 +112,12 @@ public class Keymaker {
     return workRootsDir.resolve(workRootDirName);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param toolsRoot the toolsRoot parameter
+   * @param hashedTools the hashedTools parameter
+   * @return the hashcode result
+   */
   private static ImmutableSortedMap<Path, HashCode> workerFilesWithHashes(
       WorkerInputs workerFiles) {
     ImmutableSortedMap.Builder<Path, HashCode> workerFileHashBuilder =

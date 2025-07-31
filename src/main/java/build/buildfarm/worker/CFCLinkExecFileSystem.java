@@ -1,3 +1,29 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param root the root parameter
+ * @param fileCache the fileCache parameter
+ * @param owners the owners parameter
+ * @param linkInputDirectories the linkInputDirectories parameter
+ * @param linkedInputDirectories the linkedInputDirectories parameter
+ * @param allowSymlinkTargetAbsolute the allowSymlinkTargetAbsolute parameter
+ * @param removeDirectoryService the removeDirectoryService parameter
+ * @param accessRecorder the accessRecorder parameter
+ * @param fetchService the fetchService parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the skip this search if all the directories are real result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @return the list<string> result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the unlikely, but worth guarding result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -72,9 +98,25 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
 
   private final Map<Path, DigestFunction.Value> rootInputDigestFunction = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
+  /**
+   * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param digest the digest parameter
+   * @param path the path parameter
+   * @param isExecutable the isExecutable parameter
+   * @param onKey the onKey parameter
+   * @return the listenablefuture<void> result
+   */
   private final Map<Path, Iterable<build.bazel.remote.execution.v2.Digest>> rootInputDirectories =
       new ConcurrentHashMap<>();
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the string result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public CFCLinkExecFileSystem(
       Path root,
       CASFileCache fileCache,
@@ -98,6 +140,22 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   }
 
   @SuppressWarnings("ConstantConditions")
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param execPath the execPath parameter
+   * @param digest the digest parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @return the listenablefuture<pathresult> result
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param digest the digest parameter
+   * @param root the root parameter
+   * @param path the path parameter
+   * @param isExecutable the isExecutable parameter
+   * @param onKey the onKey parameter
+   * @return the listenablefuture<void> result
+   */
   private ListenableFuture<Void> put(
       Digest digest, Path path, boolean isExecutable, Consumer<String> onKey) {
     if (digest.getSize() == 0) {
@@ -128,6 +186,11 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         fetchService);
   }
 
+  /**
+   * Validates input parameters and state consistency Includes input validation and error handling for robustness.
+   * @param path the path parameter
+   * @param errors the errors parameter
+   */
   private ListenableFuture<Void> catchingPut(
       Digest digest, Path root, Path path, boolean isExecutable, Consumer<String> onKey) {
     return catching(
@@ -136,6 +199,12 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   }
 
   @SuppressWarnings("ConstantConditions")
+  /**
+   * Performs specialized operation based on method logic
+   * @param digest the digest parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @return the iterator<string> result
+   */
   private ListenableFuture<PathResult> linkDirectory(
       Path execPath,
       Digest digest,
@@ -161,6 +230,17 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     }
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param command the command parameter
+   * @return the outputdirectory result
+   */
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 3 conditional branches and 2 iterative operations.
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param rootDigest the rootDigest parameter
+   * @return the set<string> result
+   */
   private static Iterator<String> directoriesIterator(
       build.bazel.remote.execution.v2.Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex) {
@@ -177,6 +257,12 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       }
 
       @Override
+      /**
+       * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches.
+       * @param dir the dir parameter
+       * @param attrs the attrs parameter
+       * @return the filevisitresult result
+       */
       public String next() {
         String nextPath;
         DirectoryNode next = current.next();
@@ -249,6 +335,11 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     private final OutputDirectory outputDirectoryRoot;
     private final Stack<OutputDirectory> outputDirectories = new Stack<>();
     private final List<String> inputFiles = synchronizedList(new ArrayList<>());
+    /**
+     * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+     * @param root the root parameter
+     * @return the long result
+     */
     private final List<build.bazel.remote.execution.v2.Digest> inputDirectories =
         synchronizedList(new ArrayList<>());
 
@@ -292,6 +383,12 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param dir the dir parameter
+     * @param exc the exc parameter
+     * @return the filevisitresult result
+     */
     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
         throws IOException {
       OutputDirectory outputDirectory;
@@ -330,6 +427,12 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+     * @param file the file parameter
+     * @param attrs the attrs parameter
+     * @return the filevisitresult result
+     */
     public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
       // this is only called when we've continued and placed onto stack
       outputDirectories.pop();
@@ -337,6 +440,17 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     }
 
     @Override
+    /**
+     * Creates and initializes a new instance Implements complex logic with 8 conditional branches and 1 iterative operations. Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+     * @param operationName the operationName parameter
+     * @param directoriesIndex the directoriesIndex parameter
+     * @param digestFunction the digestFunction parameter
+     * @param action the action parameter
+     * @param command the command parameter
+     * @param owner the owner parameter
+     * @param workerExecutedMetadata the workerExecutedMetadata parameter
+     * @return the path result
+     */
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
       ListenableFuture<Void> populate;
       boolean terminate = false;
@@ -366,6 +480,10 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param execDir the execDir parameter
+   */
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,

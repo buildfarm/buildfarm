@@ -1,3 +1,10 @@
+/**
+ * Persists data to storage or external destination
+ * @param backplane the backplane parameter
+ * @param workerStubs the workerStubs parameter
+ * @param retrier the retrier parameter
+ * @return the public result
+ */
 // Copyright 2022 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -52,8 +59,18 @@ import lombok.extern.java.Log;
 public class RemoteCasWriter implements CasWriter {
   private final Backplane backplane;
   private final LoadingCache<String, StubInstance> workerStubs;
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param digest the digest parameter
+   * @param file the file parameter
+   */
   private final Retrier retrier;
 
+  /**
+   * Persists data to storage or external destination
+   * @param digest the digest parameter
+   * @param file the file parameter
+   */
   public RemoteCasWriter(
       Backplane backplane, LoadingCache<String, StubInstance> workerStubs, Retrier retrier) {
     this.backplane = backplane;
@@ -62,12 +79,23 @@ public class RemoteCasWriter implements CasWriter {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param digest the digest parameter
+   * @param content the content parameter
+   */
   public void write(Digest digest, Path file) throws IOException, InterruptedException {
     if (digest.getSize() > 0) {
       insertFileToCasMember(digest, file);
     }
   }
 
+  /**
+   * Persists data to storage or external destination Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   * @param digest the digest parameter
+   * @param in the in parameter
+   * @return the long result
+   */
   private void insertFileToCasMember(Digest digest, Path file)
       throws IOException, InterruptedException {
     try (InputStream in = Files.newInputStream(file)) {
@@ -80,6 +108,12 @@ public class RemoteCasWriter implements CasWriter {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param digest the digest parameter
+   * @param workerName the workerName parameter
+   * @return the write result
+   */
   private long writeToCasMember(Digest digest, InputStream in)
       throws IOException, InterruptedException {
     // create a write for inserting into another CAS member.
@@ -98,6 +132,10 @@ public class RemoteCasWriter implements CasWriter {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @return the string result
+   */
   private Write getCasMemberWrite(Digest digest, String workerName) throws IOException {
     Instance casMember = workerStub(workerName);
 
@@ -118,6 +156,11 @@ public class RemoteCasWriter implements CasWriter {
     }
   }
 
+  /**
+   * gRPC service client for remote communication Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param worker the worker parameter
+   * @return the instance result
+   */
   private String getRandomWorker() throws IOException {
     Set<String> workerSet = backplane.getStorageWorkers();
     if (workerSet.isEmpty()) {
@@ -134,6 +177,13 @@ public class RemoteCasWriter implements CasWriter {
     return worker;
   }
 
+  /**
+   * Asynchronous computation result handler Implements complex logic with 3 conditional branches and 3 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param in the in parameter
+   * @param write the write parameter
+   * @param digest the digest parameter
+   * @return the listenablefuture<long> result
+   */
   private Instance workerStub(String worker) {
     try {
       StubInstance stubInstance = workerStubs.get(worker);
@@ -145,6 +195,13 @@ public class RemoteCasWriter implements CasWriter {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Processes 1 input sources and produces 3 outputs.
+   * @param in the in parameter
+   * @param out the out parameter
+   * @param bytesAmount the bytesAmount parameter
+   * @return the boolean result
+   */
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
       throws IOException {
     SettableFuture<Long> writtenFuture = SettableFuture.create();

@@ -1,3 +1,6 @@
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,6 +39,9 @@ import javax.annotation.concurrent.GuardedBy;
 class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   private final String dbUrl;
   private boolean opened = false;
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   */
   private Connection conn;
 
   SqliteFileDirectoriesIndex(String dbUrl, EntryPathStrategy entryPathStrategy) {
@@ -44,6 +50,11 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   }
 
   @GuardedBy("this")
+  /**
+   * Removes data or cleans up resources Includes input validation and error handling for robustness.
+   * @param entry the entry parameter
+   * @return the set<digest> result
+   */
   private void open() {
     if (!opened) {
       try {
@@ -74,6 +85,9 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   */
   public synchronized void start() {
     open();
 
@@ -88,6 +102,11 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   }
 
   @Override
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param entry the entry parameter
+   * @return the set<digest> result
+   */
   public void close() {
     try {
       conn.close();
@@ -98,6 +117,11 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   }
 
   @GuardedBy("this")
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param entries the entries parameter
+   * @param directory the directory parameter
+   */
   private Set<Digest> removeEntryDirectories(String entry) {
     open();
 
@@ -132,12 +156,21 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param directory the directory parameter
+   * @param entries the entries parameter
+   */
   public synchronized Set<Digest> removeEntry(String entry) throws IOException {
     Set<Digest> directories = removeEntryDirectories(entry);
     super.removeDirectories(directories);
     return directories;
   }
 
+  /**
+   * Removes data or cleans up resources Includes input validation and error handling for robustness.
+   * @param directory the directory parameter
+   */
   private synchronized void addEntriesDirectory(Set<String> entries, Digest directory) {
     open();
 
@@ -158,6 +191,10 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   }
 
   @Override
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param directory the directory parameter
+   */
   public void put(Digest directory, Iterable<String> entries) throws IOException {
     super.put(directory, entries);
     addEntriesDirectory(ImmutableSet.copyOf(entries), directory);

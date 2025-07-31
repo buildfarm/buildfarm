@@ -1,3 +1,18 @@
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 4 iterative operations.
+ * @param path the path parameter
+ * @param root the root parameter
+ * @param directoriesIndex the directoriesIndex parameter
+ * @return the digest result
+ */
+/**
+ * Polls for available operations from the backplane Implements complex logic with 4 conditional branches and 3 iterative operations. Performs side effects including logging and state modifications.
+ * @param stopwatch the stopwatch parameter
+ * @return the long result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +33,13 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param programPath the programPath parameter
+ * @param root the root parameter
+ * @param directoriesIndex the directoriesIndex parameter
+ * @return the string result
+ */
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.Action;
@@ -65,12 +87,21 @@ public class InputFetcher implements Runnable {
   private boolean polling = false;
   private volatile boolean stalled = false;
 
+  /**
+   * Validates input parameters and state consistency
+   * @param queuedOperation the queuedOperation parameter
+   * @return the list<string> result
+   */
   private class StallState implements AutoCloseable {
     StallState() {
       stalled = true;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public void close() {
       stalled = false;
     }
@@ -87,6 +118,11 @@ public class InputFetcher implements Runnable {
     this.pollerExecutor = pollerExecutor;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param stopwatch the stopwatch parameter
+   * @return the long result
+   */
   private List<String> validateQueuedOperation(QueuedOperation queuedOperation) {
     // Capture a list of all validation failures on the queued operation.
     // A successful validation is a an empty list of failures.
@@ -136,6 +172,9 @@ public class InputFetcher implements Runnable {
   }
 
   private static final String BAZEL_HOST_BIN_PREFIX = "bazel-out/host/bin/";
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   */
   private static final String BAZEL_RUNFILES_SUFFIX = ".runfiles/__main__/";
 
   static String getExecutablePath(
@@ -191,6 +230,13 @@ public class InputFetcher implements Runnable {
     return null;
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param action the action parameter
+   * @param command the command parameter
+   * @param execDir the execDir parameter
+   * @param tree the tree parameter
+   */
   private void putOperation() throws InterruptedException {
     Operation operation =
         executionContext.operation.toBuilder()
@@ -300,6 +346,9 @@ public class InputFetcher implements Runnable {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   public boolean isStalled() {
     return stalled;
   }
@@ -307,6 +356,11 @@ public class InputFetcher implements Runnable {
   @SuppressWarnings(
       "PMD.UnusedLocalVariable") // PMD thinks that the try-with-resources is not used. See
   // https://github.com/pmd/pmd/issues/5747
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param partialExecutionMetadata the partialExecutionMetadata parameter
+   * @param status the status parameter
+   */
   private void proceedToOutput(Action action, Command command, Path execDir, Tree tree)
       throws InterruptedException {
     // switch poller to disable deadline

@@ -1,3 +1,6 @@
+/**
+ * Performs specialized operation based on method logic
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,22 +37,44 @@ class MemoryDirectoriesIndex implements DirectoriesIndex {
   private final Map<Digest, ImmutableList<String>> directories = new HashMap<>();
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void close() {}
 
   @Override
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param entry the entry parameter
+   * @return the set<digest> result
+   */
   public void start() {}
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param directory the directory parameter
+   * @return the iterable<string> result
+   */
   public synchronized Set<Digest> removeEntry(String entry) {
     return entryDirectories.removeAll(entry);
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param directory the directory parameter
+   * @param entries the entries parameter
+   */
   public Iterable<String> directoryEntries(Digest directory) {
     return directories.get(directory);
   }
 
   @Override
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param directory the directory parameter
+   */
   public synchronized void put(Digest directory, Iterable<String> entries) {
     directories.put(directory, ImmutableList.copyOf(entries));
     for (String entry : entries) {

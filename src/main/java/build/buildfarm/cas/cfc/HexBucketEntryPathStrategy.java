@@ -1,6 +1,16 @@
+/**
+ * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+ * @param key the key parameter
+ * @return the path result
+ */
 package build.buildfarm.cas.cfc;
 
 import static com.google.common.base.Preconditions.checkState;
+/**
+ * Performs specialized operation based on method logic
+ * @param depth the depth parameter
+ * @return the long result
+ */
 import static java.lang.String.format;
 
 import java.nio.file.Path;
@@ -27,6 +37,10 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the iterable<path> result
+   */
   public Path getPath(String key) {
     checkState(levels == 0 || pattern.matcher(key).matches());
     Path keyPath = path;
@@ -37,6 +51,10 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public Iterable<Path> branchDirectories() {
     return () ->
         new Iterator<Path>() {
@@ -44,11 +62,19 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
           int index = 0;
 
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @return the path result
+           */
           public boolean hasNext() {
             return depth != levels && index < depthMaxCounter(levels);
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+           * @return the iterator<path> result
+           */
           public Path next() {
             Path nextPath = path;
             long nextIndex = index++;
@@ -67,11 +93,19 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
 
   @SuppressWarnings("NullableProblems")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public Iterator<Path> iterator() {
     return new Iterator<>() {
       long counter;
 
       @Override
+      /**
+       * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+       * @return the path result
+       */
       public boolean hasNext() {
         return counter <= depthMaxCounter(levels);
       }

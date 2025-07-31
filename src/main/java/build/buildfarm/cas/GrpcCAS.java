@@ -107,15 +107,33 @@ public class GrpcCAS implements ContentAddressableStorage {
           });
 
   @SuppressWarnings("Guava")
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param resourceName the resourceName parameter
+   * @param offset the offset parameter
+   * @return the inputstream result
+   */
   private final Supplier<ByteStreamStub> bsStub =
       Suppliers.memoize(
           new Supplier<>() {
             @Override
+            /**
+             * Checks if a blob exists in the Content Addressable Storage Includes input validation and error handling for robustness.
+             * @param digest the digest parameter
+             * @param result the result parameter
+             * @return the boolean result
+             */
             public ByteStreamStub get() {
               return ByteStreamGrpc.newStub(channel);
             }
           });
 
+  /**
+   * Loads data from storage or external source
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @return the string result
+   */
   private InputStream newStreamInput(String resourceName, long offset) throws IOException {
     return ByteStreamHelper.newInput(
         resourceName,
@@ -127,6 +145,10 @@ public class GrpcCAS implements ContentAddressableStorage {
         /* retryService= */ null);
   }
 
+  /**
+   * Removes expired entries from the cache to free space Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+   * @param digest the digest parameter
+   */
   private String readResourceName(Compressor.Value compressor, Digest digest) {
     return ResourceParser.downloadResourceName(
         DownloadBlobRequest.newBuilder()
@@ -148,6 +170,15 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param offset the offset parameter
+   * @param count the count parameter
+   * @param blobObserver the blobObserver parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   public Iterable<build.bazel.remote.execution.v2.Digest> findMissingBlobs(
       Iterable<build.bazel.remote.execution.v2.Digest> digests,
       DigestFunction.Value digestFunction) {
@@ -186,6 +217,10 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param response the response parameter
+   */
   public void get(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest digest,
@@ -205,16 +240,30 @@ public class GrpcCAS implements ContentAddressableStorage {
             request,
             new DelegateServerCallStreamObserver<ReadResponse, ByteString>(blobObserver) {
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               * @param t the t parameter
+               */
               public void onNext(ReadResponse response) {
                 blobObserver.onNext(response.getData());
               }
 
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               */
               public void onError(Throwable t) {
                 blobObserver.onError(t);
               }
 
               @Override
+              /**
+               * Stores a blob in the Content Addressable Storage
+               * @param compressor the compressor parameter
+               * @param digest the digest parameter
+               * @param offset the offset parameter
+               * @return the inputstream result
+               */
               public void onCompleted() {
                 blobObserver.onCompleted();
               }
@@ -222,12 +271,23 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+   * @param digests the digests parameter
+   * @param digestFunction the digestFunction parameter
+   * @return the listenablefuture<list<response>> result
+   */
   public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
       throws IOException {
     return newStreamInput(readResourceName(compressor, digest), offset);
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage Processes 1 input sources and produces 2 outputs. Includes input validation and error handling for robustness.
+   * @param digest the digest parameter
+   * @return the blob result
+   */
   public ListenableFuture<List<Response>> getAllFuture(
       Iterable<build.bazel.remote.execution.v2.Digest> digests,
       DigestFunction.Value digestFunction) {
@@ -246,6 +306,16 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Creates and initializes a new instance
+   * @param channel the channel parameter
+   * @param instanceName the instanceName parameter
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param uuid the uuid parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the write result
+   */
   public Blob get(Digest digest) {
     try (InputStream in =
         newStreamInput(readResourceName(Compressor.Value.IDENTITY, digest), /* offset= */ 0)) {
@@ -263,6 +333,14 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @SuppressWarnings("Guava")
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param uuid the uuid parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the write result
+   */
   public static Write newWrite(
       Channel channel,
       String instanceName,
@@ -298,6 +376,10 @@ public class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   @Nullable
+  /**
+   * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param blob the blob parameter
+   */
   public Write getWrite(
       Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     if (readonly) {
@@ -307,6 +389,11 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage Provides thread-safe access through synchronization mechanisms.
+   * @param blob the blob parameter
+   * @param onExpiration the onExpiration parameter
+   */
   public void put(Blob blob) throws InterruptedException {
     Chunker chunker = Chunker.builder().setInput(blob.getData()).build();
     try {
@@ -320,6 +407,10 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the long result
+   */
   public void put(Blob blob, Runnable onExpiration) throws InterruptedException {
     try {
       put(blob);

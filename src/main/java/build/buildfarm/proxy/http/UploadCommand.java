@@ -1,3 +1,16 @@
+/**
+ * Transfers data to remote storage or workers Includes input validation and error handling for robustness.
+ * @param uri the uri parameter
+ * @param casUpload the casUpload parameter
+ * @param hash the hash parameter
+ * @param data the data parameter
+ * @param contentLength the contentLength parameter
+ * @return the protected result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the uri result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,18 +48,34 @@ final class UploadCommand {
     this.contentLength = contentLength;
   }
 
+  /**
+   * Transfers data to remote storage or workers
+   * @return the boolean result
+   */
   public URI uri() {
     return uri;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the string result
+   */
   public boolean casUpload() {
     return casUpload;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the inputstream result
+   */
   public String hash() {
     return hash;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the long result
+   */
   public InputStream data() {
     return data;
   }

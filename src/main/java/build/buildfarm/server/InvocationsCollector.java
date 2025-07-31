@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param requestMetadata the requestMetadata parameter
+ * @return the boolean result
+ */
 package build.buildfarm.server;
 
 import static java.util.logging.Level.WARNING;
@@ -31,6 +36,9 @@ class InvocationsCollector extends LinkedBlockingQueue<RequestMetadata> implemen
               .maximumSize(100)
               .<String, Boolean>build()
               .asMap());
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   private volatile boolean running = false;
 
   InvocationsCollector(ServerInstance instance) {
@@ -38,6 +46,9 @@ class InvocationsCollector extends LinkedBlockingQueue<RequestMetadata> implemen
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public boolean add(RequestMetadata requestMetadata) {
     if (running) {
       return super.add(requestMetadata);
@@ -55,6 +66,12 @@ class InvocationsCollector extends LinkedBlockingQueue<RequestMetadata> implemen
     }
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param toolInvocationId the toolInvocationId parameter
+   * @param correlatedInvocationsId the correlatedInvocationsId parameter
+   * @param toolDetails the toolDetails parameter
+   */
   private void loop() {
     for (; ; ) {
       RequestMetadata meta;
@@ -79,6 +96,10 @@ class InvocationsCollector extends LinkedBlockingQueue<RequestMetadata> implemen
     }
   }
 
+  /**
+   * Processes the next operation in the pipeline stage
+   * @param meta the meta parameter
+   */
   private void addNewToolInvocationId(
       String toolInvocationId, String correlatedInvocationsId, ToolDetails toolDetails)
       throws IOException {

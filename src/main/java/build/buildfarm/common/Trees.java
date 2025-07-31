@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,9 +27,19 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Tree;
 
 // Convenience methods for interacting with Trees
+/**
+ * Performs specialized operation based on method logic
+ * @param directory the directory parameter
+ * @return the iterable<digest> result
+ */
 public final class Trees {
   private Trees() {}
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param tree the tree parameter
+   * @return the iterable<digest> result
+   */
   public static Iterable<Digest> directoryFileDigests(Directory directory) {
     return transform(directory.getFilesList(), FileNode::getDigest);
   }

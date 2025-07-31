@@ -7,6 +7,10 @@ import lombok.Data;
 
 @Data
 public class Queue {
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the platform result
+   */
   public enum QUEUE_TYPE {
     priority,
     standard

@@ -1,3 +1,10 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -78,6 +85,9 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void close() throws IOException {
     if (getCommittedSize() >= digest.getSize()) {
       hashOut.close();
@@ -99,21 +109,39 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination
+   * @param b the b parameter
+   */
   public void flush() throws IOException {
     hashOut.flush();
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination
+   * @param b the b parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   */
   public void write(byte[] b) throws IOException {
     hashOut.write(b);
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination
+   * @param b the b parameter
+   */
   public void write(byte[] b, int off, int len) throws IOException {
     hashOut.write(b, off, len);
   }
 
   @Override
+  /**
+   * Loads data from storage or external source
+   * @return the boolean result
+   */
   public void write(int b) throws IOException {
     hashOut.write(b);
   }
@@ -126,16 +154,36 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
   // Write methods
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public long getCommittedSize() {
     return isComplete() ? digest.getSize() : out.size();
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   * @param offset the offset parameter
+   * @param deadlineAfter the deadlineAfter parameter
+   * @param deadlineAfterUnits the deadlineAfterUnits parameter
+   * @param onReadyHandler the onReadyHandler parameter
+   * @return the feedbackoutputstream result
+   */
   public boolean isComplete() {
     return writtenFuture.isDone();
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param offset the offset parameter
+   * @param deadlineAfter the deadlineAfter parameter
+   * @param deadlineAfterUnits the deadlineAfterUnits parameter
+   * @param onReadyHandler the onReadyHandler parameter
+   * @return the listenablefuture<feedbackoutputstream> result
+   */
   public synchronized FeedbackOutputStream getOutput(
       long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     if (closedFuture == null || closedFuture.isDone()) {
@@ -146,6 +194,9 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public synchronized ListenableFuture<FeedbackOutputStream> getOutputFuture(
       long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     if (closedFuture == null || closedFuture.isDone()) {

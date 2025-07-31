@@ -1,3 +1,47 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @param contentAddressableStorage the contentAddressableStorage parameter
+ * @param actionCache the actionCache parameter
+ * @param outstandingOperations the outstandingOperations parameter
+ * @param completedOperations the completedOperations parameter
+ * @param activeBlobWrites the activeBlobWrites parameter
+ * @param ensureOutputsPresent the ensureOutputsPresent parameter
+ * @return the public result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+ * @param blobDigest the blobDigest parameter
+ * @param count the count parameter
+ * @return the bytestring result
+ */
+/**
+ * Creates and initializes a new instance
+ * @param digest the digest parameter
+ * @return the write result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the invalid http result
+ */
+/**
+ * Loads data from storage or external source Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param urls the urls parameter
+ * @param headers the headers parameter
+ * @param expectedDigest the expectedDigest parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the listenablefuture<digest> result
+ */
+/**
+ * Validates input parameters and state consistency Implements complex logic with 6 conditional branches and 3 iterative operations.
+ * @param command the command parameter
+ * @param inputRootDigest the inputRootDigest parameter
+ * @param inputFiles the inputFiles parameter
+ * @param inputDirectories the inputDirectories parameter
+ * @param directoriesIndex the directoriesIndex parameter
+ * @param preconditionFailure the preconditionFailure parameter
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -157,6 +201,13 @@ public abstract class NodeInstance extends InstanceBase {
   protected final OperationsMap outstandingOperations;
   protected final OperationsMap completedOperations;
   protected final Map<Digest, ByteString> activeBlobWrites;
+  /**
+   * Stores a blob in the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+   * @param resultFuture the resultFuture parameter
+   * @param digestFunction the digestFunction parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<actionresult> result
+   */
   protected final boolean ensureOutputsPresent;
 
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
@@ -195,6 +246,13 @@ public abstract class NodeInstance extends InstanceBase {
 
   public static final String INVALID_COMMAND = "The `Command` of the `Action` was invalid.";
 
+  /**
+   * Performs specialized operation based on method logic
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param publicName the publicName parameter
+   */
   public static final String INVALID_PLATFORM = "The `Platform` of the `Command` was invalid.";
 
   private static final String INVALID_FILE_NAME =
@@ -208,6 +266,11 @@ public abstract class NodeInstance extends InstanceBase {
   private static final String OUTPUT_FILE_IS_INPUT_DIRECTORY =
       "An output file has the same path as an input directory";
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionResultFuture the actionResultFuture parameter
+   * @return the listenablefuture<actionresult> result
+   */
   private static final String OUTPUT_DIRECTORY_IS_INPUT_FILE =
       "An output directory has the same path as an input file";
 
@@ -231,6 +294,19 @@ public abstract class NodeInstance extends InstanceBase {
   public static final String NO_REQUEUE_MISSING_MESSAGE =
       "Operation %s not requeued.  Operation no longer exists.";
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param ensureOutputsPresent the ensureOutputsPresent parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param requestMetadata the requestMetadata parameter
+   * @param name the name parameter
+   * @param flagDefault the flagDefault parameter
+   * @return the boolean result
+   */
   public static final String NO_REQUEUE_COMPLETE_MESSAGE =
       "Operation %s not requeued.  Operation has already completed.";
 
@@ -255,8 +331,55 @@ public abstract class NodeInstance extends InstanceBase {
   public void start(String publicName) throws IOException {}
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param digests the digests parameter
+   * @param digestFunction the digestFunction parameter
+   * @return the listenablefuture<list<response>> result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param uuid the uuid parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the write result
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param offset the offset parameter
+   * @param deadlineAfter the deadlineAfter parameter
+   * @param deadlineAfterUnits the deadlineAfterUnits parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the inputstream result
+   */
+  /**
+   * Loads data from storage or external source
+   * @param compressor the compressor parameter
+   * @param blobDigest the blobDigest parameter
+   * @return the string result
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param actionKey the actionKey parameter
+   * @param actionResult the actionResult parameter
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   * @param actionKey the actionKey parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<actionresult> result
+   */
   public void stop() throws InterruptedException {}
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param mergeExecutions the mergeExecutions parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the boolean result
+   */
   protected ListenableFuture<Iterable<build.bazel.remote.execution.v2.Digest>>
       findMissingActionResultOutputs(
           @Nullable ActionResult result,
@@ -368,6 +491,35 @@ public abstract class NodeInstance extends InstanceBase {
     return requestFlag(requestMetadata, "ENSURE_OUTPUTS_PRESENT", ensureOutputsPresent);
   }
 
+  /**
+   * Retrieves data from distributed storage Implements complex logic with 5 conditional branches and 2 iterative operations. Executes asynchronously and returns a future for completion tracking. Processes 2 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+   * @param url the url parameter
+   * @param expectedHash the expectedHash parameter
+   * @param headers the headers parameter
+   * @param digestUtil the digestUtil parameter
+   * @param getContentWrite the getContentWrite parameter
+   * @return the listenablefuture<digest> result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+   * @param compressor the compressor parameter
+   * @param blobDigest the blobDigest parameter
+   * @param count the count parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<bytestring> result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param blobDigest the blobDigest parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<bytestring> result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param blobDigest the blobDigest parameter
+   * @return the bytestring result
+   */
   protected static boolean shouldMergeExecutions(
       boolean mergeExecutions, RequestMetadata requestMetadata) {
     return requestFlag(requestMetadata, "MERGE_EXECUTIONS", mergeExecutions);
@@ -416,6 +568,18 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Processes the operation according to configured logic
+   * @param onCancelHandler the onCancelHandler parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param compression the compression parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public Write getBlobWrite(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest digest,
@@ -426,6 +590,32 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param chunk the chunk parameter
+   */
+  /**
+   * Processes the operation according to configured logic
+   * @param onReadyHandler the onReadyHandler parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param enable the enable parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param count the count parameter
+   */
+  /**
+   * Loads data from storage or external source
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   */
   public ListenableFuture<List<Response>> getAllBlobsFuture(
       Iterable<build.bazel.remote.execution.v2.Digest> digests,
       DigestFunction.Value digestFunction) {
@@ -476,6 +666,10 @@ public abstract class NodeInstance extends InstanceBase {
           ByteString content = ByteString.EMPTY;
 
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param t the t parameter
+           */
           public boolean isCancelled() {
             return false;
           }
@@ -487,6 +681,15 @@ public abstract class NodeInstance extends InstanceBase {
           public void setOnCancelHandler(Runnable onCancelHandler) {}
 
           @Override
+          /**
+           * Retrieves a blob from the Content Addressable Storage
+           * @param compressor the compressor parameter
+           * @param blobDigest the blobDigest parameter
+           * @param offset the offset parameter
+           * @param count the count parameter
+           * @param blobObserver the blobObserver parameter
+           * @param requestMetadata the requestMetadata parameter
+           */
           public void disableAutoInboundFlowControl() {}
 
           @Override
@@ -498,6 +701,13 @@ public abstract class NodeInstance extends InstanceBase {
           public void request(int count) {}
 
           @Override
+          /**
+           * Checks if a blob exists in the Content Addressable Storage
+           * @param digest the digest parameter
+           * @param result the result parameter
+           * @param requestMetadata the requestMetadata parameter
+           * @return the boolean result
+           */
           public void setMessageCompression(boolean enable) {}
 
           @Override
@@ -546,6 +756,14 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage Implements complex logic with 4 conditional branches and 1 iterative operations.
+   * @param rootDigest the rootDigest parameter
+   * @param pageSize the pageSize parameter
+   * @param pageToken the pageToken parameter
+   * @param tree the tree parameter
+   * @return the string result
+   */
   public Iterable<build.bazel.remote.execution.v2.Digest> putAllBlobs(
       Iterable<BatchUpdateBlobsRequest.Request> requests,
       DigestFunction.Value digestFunction,
@@ -613,10 +831,26 @@ public abstract class NodeInstance extends InstanceBase {
 
   protected abstract int getTreeMaxPageSize();
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param reason the reason parameter
+   * @param inputRoot the inputRoot parameter
+   * @param service the service parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<tree> result
+   */
   protected abstract TokenizableIterator<DirectoryEntry> createTreeIterator(
       String reason, build.buildfarm.v1test.Digest rootDigest, String pageToken);
 
   @Override
+  /**
+   * Loads data from storage or external source
+   * @param uris the uris parameter
+   * @param headers the headers parameter
+   * @param expectedDigest the expectedDigest parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<digest> result
+   */
   public String getTree(
       build.buildfarm.v1test.Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
     tree.setRootDigest(rootDigest);
@@ -662,6 +896,18 @@ public abstract class NodeInstance extends InstanceBase {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param files the files parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param strings the strings parameter
+   * @param duplicateViolationMessage the duplicateViolationMessage parameter
+   * @param unsortedViolationMessage the unsortedViolationMessage parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
   private static ListenableFuture<Digest> downloadUrl(
       URL url,
       String expectedHash,
@@ -770,6 +1016,21 @@ public abstract class NodeInstance extends InstanceBase {
     return immediateFailedFuture(new NoSuchFileException(expectedDigest.getHash()));
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Implements complex logic with 2 conditional branches and 3 iterative operations.
+   * @param digestFunction the digestFunction parameter
+   * @param directoryPath the directoryPath parameter
+   * @param directory the directory parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param onInputFile the onInputFile parameter
+   * @param onInputDirectory the onInputDirectory parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param environmentVariables the environmentVariables parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
   private static void stringsUniqueAndSortedPrecondition(
       Iterable<String> strings,
       String duplicateViolationMessage,
@@ -811,6 +1072,24 @@ public abstract class NodeInstance extends InstanceBase {
         preconditionFailure);
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Implements complex logic with 10 conditional branches and 4 iterative operations. Includes input validation and error handling for robustness.
+   * @param digestFunction the digestFunction parameter
+   * @param directoryPath the directoryPath parameter
+   * @param directory the directory parameter
+   * @param pathDigests the pathDigests parameter
+   * @param visited the visited parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param allowSymlinkTargetAbsolute the allowSymlinkTargetAbsolute parameter
+   * @param onInputFile the onInputFile parameter
+   * @param onInputDirectory the onInputDirectory parameter
+   * @param onInputDigest the onInputDigest parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   private static void enumerateActionInputDirectory(
       DigestFunction.Value digestFunction,
       String directoryPath,
@@ -866,6 +1145,19 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @VisibleForTesting
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param directoryPath the directoryPath parameter
+   * @param directoryDigest the directoryDigest parameter
+   * @param pathDigests the pathDigests parameter
+   * @param visited the visited parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param allowSymlinkTargetAbsolute the allowSymlinkTargetAbsolute parameter
+   * @param onInputFile the onInputFile parameter
+   * @param onInputDirectory the onInputDirectory parameter
+   * @param onInputDigest the onInputDigest parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
   public static void validateActionInputDirectory(
       DigestFunction.Value digestFunction,
       String directoryPath,
@@ -1010,6 +1302,18 @@ public abstract class NodeInstance extends InstanceBase {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 2 outputs.
+   * @param future the future parameter
+   * @return the v result
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications.
+   * @param inputDigests the inputDigests parameter
+   * @param digestFunction the digestFunction parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   private static void validateActionInputDirectoryDigest(
       String directoryPath,
       // based on usage might want to make this bazel and pass function
@@ -1057,6 +1361,13 @@ public abstract class NodeInstance extends InstanceBase {
     }
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param actionDigest the actionDigest parameter
+   * @param queuedOperation the queuedOperation parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   protected ListenableFuture<Tree> getTreeFuture(
       String reason, Digest inputRoot, ExecutorService service, RequestMetadata requestMetadata) {
     return listeningDecorator(service)
@@ -1079,6 +1390,12 @@ public abstract class NodeInstance extends InstanceBase {
             });
   }
 
+  /**
+   * Validates input parameters and state consistency
+   * @param operationName the operationName parameter
+   * @param actionDigest the actionDigest parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   private void validateInputs(
       Iterable<build.bazel.remote.execution.v2.Digest> inputDigests,
       DigestFunction.Value digestFunction,
@@ -1126,6 +1443,18 @@ public abstract class NodeInstance extends InstanceBase {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param blob the blob parameter
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage Implements complex logic with 5 conditional branches and 6 iterative operations.
+   * @param inputFiles the inputFiles parameter
+   * @param inputDirectories the inputDirectories parameter
+   * @param outputFiles the outputFiles parameter
+   * @param outputDirectories the outputDirectories parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
   public static <V> V getUnchecked(ListenableFuture<V> future) throws InterruptedException {
     try {
       return future.get();
@@ -1134,6 +1463,14 @@ public abstract class NodeInstance extends InstanceBase {
     }
   }
 
+  /**
+   * Validates input parameters and state consistency
+   * @param operationName the operationName parameter
+   * @param digestFunction the digestFunction parameter
+   * @param action the action parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   protected void validateQueuedOperationAndInputs(
       Digest actionDigest,
       QueuedOperation queuedOperation,
@@ -1203,6 +1540,16 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @SuppressWarnings("ConstantConditions")
+  /**
+   * Validates input parameters and state consistency
+   * @param platform the platform parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
+  /**
+   * Validates input parameters and state consistency
+   * @param actionDigest the actionDigest parameter
+   * @param queuedOperation the queuedOperation parameter
+   */
   protected void validateAction(
       String operationName,
       DigestFunction.Value digestFunction,
@@ -1249,6 +1596,15 @@ public abstract class NodeInstance extends InstanceBase {
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
   }
 
+  /**
+   * Validates input parameters and state consistency
+   * @param digestFunction the digestFunction parameter
+   * @param action the action parameter
+   * @param command the command parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param onInputDigest the onInputDigest parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
   protected void validatePlatform(
       Platform platform, PreconditionFailure.Builder preconditionFailure) {
     /* no default platform validation */
@@ -1322,6 +1678,11 @@ public abstract class NodeInstance extends InstanceBase {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionDigest the actionDigest parameter
+   * @param status the status parameter
+   */
   protected void validateAction(
       DigestFunction.Value digestFunction,
       Action action,
@@ -1449,6 +1810,12 @@ public abstract class NodeInstance extends InstanceBase {
     }
   }
 
+  /**
+   * Carries request context and tracing information Performs side effects including logging and state modifications.
+   * @param name the name parameter
+   * @param metadata the metadata parameter
+   * @return the queuedoperationmetadata result
+   */
   protected void logFailedStatus(Digest actionDigest, com.google.rpc.Status status) {
     String message =
         format(
@@ -1478,6 +1845,11 @@ public abstract class NodeInstance extends InstanceBase {
     getLogger().info(message);
   }
 
+  /**
+   * Carries request context and tracing information
+   * @param operation the operation parameter
+   * @return the requestmetadata result
+   */
   protected static QueuedOperationMetadata maybeQueuedOperationMetadata(String name, Any metadata) {
     if (metadata.is(QueuedOperationMetadata.class)) {
       try {
@@ -1489,6 +1861,11 @@ public abstract class NodeInstance extends InstanceBase {
     return null;
   }
 
+  /**
+   * Executes a build action on the worker Performs side effects including logging and state modifications.
+   * @param operation the operation parameter
+   * @return the executeoperationmetadata result
+   */
   protected static RequestMetadata expectRequestMetadata(Operation operation) {
     String name = operation.getName();
     Any metadata = operation.getMetadata();
@@ -1499,6 +1876,14 @@ public abstract class NodeInstance extends InstanceBase {
     return RequestMetadata.getDefaultInstance();
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param digest the digest parameter
+   * @param parser the parser parameter
+   * @param executor the executor parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<t> result
+   */
   protected static ExecuteOperationMetadata expectExecuteOperationMetadata(Operation operation) {
     String name = operation.getName();
     Any metadata = operation.getMetadata();
@@ -1515,6 +1900,11 @@ public abstract class NodeInstance extends InstanceBase {
     return null;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
   protected <T> ListenableFuture<T> expect(
       Digest digest, Parser<T> parser, Executor executor, RequestMetadata requestMetadata) {
     // FIXME find a way to make this a transform
@@ -1523,6 +1913,10 @@ public abstract class NodeInstance extends InstanceBase {
         getBlobFuture(Compressor.Value.IDENTITY, digest, requestMetadata),
         new FutureCallback<>() {
           @Override
+          /**
+           * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+           * @param t the t parameter
+           */
           public void onSuccess(ByteString blob) {
             try {
               future.set(parser.parseFrom(blob));
@@ -1552,6 +1946,12 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @SuppressWarnings("ConstantConditions")
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @param stage the stage parameter
+   * @return the boolean result
+   */
   protected static boolean isErrored(Operation operation) {
     return operation.getDone()
         && operation.getResultCase() == Operation.ResultCase.RESPONSE
@@ -1559,16 +1959,31 @@ public abstract class NodeInstance extends InstanceBase {
         && expectExecuteResponse(operation).getStatus().getCode() != Code.OK.getNumber();
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
   private static boolean isStage(Operation operation, ExecutionStage.Value stage) {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     return metadata != null && metadata.getStage() == stage;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
   protected static boolean isUnknown(Operation operation) {
     return isStage(operation, ExecutionStage.Value.UNKNOWN);
   }
 
   @SuppressWarnings("ConstantConditions")
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param operation the operation parameter
+   * @return the executeresponse result
+   */
   protected boolean isCancelled(Operation operation) {
     return operation.getDone()
         && operation.getResultCase() == Operation.ResultCase.RESPONSE
@@ -1576,6 +1991,11 @@ public abstract class NodeInstance extends InstanceBase {
         && expectExecuteResponse(operation).getStatus().getCode() == Code.CANCELLED.getNumber();
   }
 
+  /**
+   * Executes a build action on the worker
+   * @param operation the operation parameter
+   * @return the executeresponse result
+   */
   protected static ExecuteResponse getExecuteResponse(Operation operation) {
     if (operation.getDone() && operation.getResultCase() == Operation.ResultCase.RESPONSE) {
       return expectExecuteResponse(operation);
@@ -1583,6 +2003,16 @@ public abstract class NodeInstance extends InstanceBase {
     return null;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
   private static ExecuteResponse expectExecuteResponse(Operation operation) {
     try {
       return operation.getResponse().unpack(ExecuteResponse.class);
@@ -1591,14 +2021,33 @@ public abstract class NodeInstance extends InstanceBase {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param name the name parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
   public static boolean isQueued(Operation operation) {
     return isStage(operation, ExecutionStage.Value.QUEUED);
   }
 
+  /**
+   * Executes a build action on the worker
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
   protected static boolean isExecuting(Operation operation) {
     return isStage(operation, ExecutionStage.Value.EXECUTING);
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param operation the operation parameter
+   * @return the actionresult result
+   */
   protected static boolean isComplete(Operation operation) {
     return isStage(operation, ExecutionStage.Value.COMPLETED);
   }
@@ -1608,6 +2057,12 @@ public abstract class NodeInstance extends InstanceBase {
     return executeResponse != null && !executeResponse.getCachedResult();
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param operation the operation parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @param status the status parameter
+   */
   protected static ActionResult getCacheableActionResult(Operation operation) {
     ExecuteResponse executeResponse = getExecuteResponse(operation);
     if (executeResponse != null
@@ -1622,6 +2077,12 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Polls for available operations from the backplane
+   * @param operationName the operationName parameter
+   * @param stage the stage parameter
+   * @return the boolean result
+   */
   public void cancelOperation(String name) throws InterruptedException {
     Operation operation = getOperation(name);
     if (operation == null) {
@@ -1638,6 +2099,10 @@ public abstract class NodeInstance extends InstanceBase {
         com.google.rpc.Status.newBuilder().setCode(Code.CANCELLED.getNumber()).build());
   }
 
+  /**
+   * Removes expired entries from the cache to free space Includes input validation and error handling for robustness.
+   * @param operation the operation parameter
+   */
   protected void errorOperation(
       Operation operation, RequestMetadata requestMetadata, com.google.rpc.Status status)
       throws InterruptedException {
@@ -1762,6 +2227,11 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param name the name parameter
+   * @return the listenablefuture<workerprofilemessage> result
+   */
   public ServerCapabilities getCapabilities() {
     return ServerCapabilities.newBuilder()
         .setCacheCapabilities(getCacheCapabilities())
@@ -1770,12 +2240,21 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param names the names parameter
+   * @return the listenablefuture<batchworkerprofilesresponse> result
+   */
   public ListenableFuture<WorkerProfileMessage> getWorkerProfile(String name) {
     throw new UnsupportedOperationException(
         "NodeInstance doesn't support getWorkerProfile() method.");
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @return the prepareworkerforgracefulshutdownrequestresults result
+   */
   public ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names) {
     throw new UnsupportedOperationException(
         "NodeInstance doesn't support batchWorkerProfiles() method.");

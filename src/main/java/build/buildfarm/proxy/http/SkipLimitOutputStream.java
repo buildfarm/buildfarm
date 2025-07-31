@@ -1,3 +1,23 @@
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Persists data to storage or external destination
+ * @param b the b parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param 0 the 0 parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param 0 the 0 parameter
+ * @return the else result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,6 +49,12 @@ class SkipLimitOutputStream extends OutputStream {
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination
+   * @param b the b parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   */
   public void close() throws IOException {
     writeBytesRemaining = 0;
 
@@ -46,6 +72,10 @@ class SkipLimitOutputStream extends OutputStream {
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination
+   * @param b the b parameter
+   */
   public void write(byte[] b, int off, int len) throws IOException {
     if (skipBytesRemaining >= len) {
       skipBytesRemaining -= len;

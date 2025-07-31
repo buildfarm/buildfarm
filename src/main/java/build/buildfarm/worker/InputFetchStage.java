@@ -1,3 +1,15 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param workerContext the workerContext parameter
+ * @param output the output parameter
+ * @param error the error parameter
+ * @return the public result
+ */
+/**
+ * Returns resources to the shared pool
+ * @param operationName the operationName parameter
+ * @return the int result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,6 +51,13 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   @GuardedBy("this")
   private int slotUsage;
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param operationName the operationName parameter
+   * @param usecs the usecs parameter
+   * @param stallUSecs the stallUSecs parameter
+   * @param success the success parameter
+   */
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super(
         "InputFetchStage",
@@ -51,6 +70,11 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionContext the executionContext parameter
+   * @return the int result
+   */
   protected Logger getLogger() {
     return log;
   }
@@ -62,6 +86,10 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     return slotUsage;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public void releaseInputFetcher(
       String operationName, long usecs, long stallUSecs, boolean success) {
     int size = removeAndRelease(operationName);
@@ -76,6 +104,9 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   }
 
   @Override
+  /**
+   * Processes the next operation in the pipeline stage Provides thread-safe access through synchronization mechanisms.
+   */
   protected int claimsRequired(ExecutionContext executionContext) {
     return 1;
   }

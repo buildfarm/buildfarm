@@ -1,3 +1,7 @@
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @return the long result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -54,6 +58,10 @@ class Writes {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public long getCommittedSize() {
       try {
         return delegate.getCommittedSize();
@@ -64,6 +72,14 @@ class Writes {
     }
 
     @Override
+    /**
+     * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+     * @param offset the offset parameter
+     * @param deadlineAfter the deadlineAfter parameter
+     * @param deadlineAfterUnits the deadlineAfterUnits parameter
+     * @param onReadyHandler the onReadyHandler parameter
+     * @return the feedbackoutputstream result
+     */
     public boolean isComplete() {
       boolean complete = true; // complete if it throws
       try {
@@ -77,6 +93,14 @@ class Writes {
     }
 
     @Override
+    /**
+     * Retrieves a blob from the Content Addressable Storage
+     * @param offset the offset parameter
+     * @param deadlineAfter the deadlineAfter parameter
+     * @param deadlineAfterUnits the deadlineAfterUnits parameter
+     * @param onReadyHandler the onReadyHandler parameter
+     * @return the listenablefuture<feedbackoutputstream> result
+     */
     public FeedbackOutputStream getOutput(
         long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
         throws IOException {
@@ -91,6 +115,9 @@ class Writes {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     */
     public ListenableFuture<FeedbackOutputStream> getOutputFuture(
         long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
       // should be no reason to preserve exclusivity here
@@ -112,6 +139,11 @@ class Writes {
     }
 
     @Override
+    /**
+     * Loads data from storage or external source Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+     * @param key the key parameter
+     * @return the instance result
+     */
     public ListenableFuture<Long> getFuture() {
       return delegate.getFuture();
     }
@@ -129,6 +161,14 @@ class Writes {
                 new CacheLoader<>() {
                   @SuppressWarnings("NullableProblems")
                   @Override
+                  /**
+                   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+                   * @param compressor the compressor parameter
+                   * @param digest the digest parameter
+                   * @param uuid the uuid parameter
+                   * @param requestMetadata the requestMetadata parameter
+                   * @return the write result
+                   */
                   public Instance load(BlobWriteKey key) {
                     return instanceSupplier.get();
                   }

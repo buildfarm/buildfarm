@@ -1,3 +1,12 @@
+/**
+ * Processes the operation according to configured logic
+ * @param credentials the credentials parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param t the t parameter
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,13 +45,26 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
     implements ChannelOutboundHandler {
   private final Credentials credentials;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param ctx the ctx parameter
+   * @param t the t parameter
+   */
   public AbstractHttpHandler(Credentials credentials) {
     this.credentials = credentials;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   protected ChannelPromise userPromise;
 
   @SuppressWarnings("FutureReturnValueIgnored")
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 3 conditional branches and 2 iterative operations.
+   * @param request the request parameter
+   * @param uri the uri parameter
+   */
   protected void failAndResetUserPromise(Throwable t) {
     if (userPromise != null && !userPromise.isDone()) {
       userPromise.setFailure(t);
@@ -56,6 +78,13 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
     userPromise = null;
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param uri the uri parameter
+   * @param hash the hash parameter
+   * @param isCas the isCas parameter
+   * @return the string result
+   */
   protected void addCredentialHeaders(HttpRequest request, URI uri) throws IOException {
     String userInfo = uri.getUserInfo();
     if (userInfo != null) {
@@ -78,6 +107,11 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
     }
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param uri the uri parameter
+   * @return the string result
+   */
   protected String constructPath(URI uri, String hash, boolean isCas) {
     StringBuilder builder = new StringBuilder();
     builder.append(uri.getPath());
@@ -93,6 +127,12 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param ctx the ctx parameter
+   * @param localAddress the localAddress parameter
+   * @param promise the promise parameter
+   */
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable t) {
     failAndResetUserPromise(t);
     ctx.fireExceptionCaught(t);
@@ -100,12 +140,24 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
 
   @SuppressWarnings("FutureReturnValueIgnored")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param ctx the ctx parameter
+   * @param remoteAddress the remoteAddress parameter
+   * @param localAddress the localAddress parameter
+   * @param promise the promise parameter
+   */
   public void bind(ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) {
     ctx.bind(localAddress, promise);
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param ctx the ctx parameter
+   * @param promise the promise parameter
+   */
   public void connect(
       ChannelHandlerContext ctx,
       SocketAddress remoteAddress,
@@ -116,6 +168,11 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
 
   @SuppressWarnings("FutureReturnValueIgnored")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param ctx the ctx parameter
+   * @param promise the promise parameter
+   */
   public void disconnect(ChannelHandlerContext ctx, ChannelPromise promise) {
     failAndResetUserPromise(new ClosedChannelException());
     ctx.disconnect(promise);
@@ -123,6 +180,11 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
 
   @SuppressWarnings("FutureReturnValueIgnored")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param ctx the ctx parameter
+   * @param promise the promise parameter
+   */
   public void close(ChannelHandlerContext ctx, ChannelPromise promise) {
     failAndResetUserPromise(new ClosedChannelException());
     ctx.close(promise);
@@ -130,6 +192,10 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
 
   @SuppressWarnings("FutureReturnValueIgnored")
   @Override
+  /**
+   * Loads data from storage or external source
+   * @param ctx the ctx parameter
+   */
   public void deregister(ChannelHandlerContext ctx, ChannelPromise promise) {
     failAndResetUserPromise(new ClosedChannelException());
     ctx.deregister(promise);
@@ -137,23 +203,39 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
 
   @SuppressWarnings("FutureReturnValueIgnored")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param ctx the ctx parameter
+   */
   public void read(ChannelHandlerContext ctx) {
     ctx.read();
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")
   @Override
+  /**
+   * Manages network connections for gRPC communication
+   * @param ctx the ctx parameter
+   */
   public void flush(ChannelHandlerContext ctx) {
     ctx.flush();
   }
 
   @Override
+  /**
+   * Processes the operation according to configured logic
+   * @param ctx the ctx parameter
+   */
   public void channelInactive(ChannelHandlerContext ctx) {
     failAndResetUserPromise(new ClosedChannelException());
     ctx.fireChannelInactive();
   }
 
   @Override
+  /**
+   * Manages network connections for gRPC communication
+   * @param ctx the ctx parameter
+   */
   public void handlerRemoved(ChannelHandlerContext ctx) {
     failAndResetUserPromise(new IOException("handler removed"));
   }

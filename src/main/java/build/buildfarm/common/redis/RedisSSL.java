@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
 // Copyright 2024 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

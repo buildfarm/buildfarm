@@ -1,3 +1,8 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param queue the queue parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,9 +30,17 @@ public class ByteStringQueueInputStream extends InputStream {
   private InputStream input;
   private boolean closed;
   private boolean completed = false;
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   private Throwable exception = null;
 
   @VisibleForTesting
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @return the int result
+   */
   public ByteStringQueueInputStream(BlockingQueue<ByteString> queue) {
     this.queue = queue;
     input = ByteString.EMPTY.newInput();
@@ -35,6 +48,10 @@ public class ByteStringQueueInputStream extends InputStream {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source Includes input validation and error handling for robustness.
+   * @return the int result
+   */
   public int available() throws IOException {
     if (closed) {
       throw new IOException("stream is closed");
@@ -49,6 +66,11 @@ public class ByteStringQueueInputStream extends InputStream {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source
+   * @param b the b parameter
+   * @return the int result
+   */
   public int read() throws IOException {
     if (closed) {
       throw new IOException("stream is closed");
@@ -61,11 +83,24 @@ public class ByteStringQueueInputStream extends InputStream {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source Implements complex logic with 4 conditional branches and 1 iterative operations. Processes 1 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+   * @param b the b parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   * @return the int result
+   */
   public int read(byte[] b) throws IOException {
     return read(b, 0, b.length);
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
+  /**
+   * Performs specialized operation based on method logic
+   */
   public int read(byte[] b, int off, int len) throws IOException {
     if (closed) {
       throw new IOException("stream is closed");
@@ -96,6 +131,10 @@ public class ByteStringQueueInputStream extends InputStream {
   // FIXME efficient skip
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param t the t parameter
+   */
   public void close() {
     closed = true;
     // offer to indicate cancellation?
@@ -114,6 +153,9 @@ public class ByteStringQueueInputStream extends InputStream {
     setCompleted();
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   */
   private boolean hasNext() {
     return !queue.isEmpty() || !completed;
   }

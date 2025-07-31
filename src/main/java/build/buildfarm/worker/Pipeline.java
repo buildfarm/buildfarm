@@ -1,3 +1,26 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param stage the stage parameter
+ * @param closePriority the closePriority parameter
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param InputFetchStage the InputFetchStage parameter
+ * @return the inputfetchstage result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param ExecuteActionStage the ExecuteActionStage parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @return the not superscalar stage result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,14 +45,28 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param stage the stage parameter
+ */
 public class Pipeline {
   private final Map<PipelineStage, Thread> stageThreads;
   private final Map<PipelineStage, Integer> stageClosePriorities;
   private Thread joiningThread = null;
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 8 conditional branches and 5 iterative operations. Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param closeStage the closeStage parameter
+   */
   private boolean closing = false;
 
   // FIXME ThreadGroup?
 
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   */
   public Pipeline() {
     stageThreads = new HashMap<>();
     stageClosePriorities = new HashMap<>();
@@ -68,6 +105,13 @@ public class Pipeline {
    * Checking if there is any ongoing actions in any stages of the pipeline.
    *
    * @return true of all PipelineStages are empty.
+   */
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
    */
   public boolean isEmpty() {
     for (PipelineStage stage : stageClosePriorities.keySet()) {

@@ -1,3 +1,10 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param simpleBlobStore the simpleBlobStore parameter
+ * @param treeDefaultPageSize the treeDefaultPageSize parameter
+ * @param treeMaxPageSize the treeMaxPageSize parameter
+ * @return the public result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,8 +57,24 @@ public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
   private final SimpleBlobStore simpleBlobStore;
   private final int treeDefaultPageSize;
+  /**
+   * Performs specialized operation based on method logic
+   * @param digest the digest parameter
+   * @param digestFunction the digestFunction parameter
+   * @return the string result
+   */
   private final int treeMaxPageSize;
 
+  /**
+   * Identifies which blobs are missing from the CAS
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param digest the digest parameter
+   * @return the string result
+   */
   public ContentAddressableStorageService(
       SimpleBlobStore simpleBlobStore, int treeDefaultPageSize, int treeMaxPageSize) {
     this.simpleBlobStore = simpleBlobStore;
@@ -59,6 +82,14 @@ public class ContentAddressableStorageService
     this.treeMaxPageSize = treeMaxPageSize;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Implements complex logic with 5 conditional branches and 1 iterative operations. Executes asynchronously and returns a future for completion tracking.
+   * @param rootDigest the rootDigest parameter
+   * @param pageSize the pageSize parameter
+   * @param pageToken the pageToken parameter
+   * @param directories the directories parameter
+   * @return the string result
+   */
   private static String key(
       build.bazel.remote.execution.v2.Digest digest, DigestFunction.Value digestFunction) {
     Digest blobDigest = DigestUtil.fromDigest(digest, digestFunction);
@@ -70,6 +101,11 @@ public class ContentAddressableStorageService
   }
 
   @Override
+  /**
+   * Updates internal state or external resources
+   * @param batchRequest the batchRequest parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public void findMissingBlobs(
       FindMissingBlobsRequest request, StreamObserver<FindMissingBlobsResponse> responseObserver) {
     FindMissingBlobsResponse.Builder responseBuilder = FindMissingBlobsResponse.newBuilder();
@@ -89,6 +125,11 @@ public class ContentAddressableStorageService
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public void batchUpdateBlobs(
       BatchUpdateBlobsRequest batchRequest,
       StreamObserver<BatchUpdateBlobsResponse> responseObserver) {

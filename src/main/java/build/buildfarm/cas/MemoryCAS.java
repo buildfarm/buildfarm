@@ -1,3 +1,25 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param maxSizeInBytes the maxSizeInBytes parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param maxSizeInBytes the maxSizeInBytes parameter
+ * @param onPut the onPut parameter
+ * @param delegate the delegate parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param digests the digests parameter
+ * @return the incur access use of the digest result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param blob the blob parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,6 +69,12 @@ import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
 
 @Log
+/**
+ * Checks if a blob exists in the Content Addressable Storage
+ * @param digest the digest parameter
+ * @param result the result parameter
+ * @return the boolean result
+ */
 public class MemoryCAS implements ContentAddressableStorage {
   private final long maxSizeInBytes;
   private final Consumer<Digest> onPut;
@@ -61,6 +89,11 @@ public class MemoryCAS implements ContentAddressableStorage {
   private long sizeInBytes;
 
   private final ContentAddressableStorage delegate;
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   * @return the status result
+   */
   private final Writes writes = new Writes(this);
 
   public MemoryCAS(long maxSizeInBytes) {
@@ -93,6 +126,13 @@ public class MemoryCAS implements ContentAddressableStorage {
       Iterable<build.bazel.remote.execution.v2.Digest> digests, DigestFunction.Value digestFunction)
       throws InterruptedException {
     ImmutableList.Builder<build.bazel.remote.execution.v2.Digest> builder = ImmutableList.builder();
+    /**
+     * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+     * @param compressor the compressor parameter
+     * @param digest the digest parameter
+     * @param offset the offset parameter
+     * @return the inputstream result
+     */
     synchronized (this) {
       // incur access use of the digest
       for (build.bazel.remote.execution.v2.Digest digest : digests) {
@@ -113,6 +153,21 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param digests the digests parameter
+   * @param digestFunction the digestFunction parameter
+   * @return the list<response> result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param offset the offset parameter
+   * @param limit the limit parameter
+   * @param blobObserver the blobObserver parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   public synchronized InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
       throws IOException {
     checkArgument(compressor == Compressor.Value.IDENTITY);
@@ -135,6 +190,12 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param digests the digests parameter
+   * @param digestFunction the digestFunction parameter
+   * @return the listenablefuture<list<response>> result
+   */
   public void get(
       Compressor.Value compressor,
       Digest digest,
@@ -158,6 +219,13 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param digests the digests parameter
+   * @param digestFunction the digestFunction parameter
+   * @param blobGetter the blobGetter parameter
+   * @return the list<response> result
+   */
   public ListenableFuture<List<Response>> getAllFuture(
       Iterable<build.bazel.remote.execution.v2.Digest> digests,
       DigestFunction.Value digestFunction) {
@@ -179,6 +247,13 @@ public class MemoryCAS implements ContentAddressableStorage {
         });
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param digest the digest parameter
+   * @param digestFunction the digestFunction parameter
+   * @param blobGetter the blobGetter parameter
+   * @return the response result
+   */
   public static List<Response> getAll(
       Iterable<build.bazel.remote.execution.v2.Digest> digests,
       DigestFunction.Value digestFunction,
@@ -190,6 +265,15 @@ public class MemoryCAS implements ContentAddressableStorage {
     return responses.build();
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the long result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param digest the digest parameter
+   * @return the entry result
+   */
   private static Status statusFromThrowable(Throwable t) {
     Status status = StatusProto.fromThrowable(t);
     if (status == null) {
@@ -199,6 +283,11 @@ public class MemoryCAS implements ContentAddressableStorage {
     return status;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param digest the digest parameter
+   * @return the blob result
+   */
   public static Response getResponse(
       build.bazel.remote.execution.v2.Digest digest,
       DigestFunction.Value digestFunction,
@@ -222,6 +311,18 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param blob the blob parameter
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param uuid the uuid parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the write result
+   */
   public Blob get(Digest digest) {
     if (digest.getSize() == 0) {
       throw new IllegalArgumentException("Cannot fetch empty blob");
@@ -248,6 +349,12 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @GuardedBy("this")
   @SuppressWarnings("PMD.CompareObjectsWithEquals")
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param blob the blob parameter
+   * @param onExpiration the onExpiration parameter
+   * @return the boolean result
+   */
   private long size() {
     Entry e = header.before;
     long count = 0;
@@ -259,6 +366,11 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param blob the blob parameter
+   * @param onExpiration the onExpiration parameter
+   */
   public Write getWrite(
       Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     return writes.get(compressor, digest, uuid);
@@ -271,6 +383,10 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the long result
+   */
   public void put(Blob blob, Runnable onExpiration) {
     if (blob.getDigest().getSize() == 0) {
       throw new IllegalArgumentException("Cannot put empty blob");
@@ -283,6 +399,11 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @SuppressWarnings("PMD.CompareObjectsWithEquals")
+  /**
+   * Creates and initializes a new instance
+   * @param blob the blob parameter
+   * @param onExpiration the onExpiration parameter
+   */
   private synchronized boolean add(Blob blob, Runnable onExpiration) {
     Entry e = storage.get(blob.getDigest().getHash());
     if (e != null) {
@@ -321,6 +442,10 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @GuardedBy("this")
+  /**
+   * Removes expired entries from the cache to free space Performs side effects including logging and state modifications.
+   * @param e the e parameter
+   */
   private void createEntry(Blob blob, Runnable onExpiration) {
     Entry e = new Entry(blob);
     if (onExpiration != null) {
@@ -369,12 +494,19 @@ public class MemoryCAS implements ContentAddressableStorage {
       onExpirations = null;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param onExpiration the onExpiration parameter
+     */
     public Entry(Blob blob) {
       key = blob.getDigest().getHash();
       value = blob;
       onExpirations = null;
     }
 
+    /**
+     * Removes data or cleans up resources
+     */
     public void addOnExpiration(Runnable onExpiration) {
       if (onExpirations == null) {
         onExpirations = new ArrayList<>(1);
@@ -382,11 +514,18 @@ public class MemoryCAS implements ContentAddressableStorage {
       onExpirations.add(onExpiration);
     }
 
+    /**
+     * Removes expired entries from the cache to free space
+     */
     public void remove() {
       before.after = after;
       after.before = before;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param existingEntry the existingEntry parameter
+     */
     public void expire() {
       remove();
       if (onExpirations != null) {
@@ -396,6 +535,10 @@ public class MemoryCAS implements ContentAddressableStorage {
       }
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param header the header parameter
+     */
     public void addBefore(Entry existingEntry) {
       after = existingEntry;
       before = existingEntry.before;
@@ -403,6 +546,10 @@ public class MemoryCAS implements ContentAddressableStorage {
       after.before = this;
     }
 
+    /**
+     * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+     * @param onExpiration the onExpiration parameter
+     */
     public void recordAccess(Entry header) {
       remove();
       addBefore(header);
@@ -416,21 +563,35 @@ public class MemoryCAS implements ContentAddressableStorage {
     }
 
     @Override
+    /**
+     * Removes data or cleans up resources Includes input validation and error handling for robustness.
+     */
     public void addOnExpiration(Runnable onExpiration) {
       throw new UnsupportedOperationException("cannot add expiration to sentinal");
     }
 
     @Override
+    /**
+     * Removes expired entries from the cache to free space Includes input validation and error handling for robustness.
+     */
     public void remove() {
       throw new UnsupportedOperationException("cannot remove sentinel");
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+     * @param existingEntry the existingEntry parameter
+     */
     public void expire() {
       throw new UnsupportedOperationException("cannot expire sentinel");
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+     * @param header the header parameter
+     */
     public void addBefore(Entry existingEntry) {
       throw new UnsupportedOperationException("cannot add sentinel");
     }

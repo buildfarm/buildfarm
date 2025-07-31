@@ -1,3 +1,10 @@
+/**
+ * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+ * @param root the root parameter
+ * @return the deprecated
+
+  public path result
+ */
 package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;

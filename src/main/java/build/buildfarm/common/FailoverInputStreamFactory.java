@@ -1,3 +1,9 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param primary the primary parameter
+ * @param delegate the delegate parameter
+ * @return the public result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +30,13 @@ public class FailoverInputStreamFactory implements InputStreamFactory {
   private final InputStreamFactory primary;
   private final InputStreamFactory delegate;
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param compressor the compressor parameter
+   * @param blobDigest the blobDigest parameter
+   * @param offset the offset parameter
+   * @return the inputstream result
+   */
   public FailoverInputStreamFactory(InputStreamFactory primary, InputStreamFactory delegate) {
     this.primary = primary;
     this.delegate = delegate;

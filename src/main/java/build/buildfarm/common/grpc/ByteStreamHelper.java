@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,10 +45,28 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
 
+/**
+ * Stores a blob in the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 4 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+ * @param resourceName the resourceName parameter
+ * @param offset the offset parameter
+ * @param endpoint the endpoint parameter
+ * @param bsStubSupplier the bsStubSupplier parameter
+ * @param backoffSupplier the backoffSupplier parameter
+ * @param isRetriable the isRetriable parameter
+ * @param retryService the retryService parameter
+ * @return the inputstream result
+ */
 public final class ByteStreamHelper {
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+   */
   private ByteStreamHelper() {}
 
   @SuppressWarnings("Guava")
+  /**
+   * Performs specialized operation based on method logic
+   * @param response the response parameter
+   */
   public static InputStream newInput(
       String resourceName,
       long offset,
@@ -70,6 +92,10 @@ public final class ByteStreamHelper {
           Backoff backoff = backoffSupplier.get();
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+           * @param t the t parameter
+           */
           public void onNext(ReadResponse response) {
             streamReadyFuture.set(inputStream);
             ByteString data = response.getData();
@@ -90,6 +116,9 @@ public final class ByteStreamHelper {
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           */
           public void onError(Throwable t) {
             Status status = Status.fromThrowable(t);
             long nextDelayMillis = backoff.nextDelayMillis();

@@ -134,6 +134,11 @@ public class RedisPriorityQueue implements Queue<String> {
    * @note Suggested return identifier: wasRemoved.
    */
   @Override
+  /**
+   * Removes data or cleans up resources
+   * @param pipeline the pipeline parameter
+   * @param val the val parameter
+   */
   public boolean removeFromDequeue(String val) {
     return jedis.lrem(getDequeueName(), -1, val) != 0;
   }
@@ -214,6 +219,11 @@ public class RedisPriorityQueue implements Queue<String> {
    * @details Checks the current length of the queue.
    * @return The current length of the queue.
    * @note Suggested return identifier: length.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param pipeline the pipeline parameter
+   * @return the supplier<long> result
    */
   public long size() {
     return jedis.zcard(name);

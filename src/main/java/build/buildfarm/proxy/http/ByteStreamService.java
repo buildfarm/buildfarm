@@ -1,3 +1,29 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param simpleBlobStore the simpleBlobStore parameter
+ * @return the public result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param blobDigest the blobDigest parameter
+ * @param offset the offset parameter
+ * @param limit the limit parameter
+ * @param out the out parameter
+ * @return the listenablefuture<boolean> result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @return the new result
+ */
+/**
+ * Persists data to storage or external destination
+ * @return the return new result
+ */
+/**
+ * Handles streaming responses from gRPC calls Performs side effects including logging and state modifications.
+ * @param WriteObserverSource( the WriteObserverSource( parameter
+ * @return the return new result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,8 +72,18 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private static final int DEFAULT_CHUNK_SIZE = 1024 * 16;
 
   private final Map<String, WriteObserver> writeObservers = Maps.newConcurrentMap();
+  /**
+   * Loads data from storage or external source Executes asynchronously and returns a future for completion tracking.
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   private final SimpleBlobStore simpleBlobStore;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param b the b parameter
+   * @param len the len parameter
+   */
   public ByteStreamService(SimpleBlobStore simpleBlobStore) {
     this.simpleBlobStore = simpleBlobStore;
   }
@@ -68,6 +104,10 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         new SkipLimitOutputStream(out, offset, limit <= 0 ? size - offset : limit));
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param status the status parameter
+   */
   private void readBlob(ReadRequest request, StreamObserver<ReadResponse> responseObserver)
       throws InvalidResourceNameException {
     String resourceName = request.getResourceName();
@@ -77,6 +117,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     OutputStream responseOut =
         new ChunkOutputStream(DEFAULT_CHUNK_SIZE) {
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param t the t parameter
+           */
+          /**
+           * Performs specialized operation based on method logic
+           * @param success the success parameter
+           */
           public void onChunk(byte[] b, int len) {
             responseObserver.onNext(
                 ReadResponse.newBuilder().setData(ByteString.copyFrom(b, 0, len)).build());
@@ -86,11 +134,21 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     addCallback(
         getBlob(digest, request.getReadOffset(), request.getReadLimit(), responseOut),
         new FutureCallback<Boolean>() {
+          /**
+           * Searches for data matching specified criteria
+           * @param resourceName the resourceName parameter
+           * @return the write result
+           */
           private void onError(Status status) {
             responseObserver.onError(status.asException());
           }
 
           @Override
+          /**
+           * Loads data from storage or external source Includes input validation and error handling for robustness.
+           * @param request the request parameter
+           * @param responseObserver the responseObserver parameter
+           */
           public void onSuccess(Boolean success) {
             if (success) {
               try {
@@ -142,6 +200,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
   }
 
+  /**
+   * Searches for data matching specified criteria
+   * @param resourceName the resourceName parameter
+   * @return the write result
+   */
   private Write findBlobWrite(String resourceName)
       throws IOException, InterruptedException, InvalidResourceNameException {
     Digest digest = parseUploadBlobDigest(resourceName);
@@ -153,12 +216,22 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       final long committedSize = digest.getSize();
 
       @Override
+      /**
+       * Persists data to storage or external destination
+       * @param request the request parameter
+       * @param responseObserver the responseObserver parameter
+       */
       public long getCommittedSize() {
         return committedSize;
       }
     };
   }
 
+  /**
+   * Handles streaming responses from gRPC calls
+   * @param resourceName the resourceName parameter
+   * @return the writeobserver result
+   */
   private Write findWrite(String resourceName)
       throws IOException, InterruptedException, InvalidResourceNameException {
     Write write = writeObservers.get(resourceName);
@@ -177,6 +250,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination Performs side effects including logging and state modifications.
+   * @param responseObserver the responseObserver parameter
+   * @return the streamobserver<writerequest> result
+   */
   public void queryWriteStatus(
       QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
@@ -208,6 +286,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param resourceName the resourceName parameter
+   * @return the writeobserver result
+   */
   private WriteObserver createWriteObserver(String resourceName)
       throws InvalidResourceNameException {
     Resource.TypeCase resourceOperation = detectResourceOperation(resourceName);
@@ -231,11 +314,20 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param resourceName the resourceName parameter
+   * @return the writeobserver result
+   */
   public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
     return new WriteStreamObserver(
         responseObserver,
         new WriteObserverSource() {
           @Override
+          /**
+           * Removes data or cleans up resources Performs side effects including logging and state modifications.
+           * @param resourceName the resourceName parameter
+           */
           public WriteObserver get(String resourceName) throws InvalidResourceNameException {
             return getOrCreateWriteObserver(resourceName);
           }

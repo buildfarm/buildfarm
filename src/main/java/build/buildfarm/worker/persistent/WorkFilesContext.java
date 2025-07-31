@@ -1,3 +1,12 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param opRoot the opRoot parameter
+ * @param execTree the execTree parameter
+ * @param outputPaths the outputPaths parameter
+ * @param outputFiles the outputFiles parameter
+ * @param outputDirectories the outputDirectories parameter
+ * @return the public result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +49,13 @@ public class WorkFilesContext {
 
   private ImmutableMap<Path, Input> toolInputs = null;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param opRoot the opRoot parameter
+   * @param inputsTree the inputsTree parameter
+   * @param opCommand the opCommand parameter
+   * @return the workfilescontext result
+   */
   public WorkFilesContext(
       Path opRoot,
       Tree execTree,
@@ -55,6 +71,10 @@ public class WorkFilesContext {
     this.inputsIndexer = new InputsIndexer(execTree, this.opRoot);
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Provides thread-safe access through synchronization mechanisms.
+   * @return the immutablemap<path, input> result
+   */
   public static WorkFilesContext fromContext(Path opRoot, Tree inputsTree, Command opCommand) {
     return new WorkFilesContext(
         opRoot,
@@ -65,6 +85,10 @@ public class WorkFilesContext {
   }
 
   // Paths are absolute paths from the opRoot; same as the Input.getPath();
+  /**
+   * Retrieves a blob from the Content Addressable Storage Provides thread-safe access through synchronization mechanisms.
+   * @return the immutablemap<path, input> result
+   */
   public ImmutableMap<Path, Input> getPathInputs() {
     synchronized (this) {
       if (pathInputs == null) {

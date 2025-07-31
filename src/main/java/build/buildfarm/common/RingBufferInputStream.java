@@ -1,3 +1,8 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param size the size parameter
+ * @return the public result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +23,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import javax.annotation.concurrent.GuardedBy;
 
+/**
+ * Performs specialized operation based on method logic
+ */
 public class RingBufferInputStream extends InputStream {
+  /**
+   * Performs specialized operation based on method logic
+   * @return the int result
+   */
   private final byte[] buffer;
   int inIndex = 0;
   int outIndex = 0;
@@ -26,6 +38,9 @@ public class RingBufferInputStream extends InputStream {
   boolean shutdown = false; // ignores available data
   boolean closed = false;
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public RingBufferInputStream(int size) {
     buffer = new byte[size];
   }
@@ -36,6 +51,10 @@ public class RingBufferInputStream extends InputStream {
     notify();
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the int result
+   */
   public synchronized void shutdown() {
     closed = true;
     shutdown = true;
@@ -43,11 +62,19 @@ public class RingBufferInputStream extends InputStream {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source Includes input validation and error handling for robustness.
+   * @return the int result
+   */
   public synchronized int available() {
     return inAvailable();
   }
 
   @GuardedBy("this")
+  /**
+   * Performs specialized operation based on method logic
+   * @return the int result
+   */
   private int inAvailable() {
     if (!flipped) {
       return outIndex - inIndex;
@@ -55,6 +82,10 @@ public class RingBufferInputStream extends InputStream {
     return buffer.length - inIndex + outIndex;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the int result
+   */
   private int outAvailable() {
     if (!flipped) {
       return buffer.length - outIndex;
@@ -63,6 +94,10 @@ public class RingBufferInputStream extends InputStream {
   }
 
   @GuardedBy("this")
+  /**
+   * Performs specialized operation based on method logic
+   * @return the int result
+   */
   private int waitForInAvailable() throws InterruptedException {
     while (!shutdown) {
       int len = inAvailable();
@@ -77,6 +112,10 @@ public class RingBufferInputStream extends InputStream {
     return -1;
   }
 
+  /**
+   * Loads data from storage or external source
+   * @return the int result
+   */
   private int waitForOutAvailable() throws InterruptedException {
     while (!closed && !shutdown) {
       int len = outAvailable();
@@ -89,6 +128,13 @@ public class RingBufferInputStream extends InputStream {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source Includes input validation and error handling for robustness.
+   * @param buf the buf parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   * @return the int result
+   */
   public int read() throws IOException {
     try {
       return readInterruptibly();
@@ -106,6 +152,13 @@ public class RingBufferInputStream extends InputStream {
     }
   }
 
+  /**
+   * Loads data from storage or external source
+   * @param buf the buf parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   * @return the int result
+   */
   private synchronized int readInterruptibly() throws InterruptedException {
     if (waitForInAvailable() <= 0) {
       return -1;
@@ -119,6 +172,17 @@ public class RingBufferInputStream extends InputStream {
     return b;
   }
 
+  /**
+   * Persists data to storage or external destination Includes input validation and error handling for robustness.
+   * @param buf the buf parameter
+   */
+  /**
+   * Loads data from storage or external source
+   * @param buf the buf parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   * @return the int result
+   */
   private synchronized int readInterruptibly(byte[] buf, int off, int len)
       throws InterruptedException {
     int totalBytesRead = 0;
@@ -134,6 +198,13 @@ public class RingBufferInputStream extends InputStream {
   }
 
   @GuardedBy("this")
+  /**
+   * Persists data to storage or external destination
+   * @param buf the buf parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   * @return the int result
+   */
   private int readPartial(byte[] buf, int off, int len) throws InterruptedException {
     if (len <= 0) {
       return 0;

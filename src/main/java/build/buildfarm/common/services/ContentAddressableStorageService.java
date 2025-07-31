@@ -1,3 +1,20 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param instance the instance parameter
+ * @return the public result
+ */
+/**
+ * Identifies which blobs are missing from the CAS Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+ * @param instance the instance parameter
+ * @param request the request parameter
+ * @param responseObserver the responseObserver parameter
+ */
+/**
+ * Loads data from storage or external source Executes asynchronously and returns a future for completion tracking.
+ * @param instance the instance parameter
+ * @param batchRequest the batchRequest parameter
+ * @param responseObserver the responseObserver parameter
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,6 +73,11 @@ import java.util.stream.StreamSupport;
 import lombok.extern.java.Log;
 
 @Log
+/**
+ * Identifies which blobs are missing from the CAS
+ * @param request the request parameter
+ * @param responseObserver the responseObserver parameter
+ */
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
   private static final Histogram missingBlobs =
@@ -68,14 +90,37 @@ public class ContentAddressableStorageService
   private final Instance instance;
   private final long writeDeadlineAfter;
 
+  /**
+   * Stores a blob in the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+   * @param instance the instance parameter
+   * @param requests the requests parameter
+   * @param digestFunction the digestFunction parameter
+   * @param writeDeadlineAfter the writeDeadlineAfter parameter
+   * @param writeDeadlineAfterUnits the writeDeadlineAfterUnits parameter
+   * @return the iterable<listenablefuture<response>> result
+   */
+  /**
+   * Asynchronous computation result handler
+   * @param codeFuture the codeFuture parameter
+   * @param digest the digest parameter
+   * @return the listenablefuture<response> result
+   */
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param builder the builder parameter
+   */
   public ContentAddressableStorageService(Instance instance) {
     this.instance = instance;
     this.writeDeadlineAfter = configs.getServer().getCasWriteTimeout();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param t the t parameter
+   */
   public void findMissingBlobs(
       FindMissingBlobsRequest request, StreamObserver<FindMissingBlobsResponse> responseObserver) {
     instanceFindMissingBlobs(instance, request, responseObserver);
@@ -121,6 +166,11 @@ public class ContentAddressableStorageService
 
           @SuppressWarnings("NullableProblems")
           @Override
+          /**
+           * Updates internal state or external resources Executes asynchronously and returns a future for completion tracking.
+           * @param batchRequest the batchRequest parameter
+           * @param responseObserver the responseObserver parameter
+           */
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() != Code.CANCELLED) {
@@ -149,6 +199,14 @@ public class ContentAddressableStorageService
         directExecutor());
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param instance the instance parameter
+   * @param rootDigest the rootDigest parameter
+   * @param pageToken the pageToken parameter
+   * @param pageSize the pageSize parameter
+   * @param responseObserver the responseObserver parameter
+   */
   private static Iterable<ListenableFuture<Response>> putAllBlobs(
       Instance instance,
       Iterable<Request> requests,
@@ -181,6 +239,14 @@ public class ContentAddressableStorageService
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param response the response parameter
+   */
   public void batchUpdateBlobs(
       BatchUpdateBlobsRequest batchRequest,
       StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
@@ -213,6 +279,10 @@ public class ContentAddressableStorageService
 
           @SuppressWarnings("NullableProblems")
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param response the response parameter
+           */
           public void onFailure(Throwable t) {
             responseObserver.onError(t);
           }
@@ -253,6 +323,10 @@ public class ContentAddressableStorageService
             directExecutor()),
         new FutureCallback<BatchReadBlobsResponse>() {
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param t the t parameter
+           */
           public void onSuccess(BatchReadBlobsResponse response) {
             responseObserver.onNext(response);
             responseObserver.onCompleted();
@@ -260,6 +334,11 @@ public class ContentAddressableStorageService
 
           @SuppressWarnings("NullableProblems")
           @Override
+          /**
+           * Loads data from storage or external source
+           * @param batchRequest the batchRequest parameter
+           * @param responseObserver the responseObserver parameter
+           */
           public void onFailure(Throwable t) {
             responseObserver.onError(Status.fromThrowable(t).asException());
           }
@@ -268,6 +347,11 @@ public class ContentAddressableStorageService
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public void batchReadBlobs(
       BatchReadBlobsRequest batchRequest, StreamObserver<BatchReadBlobsResponse> responseObserver) {
     batchReadBlobs(instance, batchRequest, responseObserver);

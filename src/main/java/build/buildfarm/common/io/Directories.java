@@ -1,3 +1,11 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param path the path parameter
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,6 +51,11 @@ import lombok.extern.java.Log;
 public final class Directories {
   private static final Set<PosixFilePermission> writablePerms =
       PosixFilePermissions.fromString("rwxr-xr-x");
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param path the path parameter
+   * @param fileStore the fileStore parameter
+   */
   private static final Set<PosixFilePermission> nonWritablePerms =
       PosixFilePermissions.fromString("r-xr-xr-x");
   private static final Set<PosixFilePermission> readOnlyPerms =
@@ -50,6 +63,12 @@ public final class Directories {
 
   private Directories() {}
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param dir the dir parameter
+   * @param writable the writable parameter
+   * @param fileStore the fileStore parameter
+   */
   private static void makeUnwritable(Path path, FileStore fileStore) throws IOException {
     if (fileStore.supportsFileAttributeView("posix")) {
       Files.setPosixFilePermissions(
@@ -81,6 +100,13 @@ public final class Directories {
     }
   }
 
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param path the path parameter
+   * @param fileStore the fileStore parameter
+   * @param service the service parameter
+   * @return the listenablefuture<void> result
+   */
   private static void makeWritable(Path dir, boolean writable, FileStore fileStore)
       throws IOException {
     if (fileStore.supportsFileAttributeView("posix")) {
@@ -115,6 +141,17 @@ public final class Directories {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param dir the dir parameter
+   * @param attrs the attrs parameter
+   * @return the filevisitresult result
+   */
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param directory the directory parameter
+   * @param fileStore the fileStore parameter
+   */
   public static ListenableFuture<Void> remove(
       Path path, FileStore fileStore, ExecutorService service) {
     String suffix = UUID.randomUUID().toString();
@@ -141,11 +178,29 @@ public final class Directories {
             null);
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param directory the directory parameter
+   * @param onFileVisit the onFileVisit parameter
+   * @param onPostVisit the onPostVisit parameter
+   */
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param file the file parameter
+   * @param attrs the attrs parameter
+   * @return the filevisitresult result
+   */
   public static void remove(Path directory, FileStore fileStore) throws IOException {
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<>() {
           @Override
+          /**
+           * Performs specialized operation based on method logic Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+           * @param dir the dir parameter
+           * @param e the e parameter
+           * @return the filevisitresult result
+           */
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {
             makeWritable(dir, true, fileStore);
@@ -172,6 +227,12 @@ public final class Directories {
   }
 
   @FunctionalInterface
+  /**
+   * Performs specialized operation based on method logic
+   * @param file the file parameter
+   * @param attrs the attrs parameter
+   * @return the filevisitresult result
+   */
   public interface PathConsumer {
     void accept(Path path) throws IOException;
   }
@@ -186,6 +247,12 @@ public final class Directories {
         directory,
         new SimpleFileVisitor<>() {
           @Override
+          /**
+           * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+           * @param dir the dir parameter
+           * @param e the e parameter
+           * @return the filevisitresult result
+           */
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
             onFileVisit.accept(file);
@@ -193,6 +260,11 @@ public final class Directories {
           }
 
           @Override
+          /**
+           * Persists data to storage or external destination
+           * @param directory the directory parameter
+           * @param fileStore the fileStore parameter
+           */
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e != null) {
               throw e;
@@ -203,10 +275,20 @@ public final class Directories {
         });
   }
 
+  /**
+   * Persists data to storage or external destination
+   * @param directory the directory parameter
+   * @param fileStore the fileStore parameter
+   */
   public static void disableAllWriteAccess(Path directory, FileStore fileStore) throws IOException {
     forAllPostDirs(directory, dir -> makeWritable(dir, false, fileStore));
   }
 
+  /**
+   * Persists data to storage or external destination
+   * @param directory the directory parameter
+   * @param fileStore the fileStore parameter
+   */
   public static void disableAllFileWriteAccess(Path directory, FileStore fileStore)
       throws IOException {
     forAllPostDirsAndFiles(
@@ -215,6 +297,11 @@ public final class Directories {
         dir -> makeWritable(dir, false, fileStore));
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param directory the directory parameter
+   * @param owner the owner parameter
+   */
   public static void enableAllWriteAccess(Path directory, FileStore fileStore) throws IOException {
     forAllPostDirs(directory, dir -> makeWritable(dir, true, fileStore));
   }

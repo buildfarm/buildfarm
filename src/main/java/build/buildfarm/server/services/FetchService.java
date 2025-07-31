@@ -1,3 +1,8 @@
+/**
+ * Loads data from storage or external source
+ * @param instance the instance parameter
+ * @return the public result
+ */
 package build.buildfarm.server.services;
 
 import static com.google.common.util.concurrent.Futures.addCallback;
@@ -32,11 +37,23 @@ public class FetchService extends FetchImplBase {
   // key-value metadata to download requests. These are the qualifier names
   // supported by Bazel.
   public static final String QUALIFIER_CHECKSUM_SRI = "checksum.sri";
+  /**
+   * Loads data from storage or external source
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public static final String QUALIFIER_CANONICAL_ID = "bazel.canonical_id";
 
   // The `:` character is not permitted in an HTTP header name. So, we use it to
   // delimit the qualifier prefix which denotes an HTTP header qualifer from the
   // header name itself.
+  /**
+   * Transforms data between different representations
+   * @param name the name parameter
+   * @param value the value parameter
+   * @param digestFunction the digestFunction parameter
+   * @param fetchQualifiers the fetchQualifiers parameter
+   */
   public static final String QUALIFIER_HTTP_HEADER_PREFIX = "http_header:";
 
   public FetchService(Instance instance) {
@@ -44,6 +61,10 @@ public class FetchService extends FetchImplBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param actualDigest the actualDigest parameter
+   */
   public void fetchBlob(
       FetchBlobRequest request, StreamObserver<FetchBlobResponse> responseObserver) {
     try {
@@ -53,6 +74,12 @@ public class FetchService extends FetchImplBase {
     }
   }
 
+  /**
+   * Transforms data between different representations
+   * @param qualifiers the qualifiers parameter
+   * @param digestFunction the digestFunction parameter
+   * @return the fetchqualifiers result
+   */
   private static void parseQualifier(
       String name,
       String value,
@@ -70,6 +97,12 @@ public class FetchService extends FetchImplBase {
     }
   }
 
+  /**
+   * Loads data from storage or external source Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param instance the instance parameter
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   private static FetchQualifiers parseQualifiers(
       Iterable<Qualifier> qualifiers, DigestFunction.Value digestFunction) {
     FetchQualifiers.Builder fetchQualifiers = FetchQualifiers.newBuilder();
@@ -113,6 +146,10 @@ public class FetchService extends FetchImplBase {
             request.getUrisList(), qualifiers.getHeadersMap(), expectedDigest, requestMetadata),
         new FutureCallback<>() {
           @Override
+          /**
+           * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+           * @param t the t parameter
+           */
           public void onSuccess(Digest actualDigest) {
             log.log(
                 Level.INFO,
@@ -129,6 +166,11 @@ public class FetchService extends FetchImplBase {
 
           @SuppressWarnings("NullableProblems")
           @Override
+          /**
+           * Loads data from storage or external source Performs side effects including logging and state modifications.
+           * @param request the request parameter
+           * @param responseObserver the responseObserver parameter
+           */
           public void onFailure(Throwable t) {
             // handle NoSuchFileException
             log.log(Level.SEVERE, "fetch blob failed", t);

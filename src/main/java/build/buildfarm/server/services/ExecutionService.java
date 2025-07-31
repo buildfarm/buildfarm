@@ -1,3 +1,32 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param instance the instance parameter
+ * @param keepaliveScheduler the keepaliveScheduler parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+ * @param serverCallStreamObserver the serverCallStreamObserver parameter
+ * @param future the future parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the boolean result
+ */
+/**
+ * Creates and initializes a new instance
+ * @param serverCallStreamObserver the serverCallStreamObserver parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the keepalivewatcher result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the return new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param operation the operation parameter
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,6 +86,14 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param t the t parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param result the result parameter
+   */
   public ExecutionService(Instance instance, ScheduledExecutorService keepaliveScheduler) {
     this.instance = instance;
     this.keepaliveAfter = configs.getServer().getExecuteKeepaliveAfterSeconds();
@@ -64,6 +101,9 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     this.metricsPublisher = getMetricsPublisher();
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   private void withCancellation(
       ServerCallStreamObserver<Operation> serverCallStreamObserver, ListenableFuture<Void> future) {
     addCallback(
@@ -100,6 +140,10 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   }
 
   abstract class KeepaliveWatcher implements Watcher {
+    /**
+     * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+     * @param operation the operation parameter
+     */
     private final ServerCallStreamObserver<Operation> serverCallStreamObserver;
     private ListenableFuture<?> keepaliveFuture = null;
 
@@ -124,6 +168,15 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param request the request parameter
+     * @param responseObserver the responseObserver parameter
+     */
+    /**
+     * Performs specialized operation based on method logic
+     * @param operationName the operationName parameter
+     */
     public final synchronized void observe(Operation operation) {
       cancel();
       if (operation == null) {
@@ -176,6 +229,11 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   }
 
   @Override
+  /**
+   * Executes a build action on the worker
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public void waitExecution(
       WaitExecutionRequest request, StreamObserver<Operation> responseObserver) {
     UUID executionId = instance.unbindExecutions(request.getName());

@@ -1,3 +1,48 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
+/**
+ * Returns resources to the shared pool
+ * @param onPut the onPut parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param 0 the 0 parameter
+ * @return the needs some treatment for compressor result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param name the name parameter
+ * @param fileSystem the fileSystem parameter
+ * @return the userprincipal result
+ */
+/**
+ * Loads data from storage or external source Performs side effects including logging and state modifications.
+ * @param Runnable( the Runnable( parameter
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param now the now parameter
+ * @return the shardworker result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param now the now parameter
+ * @return the long result
+ */
+/**
+ * Creates and initializes a new instance Performs side effects including logging and state modifications.
+ * @return the boolean result
+ */
+/**
+ * Removes expired entries from the cache to free space
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -162,12 +207,30 @@ public final class Worker extends LoggingMain {
   private Backplane backplane;
   private LoadingCache<String, StubInstance> workerStubs;
   private AtomicBoolean released = new AtomicBoolean(true);
+  /**
+   * Creates and initializes a new instance Implements complex logic with 3 conditional branches and 2 iterative operations.
+   * @param serverBuilder the serverBuilder parameter
+   * @param storage the storage parameter
+   * @param instance the instance parameter
+   * @param pipeline the pipeline parameter
+   * @param context the context parameter
+   * @return the server result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @return the operation result
+   */
   private AtomicBoolean shutdownInitiated = new AtomicBoolean(false);
 
   /**
    * The method will prepare the worker for graceful shutdown when the worker is ready. Note on
    * using stderr here instead of log. By the time this is called in PreDestroy, the log is no
    * longer available and is not logging messages.
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param executionContext the executionContext parameter
    */
   public void prepareWorkerForGracefulShutdown() {
     if (configs.getWorker().getGracefulShutdownSeconds() == 0) {
@@ -224,12 +287,21 @@ public final class Worker extends LoggingMain {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     */
     public void put(ExecutionContext executionContext) throws InterruptedException {
       executionContext.claim.release();
       super.put(executionContext);
     }
   }
 
+  /**
+   * Creates and initializes a new instance Processes 1 input sources and produces 3 outputs. Includes input validation and error handling for robustness.
+   * @param remoteInputStreamFactory the remoteInputStreamFactory parameter
+   * @param storage the storage parameter
+   * @return the execfilesystem result
+   */
   private Server createServer(
       ServerBuilder<?> serverBuilder,
       @Nullable CASFileCache storage,
@@ -288,6 +360,18 @@ public final class Worker extends LoggingMain {
   }
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
+  /**
+   * Creates and initializes a new instance Implements complex logic with 5 conditional branches and 1 iterative operations. Includes input validation and error handling for robustness.
+   * @param remoteInputStreamFactory the remoteInputStreamFactory parameter
+   * @param removeDirectoryService the removeDirectoryService parameter
+   * @param accessRecorder the accessRecorder parameter
+   * @param fetchService the fetchService parameter
+   * @param storage the storage parameter
+   * @param resourceSet the resourceSet parameter
+   * @param ownerName the ownerName parameter
+   * @param ownerNames the ownerNames parameter
+   * @return the execfilesystem result
+   */
   private ExecFileSystem createFuseExecFileSystem(
       InputStreamFactory remoteInputStreamFactory, ContentAddressableStorage storage) {
     InputStreamFactory storageInputStreamFactory =
@@ -340,6 +424,26 @@ public final class Worker extends LoggingMain {
     }
   }
 
+  /**
+   * Creates and initializes a new instance Implements complex logic with 5 conditional branches and 2 iterative operations. Includes input validation and error handling for robustness.
+   * @param remoteInputStreamFactory the remoteInputStreamFactory parameter
+   * @param removeDirectoryService the removeDirectoryService parameter
+   * @param accessRecorder the accessRecorder parameter
+   * @param zstdBufferPool the zstdBufferPool parameter
+   * @param cas the cas parameter
+   * @param delegate the delegate parameter
+   * @param delegateSkipLoad the delegateSkipLoad parameter
+   * @return the contentaddressablestorage result
+   */
+  /**
+   * Creates and initializes a new instance
+   * @param remoteInputStreamFactory the remoteInputStreamFactory parameter
+   * @param removeDirectoryService the removeDirectoryService parameter
+   * @param accessRecorder the accessRecorder parameter
+   * @param zstdBufferPool the zstdBufferPool parameter
+   * @param storages the storages parameter
+   * @return the contentaddressablestorage result
+   */
   private ExecFileSystem createExecFileSystem(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
@@ -415,6 +519,22 @@ public final class Worker extends LoggingMain {
     return storage;
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param root the root parameter
+   * @param cas the cas parameter
+   * @param maxEntrySizeInBytes the maxEntrySizeInBytes parameter
+   * @param expireService the expireService parameter
+   * @param accessRecorder the accessRecorder parameter
+   * @param storage the storage parameter
+   * @param zstdBufferPool the zstdBufferPool parameter
+   * @param onPut the onPut parameter
+   * @param onExpire the onExpire parameter
+   * @param delegate the delegate parameter
+   * @param delegateSkipLoad the delegateSkipLoad parameter
+   * @param externalInputStreamFactory the externalInputStreamFactory parameter
+   * @return the casfilecache result
+   */
   private ContentAddressableStorage createStorage(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
@@ -450,6 +570,19 @@ public final class Worker extends LoggingMain {
     }
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param digest the digest parameter
+   */
+  /**
+   * Creates and initializes a new instance
+   * @param removeDirectoryService the removeDirectoryService parameter
+   * @param accessRecorder the accessRecorder parameter
+   * @param fetchService the fetchService parameter
+   * @param fileCache the fileCache parameter
+   * @param owners the owners parameter
+   * @return the execfilesystem result
+   */
   private CASFileCache createCASFileCache(
       Path root,
       Cas cas,
@@ -498,6 +631,14 @@ public final class Worker extends LoggingMain {
         externalInputStreamFactory);
   }
 
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param name the name parameter
+   */
+  /**
+   * Removes expired entries from the cache to free space Performs side effects including logging and state modifications.
+   * @param digests the digests parameter
+   */
   private ExecFileSystem createCFCExecFileSystem(
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
@@ -527,6 +668,11 @@ public final class Worker extends LoggingMain {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param digests the digests parameter
+   * @param name the name parameter
+   */
   private void onStoragePut(Digest digest) {
     try {
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
@@ -538,6 +684,10 @@ public final class Worker extends LoggingMain {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param worker the worker parameter
+   */
   private void onStorageExpire(Iterable<Digest> digests) {
     if (configs.getWorker().getCapabilities().isCas()) {
       try {
@@ -561,6 +711,9 @@ public final class Worker extends LoggingMain {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   private void addBlobsLocation(List<Digest> digests, String name) {
     while (!backplane.isStopped()) {
       try {
@@ -593,6 +746,10 @@ public final class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
+  /**
+   * Loads data from storage or external source Processes 2 input sources and produces 2 outputs.
+   * @return the long result
+   */
   private void startFailsafeRegistration() {
     String endpoint = configs.getWorker().getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
@@ -640,6 +797,9 @@ public final class Worker extends LoggingMain {
               }
 
               @Override
+              /**
+               * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 1 iterative operations. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+               */
               public void run() {
                 try {
                   while (server != null && !server.isShutdown()) {
@@ -655,6 +815,9 @@ public final class Worker extends LoggingMain {
         .start();
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 1 iterative operations. Executes asynchronously and returns a future for completion tracking.
+   */
   private long loadWorkerStartTimeInMillis() {
     try {
       File cache = new File(configs.getWorker().getRoot() + "/cache");
@@ -704,6 +867,9 @@ public final class Worker extends LoggingMain {
         .setChild(
             new Gauge.Child() {
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               */
               public double get() {
                 return zstdBufferPool.getNumActive();
               }
@@ -815,6 +981,9 @@ public final class Worker extends LoggingMain {
     awaitRelease();
   }
 
+  /**
+   * Returns resources to the shared pool Executes asynchronously and returns a future for completion tracking.
+   */
   private void awaitTermination() throws InterruptedException {
     pipeline.join();
     if (server != null && !server.isTerminated()) {
@@ -849,12 +1018,22 @@ public final class Worker extends LoggingMain {
     shutdownInitiated.set(true);
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 6 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   */
   private synchronized void awaitRelease() throws InterruptedException {
     while (!released.get()) {
       wait();
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param args the args parameter
+   */
   public synchronized void stop() throws InterruptedException {
     try {
       shutdown();

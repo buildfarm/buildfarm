@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param request the request parameter
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,6 +41,9 @@ class BlobWriteObserver implements WriteObserver {
   private final Thread putThread;
   private long committedSize = 0;
   private final AtomicReference<Throwable> error = new AtomicReference<>(null);
+  /**
+   * Validates input parameters and state consistency Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   */
   private boolean complete = false;
 
   BlobWriteObserver(String resourceName, SimpleBlobStore simpleBlobStore)
@@ -60,6 +67,10 @@ class BlobWriteObserver implements WriteObserver {
     putThread.start();
   }
 
+  /**
+   * Validates input parameters and state consistency Implements complex logic with 4 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param request the request parameter
+   */
   private void checkError() {
     Throwable t = error.get();
     if (t != null) {
@@ -112,6 +123,10 @@ class BlobWriteObserver implements WriteObserver {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+   * @param t the t parameter
+   */
   public void onNext(WriteRequest request) {
     boolean shutdownBuffer = true;
     try {
@@ -137,6 +152,9 @@ class BlobWriteObserver implements WriteObserver {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void onError(Throwable t) {
     if (!error.compareAndSet(null, t)) {
       error.get().addSuppressed(t);
@@ -159,6 +177,10 @@ class BlobWriteObserver implements WriteObserver {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public long getCommittedSize() {
     return committedSize;
   }

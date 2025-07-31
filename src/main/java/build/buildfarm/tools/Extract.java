@@ -1,3 +1,14 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the return new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Processes the operation according to configured logic
+ * @param directory the directory parameter
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +28,24 @@ package build.buildfarm.tools;
 import static build.buildfarm.common.grpc.Channels.createChannel;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param instanceName the instanceName parameter
+ * @param digest the digest parameter
+ * @param bsStub the bsStub parameter
+ * @param retryService the retryService parameter
+ * @return the inputstream result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param instanceName the instanceName parameter
+ * @param digest the digest parameter
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param args the args parameter
+ */
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import build.bazel.remote.execution.v2.Action;
@@ -59,6 +88,27 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 class Extract {
+  /**
+   * Performs specialized operation based on method logic
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param response the response parameter
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param root the root parameter
+   * @param instanceName the instanceName parameter
+   * @param digest the digest parameter
+   * @param bsStub the bsStub parameter
+   * @param outstandingOperations the outstandingOperations parameter
+   * @param retryService the retryService parameter
+   * @return the runnable result
+   */
   public static void main(String[] args) throws Exception {
     String host = args[0];
     String instanceName = args[1];
@@ -83,6 +133,15 @@ class Extract {
     return String.format("%s/blobs/%s", instanceName, DigestUtil.toString(digest));
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Processes 1 input sources and produces 2 outputs.
+   * @param type the type parameter
+   * @param instanceName the instanceName parameter
+   * @param digest the digest parameter
+   * @param bsStub the bsStub parameter
+   * @param root the root parameter
+   * @return the bytestring result
+   */
   static InputStream newInput(
       String instanceName,
       Digest digest,
@@ -99,6 +158,13 @@ class Extract {
         retryService);
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 2 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+   * @param instanceName the instanceName parameter
+   * @param digest the digest parameter
+   * @param bsStub the bsStub parameter
+   * @return the bytestring result
+   */
   static Runnable blobGetter(
       Path root,
       String instanceName,
@@ -143,6 +209,19 @@ class Extract {
     return content;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param root the root parameter
+   * @param instanceName the instanceName parameter
+   * @param digest the digest parameter
+   * @param visitedDirectories the visitedDirectories parameter
+   * @param visitedDigests the visitedDigests parameter
+   * @param bsStub the bsStub parameter
+   * @param executor the executor parameter
+   * @param outstandingOperations the outstandingOperations parameter
+   * @param retryService the retryService parameter
+   * @return the runnable result
+   */
   static ByteString getBlob(String instanceName, Digest digest, ByteStreamStub bsStub)
       throws InterruptedException {
     SettableFuture<ByteString> blobFuture = SettableFuture.create();
@@ -170,6 +249,9 @@ class Extract {
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           */
           public void onCompleted() {
             blobFuture.set(out.toByteString());
           }
@@ -184,6 +266,13 @@ class Extract {
     }
   }
 
+  /**
+   * Retrieves data from distributed storage Executes asynchronously and returns a future for completion tracking.
+   * @param root the root parameter
+   * @param instanceName the instanceName parameter
+   * @param actionDigests the actionDigests parameter
+   * @param channel the channel parameter
+   */
   static Runnable directoryGetter(
       Path root,
       String instanceName,

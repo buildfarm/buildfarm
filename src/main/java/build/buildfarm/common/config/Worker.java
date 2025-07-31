@@ -34,6 +34,10 @@ import lombok.extern.java.Log;
 public class Worker {
   private int port = 8981;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the int result
+   */
   private String publicName;
   private Capabilities capabilities = new Capabilities();
   private String root = "/tmp/worker";
@@ -69,12 +73,19 @@ public class Worker {
 
   private boolean errorOperationOutputSizeExceeded = false;
   private boolean legacyDirectoryFileCache = false;
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   */
   private boolean absolutizeCommandProgram = isWindows();
 
   public List<ExecutionPolicy> getExecutionPolicies() {
     return executionPolicies;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the path result
+   */
   public int getWorkerType() {
     int workerType = 0;
     if (getCapabilities().isCas()) {
@@ -93,6 +104,9 @@ public class Worker {
     return Path.of(root);
   }
 
+  /**
+   * Validates input parameters and state consistency Includes input validation and error handling for robustness.
+   */
   private void addRootIfMissing() throws ConfigurationException {
     try {
       if (!Files.isDirectory(Path.of(root))) {
@@ -103,6 +117,9 @@ public class Worker {
     }
   }
 
+  /**
+   * Validates input parameters and state consistency Includes input validation and error handling for robustness.
+   */
   private void verifyRootConfiguration() throws ConfigurationException {
     // Configuration error if no root is specified.
     if (Strings.isNullOrEmpty(root)) {

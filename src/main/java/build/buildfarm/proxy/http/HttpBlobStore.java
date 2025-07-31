@@ -603,6 +603,11 @@ public final class HttpBlobStore implements SimpleBlobStore {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param status the status parameter
+   * @return the boolean result
+   */
   private boolean reset(InputStream in) throws IOException {
     if (in.markSupported()) {
       in.reset();
@@ -650,6 +655,9 @@ public final class HttpBlobStore implements SimpleBlobStore {
 
   /** See https://tools.ietf.org/html/rfc6750#section-3.1 */
   @SuppressWarnings("ConstantConditions")
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   */
   private boolean authTokenExpired(HttpResponse response) {
     synchronized (credentialsLock) {
       if (creds == null) {

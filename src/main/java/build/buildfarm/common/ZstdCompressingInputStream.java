@@ -1,3 +1,8 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param in the in parameter
+ * @return the public result
+ */
 // Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,8 +43,15 @@ public class ZstdCompressingInputStream extends FilterInputStream {
 
   private final PipedInputStream pis;
   private ZstdOutputStreamNoFinalizer zos;
+  /**
+   * Performs specialized operation based on method logic Processes 1 input sources and produces 1 outputs.
+   */
   private final int size;
 
+  /**
+   * Loads data from storage or external source Processes 1 input sources and produces 1 outputs.
+   * @return the int result
+   */
   public ZstdCompressingInputStream(InputStream in) throws IOException {
     this(in, 512);
   }
@@ -67,6 +79,11 @@ public class ZstdCompressingInputStream extends FilterInputStream {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source
+   * @param b the b parameter
+   * @return the int result
+   */
   public int read() throws IOException {
     if (pis.available() == 0) {
       if (zos == null) {
@@ -78,11 +95,21 @@ public class ZstdCompressingInputStream extends FilterInputStream {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source Processes 1 input sources and produces 1 outputs.
+   * @param b the b parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   * @return the int result
+   */
   public int read(byte[] b) throws IOException {
     return read(b, 0, b.length);
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public int read(byte[] b, int off, int len) throws IOException {
     int count = 0;
     int n = len > 0 ? -1 : 0;

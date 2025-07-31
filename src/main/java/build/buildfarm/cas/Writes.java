@@ -1,3 +1,15 @@
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param compressor the compressor parameter
+ * @param digest the digest parameter
+ * @param uuid the uuid parameter
+ * @return the write result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+ * @param digest the digest parameter
+ * @return the settablefuture<bytestring> result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,6 +48,13 @@ public class Writes {
   private final ContentAddressableStorage storage;
   private final Cache<BlobWriteKey, Write> blobWrites =
       CacheBuilder.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).build();
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param compressor the compressor parameter
+   * @param digest the digest parameter
+   * @param uuid the uuid parameter
+   * @return the write result
+   */
   private final Cache<Digest, SettableFuture<ByteString>> writesInProgress =
       CacheBuilder.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).build();
 
@@ -50,6 +69,11 @@ public class Writes {
     return getNonEmpty(compressor, digest, uuid);
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param key the key parameter
+   * @return the write result
+   */
   private synchronized Write getNonEmpty(Compressor.Value compressor, Digest digest, UUID uuid) {
     checkArgument(compressor == Compressor.Value.IDENTITY);
     Blob blob = storage.get(digest);
@@ -59,6 +83,11 @@ public class Writes {
     return get(BlobWriteKey.newBuilder().setDigest(digest).setIdentifier(uuid.toString()).build());
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param key the key parameter
+   * @return the write result
+   */
   private Write get(BlobWriteKey key) {
     try {
       return blobWrites.get(key, () -> newWrite(key));

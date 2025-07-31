@@ -1,3 +1,35 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param offset the offset parameter
+ * @return the inputstream result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param 0 the 0 parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the int result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param 0 the 0 parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @return the if either in or out are closed, it should be due to a local switch result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param 0 the 0 parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @return the if either in or out are closed, it should be due to a local switch result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,6 +71,9 @@ class ReadThroughInputStream extends InputStream {
   private boolean local = false;
 
   @GuardedBy("this")
+  /**
+   * Performs specialized operation based on method logic
+   */
   private long localOffset;
 
   @GuardedBy("this")
@@ -48,6 +83,9 @@ class ReadThroughInputStream extends InputStream {
   private long remaining;
 
   @GuardedBy("this")
+  /**
+   * Loads data from storage or external source Processes 1 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+   */
   private IOException exception = null;
 
   ReadThroughInputStream(
@@ -68,6 +106,10 @@ class ReadThroughInputStream extends InputStream {
     out = write.getOutput(1, MINUTES, () -> {});
   }
 
+  /**
+   * Loads data from storage or external source Implements complex logic with 10 conditional branches and 2 iterative operations. Processes 1 input sources and produces 3 outputs. Includes input validation and error handling for robustness.
+   * @return the int result
+   */
   private synchronized void switchToLocal() {
     if (!local && localOffset < size) {
       local = true;
@@ -110,6 +152,18 @@ class ReadThroughInputStream extends InputStream {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source Implements complex logic with 8 conditional branches and 2 iterative operations. Processes 1 input sources and produces 3 outputs. Includes input validation and error handling for robustness.
+   * @param buf the buf parameter
+   * @param ofs the ofs parameter
+   * @param len the len parameter
+   * @return the int result
+   */
+  /**
+   * Loads data from storage or external source
+   * @param buf the buf parameter
+   * @return the int result
+   */
   public synchronized int read() throws IOException {
     if (local) {
       if (exception != null) {
@@ -159,6 +213,11 @@ class ReadThroughInputStream extends InputStream {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param n the n parameter
+   * @return the long result
+   */
   public synchronized int read(byte[] buf, int ofs, int len) throws IOException {
     if (local) {
       if (exception != null) {
@@ -196,6 +255,9 @@ class ReadThroughInputStream extends InputStream {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   */
   public synchronized long skip(long n) throws IOException {
     if (local) {
       if (exception != null) {

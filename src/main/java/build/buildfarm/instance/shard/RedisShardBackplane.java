@@ -1,3 +1,104 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param source the source parameter
+ * @param subscribeToBackplane the subscribeToBackplane parameter
+ * @param runFailsafeOperation the runFailsafeOperation parameter
+ * @param onPublish the onPublish parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param source the source parameter
+ * @param subscribeToBackplane the subscribeToBackplane parameter
+ * @param runFailsafeOperation the runFailsafeOperation parameter
+ * @param onPublish the onPublish parameter
+ * @param jedisClusterFactory the jedisClusterFactory parameter
+ * @return the public result
+ */
+/**
+ * Executes a build action on the worker Implements complex logic with 4 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications.
+ * @return the jedis,
+        new result
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications.
+ * @param executeEntry the executeEntry parameter
+ * @param balancedQueueEntry the balancedQueueEntry parameter
+ */
+/**
+ * Executes a build action on the worker
+ * @return the jedis,
+        new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param expiringChannels the expiringChannels parameter
+ * @return the update expired watches with null operation result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param onMessage the onMessage parameter
+ * @param effectiveAt the effectiveAt parameter
+ * @param operationChange the operationChange parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param onMessage the onMessage parameter
+ * @param operation the operation parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param pipeline the pipeline parameter
+ * @param operation the operation parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param jedis the jedis parameter
+ * @param operation the operation parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param jedis the jedis parameter
+ * @param channel the channel parameter
+ * @param effectiveAt the effectiveAt parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param client the client parameter
+ * @param state the state parameter
+ * @param clientPublicName the clientPublicName parameter
+ * @param onWorkerRemoved the onWorkerRemoved parameter
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param jedis the jedis parameter
+ * @param provisions the provisions parameter
+ * @param resourceSet the resourceSet parameter
+ * @return the queueentry result
+ */
+/**
+ * Polls for available operations from the backplane
+ * @param queueEntry the queueEntry parameter
+ * @param requeueAt the requeueAt parameter
+ * @return the string result
+ */
+/**
+ * Polls for available operations from the backplane Performs side effects including logging and state modifications.
+ * @param jedis the jedis parameter
+ * @param executionName the executionName parameter
+ * @param dispatchedOperationJson the dispatchedOperationJson parameter
+ * @return the boolean result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param actionKey the actionKey parameter
+ * @return the operation result
+ */
+/**
+ * Manages network connections for gRPC communication
+ * @param executionName the executionName parameter
+ * @return the string result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -105,9 +206,19 @@ import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.UnifiedJedis;
 
 @Log
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param balancedQueueEntry the balancedQueueEntry parameter
+ */
 public class RedisShardBackplane implements Backplane {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
+  /**
+   * Transforms data between different representations Performs side effects including logging and state modifications.
+   * @param value the value parameter
+   * @param key the key parameter
+   * @return the instant result
+   */
   private static final int workerSetMaxAge = 3; // seconds
 
   static final JsonFormat.Printer executionPrinter =
@@ -139,6 +250,12 @@ public class RedisShardBackplane implements Backplane {
   private final Function<Operation, Operation> onPublish;
   private final Supplier<UnifiedJedis> jedisClusterFactory;
 
+  /**
+   * Processes the operation according to configured logic Implements complex logic with 4 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param onOperationName the onOperationName parameter
+   * @param now the now parameter
+   */
   private @Nullable InterruptingRunnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
@@ -153,6 +270,17 @@ public class RedisShardBackplane implements Backplane {
   private final Map<String, ShardWorker> storageWorkers = new ConcurrentHashMap<>();
   private final Supplier<Set<String>> recentExecuteWorkers;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param onOperationName the onOperationName parameter
+   */
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param onOperationName the onOperationName parameter
+   * @param now the now parameter
+   */
   private DistributedState state = new DistributedState();
 
   public RedisShardBackplane(
@@ -169,6 +297,10 @@ public class RedisShardBackplane implements Backplane {
         JedisClusterFactory.create(source));
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications.
+   * @param executionQueueEntry the executionQueueEntry parameter
+   */
   public RedisShardBackplane(
       String source,
       boolean subscribeToBackplane,
@@ -199,9 +331,28 @@ public class RedisShardBackplane implements Backplane {
     this.onUnsubscribe = onUnsubscribe;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param instant the instant parameter
+   * @return the timestamp result
+   */
+  /**
+   * Updates internal state or external resources
+   * @param operationChange the operationChange parameter
+   * @return the string result
+   */
   abstract static class ExecuteEntryListVisitor implements Visitor<BalancedQueueEntry> {
+    /**
+     * Performs specialized operation based on method logic
+     * @param executeEntry the executeEntry parameter
+     * @param executeEntryJson the executeEntryJson parameter
+     */
     protected abstract void visit(ExecuteEntry executeEntry, BalancedQueueEntry balancedQueueEntry);
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param executionQueueEntry the executionQueueEntry parameter
+     */
     public void visit(BalancedQueueEntry balancedQueueEntry) {
       String entry = balancedQueueEntry.getValue();
       ExecuteEntry.Builder executeEntry = ExecuteEntry.newBuilder();
@@ -214,6 +365,11 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param onOperationName the onOperationName parameter
+   */
   private Instant convertToMilliInstant(String value, String key) {
     if (value != null) {
       try {
@@ -225,6 +381,15 @@ public class RedisShardBackplane implements Backplane {
     return null;
   }
 
+  /**
+   * Updates internal state or external resources Implements complex logic with 7 conditional branches and 1 iterative operations. Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param onOperationName the onOperationName parameter
+   */
   private void scanProcessing(UnifiedJedis jedis, Consumer<String> onOperationName, Instant now) {
     state.prequeue.visitDequeue(
         jedis,
@@ -315,6 +480,10 @@ public class RedisShardBackplane implements Backplane {
         jedis,
         new Visitor<>() {
           @Override
+          /**
+           * Updates internal state or external resources Performs side effects including logging and state modifications.
+           * @param jedis the jedis parameter
+           */
           public void visit(ExecutionQueueEntry executionQueueEntry) {
             QueueEntry queueEntry = executionQueueEntry.getQueueEntry();
             onOperationName.accept(queueEntry.getExecuteEntry().getOperationName());
@@ -328,6 +497,18 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  /**
+   * Loads data from storage or external source Performs side effects including logging and state modifications.
+   */
+  /**
+   * Loads data from storage or external source
+   * @param onWorkerRemoved the onWorkerRemoved parameter
+   */
+  /**
+   * Removes expired entries from the cache to free space
+   * @param from the from parameter
+   * @return the instant result
+   */
   private void updateWatchers(UnifiedJedis jedis) {
     Instant now = Instant.now();
     Instant expiresAt = nextExpiresAt(now);
@@ -440,6 +621,11 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+   * @param clientPublicName the clientPublicName parameter
+   * @param onWorkerRemoved the onWorkerRemoved parameter
+   */
   public void updateWatchedIfDone(UnifiedJedis jedis) {
     List<String> operationChannels = subscriber.watchedOperationChannels();
     if (operationChannels.isEmpty()) {
@@ -472,8 +658,17 @@ public class RedisShardBackplane implements Backplane {
     return from.plusSeconds(10);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param client the client parameter
+   * @param clientPublicName the clientPublicName parameter
+   * @param onWorkerRemoved the onWorkerRemoved parameter
+   */
   private void startSubscriptionThread(Consumer<String> onWorkerRemoved) {
     ListMultimap<String, TimedWatchFuture> watchers =
+        /**
+         * Performs specialized operation based on method logic Implements complex logic with 10 conditional branches. Performs side effects including logging and state modifications.
+         */
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     subscriberService = BuildfarmExecutors.getSubscriberPool();
@@ -528,6 +723,16 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionName the executionName parameter
+   * @param watcher the watcher parameter
+   * @return the listenablefuture<void> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public void start(String clientPublicName, Consumer<String> onWorkerRemoved) throws IOException {
     // Construct a single redis client to be used throughout the entire backplane.
     // We wish to avoid various synchronous and error handling issues that could occur when using
@@ -535,6 +740,21 @@ public class RedisShardBackplane implements Backplane {
     start(new RedisClient(jedisClusterFactory.get()), clientPublicName, onWorkerRemoved);
   }
 
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param name the name parameter
+   * @param changeJson the changeJson parameter
+   * @param storage the storage parameter
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param shardWorker the shardWorker parameter
+   * @param json the json parameter
+   * @return the boolean result
+   */
   private void start(RedisClient client, String clientPublicName, Consumer<String> onWorkerRemoved)
       throws IOException {
     // Create containers that make up the backplane
@@ -566,6 +786,14 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param shardWorker the shardWorker parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   */
   public synchronized void stop() throws InterruptedException {
     if (failsafeOperationThread != null) {
       failsafeOperationThread.interrupt();
@@ -630,6 +858,28 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @return the scanresult<string> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @return the scanresult<operation> result
+   */
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @return the casindexresults result
+   */
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param name the name parameter
+   * @param reason the reason parameter
+   * @return the boolean result
+   */
   public void addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
     Timestamp effectiveAt = Timestamps.fromMillis(shardWorker.getFirstRegisteredAt());
@@ -658,6 +908,11 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param cursor the cursor parameter
+   * @return the string result
+   */
   private boolean addWorkerByType(UnifiedJedis jedis, ShardWorker shardWorker, String json) {
     int type = shardWorker.getWorkerType();
     if (type == 0) {
@@ -685,6 +940,19 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @param keyMatch the keyMatch parameter
+   * @return the scanresult<string> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @return the scanresult<string> result
+   */
   public boolean removeWorker(String name, String reason) throws IOException {
     WorkerChange workerChange =
         WorkerChange.newBuilder()
@@ -699,6 +967,16 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param workerName the workerName parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @return the scanresult<string> result
+   */
   public CasIndexResults reindexCas() throws IOException {
     CasIndexSettings settings = new CasIndexSettings();
     settings.casQuery = configs.getBackplane().getCasPrefix() + ":*";
@@ -706,6 +984,18 @@ public class RedisShardBackplane implements Backplane {
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @return the set<string> result
+   */
+  /**
+   * Creates and initializes a new instance
+   * @param jedis the jedis parameter
+   * @return the casworkermap result
+   */
+  /**
+   * Removes expired entries from the cache to free space Provides thread-safe access through synchronization mechanisms.
+   */
   private static String tokenFromRedisCursor(String cursor) {
     return cursor.equals(SCAN_POINTER_START) ? SENTINEL_PAGE_TOKEN : cursor;
   }
@@ -725,6 +1015,11 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param workerNames the workerNames parameter
+   * @return the map<string, long> result
+   */
   public ScanResult<String> scanCorrelatedInvocations(String cursor, int count) throws IOException {
     redis.clients.jedis.resps.ScanResult<String> scanResult =
         client.call(jedis -> state.correlatedInvocations.scan(jedis, cursor, count));
@@ -762,12 +1057,28 @@ public class RedisShardBackplane implements Backplane {
    * access to the shared storage set.
    */
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param blobDigest the blobDigest parameter
+   * @return the long result
+   */
   public Set<String> getStorageWorkers() throws IOException {
     refreshStorageWorkersIfExpired();
     return new HashSet<>(storageWorkers.keySet());
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param list the list parameter
+   * @param n the n parameter
+   * @return the list<t> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param numWorkers the numWorkers parameter
+   * @return the list<string> result
+   */
   public Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames)
       throws IOException {
     refreshStorageWorkersIfExpired();
@@ -794,6 +1105,13 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param testedAt the testedAt parameter
+   * @param workers the workers parameter
+   * @param storage the storage parameter
+   */
   private CasWorkerMap createCasWorkerMap(UnifiedJedis jedis) {
     return new JedisCasWorkerMap(
         jedis, configs.getBackplane().getCasPrefix(), configs.getBackplane().getCasExpire());
@@ -804,6 +1122,23 @@ public class RedisShardBackplane implements Backplane {
     return client.call(jedis -> createCasWorkerMap(jedis).insertTime(blobDigest));
   }
 
+  /**
+   * Removes expired entries from the cache to free space
+   * @param jedis the jedis parameter
+   * @param workers the workers parameter
+   * @param publish the publish parameter
+   * @return the map<string, shardworker> result
+   */
+  /**
+   * Executes a build action on the worker
+   * @param jedis the jedis parameter
+   * @return the map<string, shardworker> result
+   */
+  /**
+   * Removes expired entries from the cache to free space
+   * @param jedis the jedis parameter
+   * @return the map<string, shardworker> result
+   */
   private synchronized Set<String> getExecuteWorkers() throws IOException {
     try {
       return recentExecuteWorkers.get();
@@ -832,6 +1167,20 @@ public class RedisShardBackplane implements Backplane {
     return randomN(allWorkers, numWorkers);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionId the actionId parameter
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param actionKey the actionKey parameter
+   * @return the actionresult result
+   */
+  /**
+   * Transforms data between different representations
+   * @param json the json parameter
+   * @return the actionresult result
+   */
   public static <T> List<T> randomN(List<T> list, int n) {
     return Stream.generate(
             () -> list.remove((int) (list.size() * ThreadLocalRandom.current().nextDouble())))
@@ -871,6 +1220,11 @@ public class RedisShardBackplane implements Backplane {
     return fetchAndExpireWorkers(jedis, state.executeWorkers.asMap(jedis), /* storage= */ false);
   }
 
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param actionKey the actionKey parameter
+   */
   private Map<String, ShardWorker> fetchAndExpireWorkers(
       UnifiedJedis jedis, Map<String, String> workers, boolean publish) {
     long now = System.currentTimeMillis();
@@ -900,6 +1254,11 @@ public class RedisShardBackplane implements Backplane {
     return returnWorkers;
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param actionKey the actionKey parameter
+   * @param actionResult the actionResult parameter
+   */
   public static ActionResult parseActionResult(String json) {
     try {
       ActionResult.Builder builder = ActionResult.newBuilder();
@@ -912,6 +1271,20 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param blobDigest the blobDigest parameter
+   * @param addWorkers the addWorkers parameter
+   * @param removeWorkers the removeWorkers parameter
+   */
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param actionKeys the actionKeys parameter
+   */
+  /**
+   * Removes data or cleans up resources
+   * @param actionKey the actionKey parameter
+   */
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
     String json =
         client.call(
@@ -932,6 +1305,16 @@ public class RedisShardBackplane implements Backplane {
   // we do this by action hash only, so that we can use RequestMetadata to filter
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param blobDigests the blobDigests parameter
+   * @param workerName the workerName parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param blobDigest the blobDigest parameter
+   * @param workerName the workerName parameter
+   */
   public void blacklistAction(String actionId) throws IOException {
     client.run(
         jedis ->
@@ -941,6 +1324,16 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Removes data or cleans up resources
+   * @param blobDigests the blobDigests parameter
+   * @param workerName the workerName parameter
+   */
+  /**
+   * Removes data or cleans up resources
+   * @param blobDigest the blobDigest parameter
+   * @param workerName the workerName parameter
+   */
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
     String json = actionResultPrinter.print(actionResult);
     client.run(
@@ -949,18 +1342,39 @@ public class RedisShardBackplane implements Backplane {
                 jedis, actionKey.toString(), json, configs.getBackplane().getActionCacheExpire()));
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param jedis the jedis parameter
+   * @param executionName the executionName parameter
+   * @return the operation result
+   */
   private void removeActionResult(UnifiedJedis jedis, ActionKey actionKey) {
     state.actionCache.remove(jedis, actionKey.toString());
   }
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param blobDigest the blobDigest parameter
+   * @return the set<string> result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param blobDigest the blobDigest parameter
+   * @return the string result
+   */
   public void removeActionResult(ActionKey actionKey) throws IOException {
     client.run(jedis -> removeActionResult(jedis, actionKey));
   }
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param blobDigests the blobDigests parameter
+   * @return the map<digest, set<string>> result
+   */
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
     // convert action keys to strings
     List<String> keyNames = new ArrayList<>();
@@ -970,6 +1384,11 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
+  /**
+   * Transforms data between different representations
+   * @param workerChangeJson the workerChangeJson parameter
+   * @return the workerchange result
+   */
   public void adjustBlobLocations(
       Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
     client.run(jedis -> createCasWorkerMap(jedis).adjust(blobDigest, addWorkers, removeWorkers));
@@ -981,6 +1400,11 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
+  /**
+   * Transforms data between different representations
+   * @param operationChangeJson the operationChangeJson parameter
+   * @return the operationchange result
+   */
   public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException {
     client.run(jedis -> createCasWorkerMap(jedis).addAll(blobDigests, workerName));
   }
@@ -997,11 +1421,22 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param executionName the executionName parameter
+   * @return the operation result
+   */
   public String getBlobLocation(Digest blobDigest) throws IOException {
     return client.call(jedis -> createCasWorkerMap(jedis).getAny(blobDigest));
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param operation the operation parameter
+   * @param stage the stage parameter
+   * @return the boolean result
+   */
   public Set<String> getBlobLocationSet(Digest blobDigest) throws IOException {
     return client.call(jedis -> createCasWorkerMap(jedis).get(blobDigest));
   }
@@ -1026,18 +1461,53 @@ public class RedisShardBackplane implements Backplane {
     return operationChange.build();
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param executionName the executionName parameter
+   * @param provisions the provisions parameter
+   * @param queueEntryJson the queueEntryJson parameter
+   * @param priority the priority parameter
+   */
   private Operation getExecution(UnifiedJedis jedis, String executionName) {
     return state.executions.get(jedis, executionName);
   }
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param queueEntry the queueEntry parameter
+   * @param operation the operation parameter
+   */
   public Operation getExecution(String executionName) throws IOException {
     return client.call(jedis -> getExecution(jedis, executionName));
   }
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param scope the scope parameter
+   * @param value the value parameter
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @return the scanresult<string> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param correlatedInvocationsId the correlatedInvocationsId parameter
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @return the scanresult<string> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param toolInvocationId the toolInvocationId parameter
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @return the scanresult<operation> result
+   */
   public boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException {
     boolean queue = stage == ExecutionStage.Value.QUEUED;
     boolean complete = !queue && operation.getDone();
@@ -1072,6 +1542,15 @@ public class RedisShardBackplane implements Backplane {
     return true;
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @return the executeentry result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the executorservice result
+   */
   private void queue(
       UnifiedJedis jedis,
       String executionName,
@@ -1086,6 +1565,12 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @return the scanresult<dispatchedoperation> result
+   */
   public void queue(QueueEntry queueEntry, Operation operation) throws IOException {
     String executionName = operation.getName();
     String operationJson = executionPrinter.print(operation);
@@ -1136,6 +1621,10 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the executeentry result
+   */
   public ScanResult<DispatchedOperation> scanDispatchedOperations(String cursor, int count)
       throws IOException {
     ImmutableList.Builder<DispatchedOperation> builder = new ImmutableList.Builder<>();
@@ -1194,10 +1683,25 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param queueEntry the queueEntry parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param provisions the provisions parameter
+   * @param resourceSet the resourceSet parameter
+   * @return the queueentry result
+   */
   public ExecuteEntry deprequeueOperation() throws IOException, InterruptedException {
     return client.blockingCall(this::deprequeueOperation);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionName the executionName parameter
+   * @return the operation result
+   */
   private @Nullable QueueEntry dispatchOperation(
       UnifiedJedis jedis, List<Platform.Property> provisions, LocalResourceSet resourceSet)
       throws InterruptedException {
@@ -1256,6 +1760,13 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Polls for available operations from the backplane Performs side effects including logging and state modifications.
+   * @param queueEntry the queueEntry parameter
+   * @param stage the stage parameter
+   * @param requeueAt the requeueAt parameter
+   * @return the boolean result
+   */
   public void rejectOperation(QueueEntry queueEntry) throws IOException {
     String executionName = queueEntry.getExecuteEntry().getOperationName();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
@@ -1280,6 +1791,10 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionKey the actionKey parameter
+   */
   public boolean pollExecution(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
       throws IOException {
     String executionName = queueEntry.getExecuteEntry().getOperationName();
@@ -1306,6 +1821,13 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param executeEntry the executeEntry parameter
+   * @param execution the execution parameter
+   * @param ignoreMerge the ignoreMerge parameter
+   * @return the boolean result
+   */
   public @Nullable Operation mergeExecution(ActionKey actionKey) throws IOException {
     return client.call(jedis -> state.executions.merge(jedis, actionKey.toString()));
   }
@@ -1318,6 +1840,14 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param queueEntry the queueEntry parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionName the executionName parameter
+   */
   public boolean prequeue(ExecuteEntry executeEntry, Operation execution, boolean ignoreMerge)
       throws IOException {
     String toolInvocationId = executeEntry.getRequestMetadata().getToolInvocationId();
@@ -1344,6 +1874,11 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param executionName the executionName parameter
+   */
   private Operation keepaliveExecution(String executionName) {
     return Operation.newBuilder().setName(executionName).build();
   }
@@ -1358,6 +1893,14 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param executionName the executionName parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionName the executionName parameter
+   */
   public void requeueDispatchedExecution(QueueEntry queueEntry) throws IOException {
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     String executionName = queueEntry.getExecuteEntry().getOperationName();
@@ -1375,6 +1918,12 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the boolean result
+   */
   private void completeOperation(UnifiedJedis jedis, String executionName) {
     state.dispatchedExecutions.remove(jedis, executionName);
   }
@@ -1387,6 +1936,16 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param provisions the provisions parameter
+   * @return the boolean result
+   */
+  /**
+   * Manages network connections for gRPC communication
+   * @param channel the channel parameter
+   * @return the string result
+   */
   public void deleteOperation(String executionName) throws IOException {
     Operation o =
         Operation.newBuilder()
@@ -1410,6 +1969,11 @@ public class RedisShardBackplane implements Backplane {
     return configs.getBackplane().getOperationChannelPrefix() + ":" + executionName;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param requestMetadata the requestMetadata parameter
+   * @return the boolean result
+   */
   public static String parseExecutionChannel(String channel) {
     // should probably verify prefix
     return channel.split(":")[1];
@@ -1422,6 +1986,14 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException {
     if (requestMetadata.getToolInvocationId().isEmpty()
         && requestMetadata.getActionId().isEmpty()) {
@@ -1430,6 +2002,11 @@ public class RedisShardBackplane implements Backplane {
     return client.call(jedis -> isBlacklisted(jedis, requestMetadata));
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 3 input sources and produces 1 outputs.
+   * @param jedis the jedis parameter
+   * @return the backplanestatus result
+   */
   private boolean isBlacklisted(UnifiedJedis jedis, RequestMetadata requestMetadata) {
     boolean isActionBlocked =
         (!requestMetadata.getActionId().isEmpty()
@@ -1442,6 +2019,10 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the backplanestatus result
+   */
   public boolean canQueue() throws IOException {
     return client.call(jedis -> state.executionQueue.canQueue(jedis));
   }
@@ -1454,6 +2035,11 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param request the request parameter
+   * @return the getclientstarttimeresult result
+   */
   public BackplaneStatus backplaneStatus() throws IOException {
     return client.call(this::backplaneStatus);
   }
@@ -1480,6 +2066,10 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
+  /**
+   * Updates internal state or external resources
+   * @param digests the digests parameter
+   */
   public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request)
       throws IOException {
     List<GetClientStartTime> startTimes = new ArrayList<>();
@@ -1500,11 +2090,22 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param correlatedInvocationsId the correlatedInvocationsId parameter
+   * @param indexScopeValues the indexScopeValues parameter
+   */
   public void updateDigestsExpiry(Iterable<Digest> digests) throws IOException {
     client.run(jedis -> createCasWorkerMap(jedis).setExpire(digests));
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param toolInvocationId the toolInvocationId parameter
+   * @param correlatedInvocationsId the correlatedInvocationsId parameter
+   * @param toolDetails the toolDetails parameter
+   */
   public void indexCorrelatedInvocationsId(
       String correlatedInvocationsId, Map<String, List<String>> indexScopeValues)
       throws IOException {
@@ -1520,6 +2121,13 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionId the actionId parameter
+   * @param toolInvocationId the toolInvocationId parameter
+   * @param actionMnemonic the actionMnemonic parameter
+   * @param targetId the targetId parameter
+   */
   public void addToolInvocationId(
       String toolInvocationId, String correlatedInvocationsId, ToolDetails toolDetails)
       throws IOException {

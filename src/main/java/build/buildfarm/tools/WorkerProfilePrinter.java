@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param stage the stage parameter
+ */
 // Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,11 +24,20 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
 
 class WorkerProfilePrinter {
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 6 conditional branches.
+   * @param time the time parameter
+   */
   public static void printStageInformation(StageInformation stage) {
     System.out.printf("%s slots configured: %d%n", stage.getName(), stage.getSlotsConfigured());
     System.out.printf("%s slots used %d%n", stage.getName(), stage.getSlotsUsed());
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param d the d parameter
+   * @return the float result
+   */
   public static void printOperationTime(OperationTimesBetweenStages time) {
     String periodInfo = "\nIn last ";
     switch ((int) time.getPeriod().getSeconds()) {

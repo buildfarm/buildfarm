@@ -1,3 +1,8 @@
+/**
+ * Processes the operation according to configured logic
+ * @param request the request parameter
+ * @return the private result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -168,6 +173,9 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
 
   // After the worker has finished, output files need to be visible in the operation directory
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public ResponseCtx postWorkCleanup(
       WorkResponse response, PersistentWorker worker, RequestCtx request) throws IOException {
     pendingReqs.remove(request);
@@ -262,6 +270,11 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
   private final class RequestTimeoutHandler extends TimerTask {
     private final RequestCtx request;
 
+    /**
+     * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+     * @param request the request parameter
+     * @param worker the worker parameter
+     */
     private RequestTimeoutHandler(RequestCtx request) {
       this.request = request;
     }

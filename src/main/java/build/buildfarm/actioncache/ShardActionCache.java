@@ -1,3 +1,10 @@
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+ * @param maxLocalCacheSize the maxLocalCacheSize parameter
+ * @param backplane the backplane parameter
+ * @param service the service parameter
+ * @return the public result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,6 +43,11 @@ public class ShardActionCache implements ActionCache {
   private final Backplane backplane;
   private final AsyncLoadingCache<ActionKey, ActionResult> actionResultCache;
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+   * @param actionKey the actionKey parameter
+   * @return the listenablefuture<actionresult> result
+   */
   public ShardActionCache(
       int maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
     this.backplane = backplane;
@@ -55,6 +67,11 @@ public class ShardActionCache implements ActionCache {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param actionKey the actionKey parameter
+   * @param actionResult the actionResult parameter
+   */
   public ListenableFuture<ActionResult> get(ActionKey actionKey) {
     return catching(
         toListenableFuture(actionResultCache.get(actionKey)),
@@ -64,6 +81,10 @@ public class ShardActionCache implements ActionCache {
   }
 
   @Override
+  /**
+   * Marks cache entries as invalid without removal
+   * @param actionKey the actionKey parameter
+   */
   public void put(ActionKey actionKey, ActionResult actionResult) {
     try {
       backplane.putActionResult(actionKey, actionResult);
@@ -75,6 +96,11 @@ public class ShardActionCache implements ActionCache {
   }
 
   @Override
+  /**
+   * Loads data from storage or external source Executes asynchronously and returns a future for completion tracking.
+   * @param actionKey the actionKey parameter
+   * @param actionResult the actionResult parameter
+   */
   public void invalidate(ActionKey actionKey) {
     actionResultCache.synchronous().invalidate(actionKey);
   }

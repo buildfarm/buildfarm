@@ -1,3 +1,7 @@
+/**
+ * Manages network connections for gRPC communication
+ * @return the private result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +26,11 @@ import io.grpc.netty.NettyChannelBuilder;
 
 public final class Channels {
   private static final String GRPCS_URL_PREFIX = "grpcs://";
+  /**
+   * Manages network connections for gRPC communication
+   * @param target the target parameter
+   * @return the managedchannel result
+   */
   private static final String GRPC_URL_PREFIX = "grpc://";
 
   private Channels() {}

@@ -1,3 +1,19 @@
+/**
+ * Executes a build action on the worker
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param code the code parameter
+ * @param responseType the responseType parameter
+ * @param micros the micros parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches and 2 iterative operations.
+ * @param operation the operation parameter
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,6 +87,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 class Executor {
+  /**
+   * Executes a build action on the worker Implements complex logic with 1 conditional branches and 4 iterative operations. Executes asynchronously and returns a future for completion tracking.
+   * @param instanceName the instanceName parameter
+   * @param actionDigests the actionDigests parameter
+   * @param execStub the execStub parameter
+   */
   static class ExecutionObserver implements StreamObserver<Operation> {
     private final AtomicLong countdown;
     private final AtomicInteger[] statusCounts;
@@ -134,6 +156,10 @@ class Executor {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param t the t parameter
+     */
     public void onNext(Operation operation) {
       noticeFuture.cancel(false);
       if (operationName == null) {
@@ -174,6 +200,9 @@ class Executor {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     */
     public void onError(Throwable t) {
       complete = true;
       noticeFuture.cancel(false);
@@ -185,6 +214,10 @@ class Executor {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param response the response parameter
+     */
     public void onCompleted() {
       complete = true;
       noticeFuture.cancel(false);
@@ -192,6 +225,12 @@ class Executor {
     }
   }
 
+  /**
+   * Loads data from storage or external source Implements complex logic with 7 conditional branches and 5 iterative operations. Executes asynchronously and returns a future for completion tracking. Processes 4 input sources and produces 2 outputs. Includes input validation and error handling for robustness.
+   * @param instanceName the instanceName parameter
+   * @param channel the channel parameter
+   * @param blobsDir the blobsDir parameter
+   */
   static void executeActions(
       String instanceName, List<Digest> actionDigests, ExecutionStub execStub)
       throws InterruptedException {
@@ -294,11 +333,18 @@ class Executor {
             bsStub.write(
                 new StreamObserver<WriteResponse>() {
                   @Override
+                  /**
+                   * Performs specialized operation based on method logic
+                   */
                   public void onNext(WriteResponse response) {
                     writtenFuture.set(response);
                   }
 
                   @Override
+                  /**
+                   * Performs specialized operation based on method logic
+                   * @param t the t parameter
+                   */
                   public void onCompleted() {}
 
                   @Override
@@ -353,6 +399,10 @@ class Executor {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param args the args parameter
+   */
   private static List<build.bazel.remote.execution.v2.Digest> findMissingBlobs(
       String instanceName, Path blobsDir, ContentAddressableStorageBlockingStub casStub)
       throws IOException {

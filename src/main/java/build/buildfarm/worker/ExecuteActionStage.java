@@ -1,3 +1,24 @@
+/**
+ * Executes a build action on the worker
+ * @param workerContext the workerContext parameter
+ * @param output the output parameter
+ * @param error the error parameter
+ * @return the public result
+ */
+/**
+ * Executes a build action on the worker
+ * @param workerContext the workerContext parameter
+ * @param output the output parameter
+ * @param error the error parameter
+ * @param width the width parameter
+ * @return the public result
+ */
+/**
+ * Returns resources to the shared pool
+ * @param operationName the operationName parameter
+ * @param claims the claims parameter
+ * @return the int result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,6 +50,12 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
       Gauge.build().name("execution_slot_usage").help("Execution slot Usage.").register();
   private static final Histogram executionTime =
       Histogram.build().name("execution_time_ms").help("Execution time in ms.").register();
+  /**
+   * Creates and initializes a new instance Performs side effects including logging and state modifications.
+   * @param workerContext the workerContext parameter
+   * @param nextStage the nextStage parameter
+   * @return the pipelinestage result
+   */
   private static final Histogram executionStallTime =
       Histogram.build()
           .name("execution_stall_time_ms")
@@ -42,6 +69,10 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     this(workerContext, output, error, workerContext.getExecuteStageWidth());
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param executionContext the executionContext parameter
+   */
   public ExecuteActionStage(
       WorkerContext workerContext, PipelineStage output, PipelineStage error, int width) {
     super(
@@ -57,6 +88,14 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
       WorkerContext workerContext, PipelineStage nextStage) {
     return new PipelineStage.NullStage(workerContext, nextStage) {
       @Override
+      /**
+       * Thread pool for concurrent task execution
+       * @param operationName the operationName parameter
+       * @param claims the claims parameter
+       * @param usecs the usecs parameter
+       * @param stallUSecs the stallUSecs parameter
+       * @param exitCode the exitCode parameter
+       */
       public void put(ExecutionContext executionContext) throws InterruptedException {
         try {
           workerContext.destroyExecDir(executionContext.execDir);
@@ -71,6 +110,11 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionContext the executionContext parameter
+   * @return the int result
+   */
   protected Logger getLogger() {
     return log;
   }
@@ -95,11 +139,17 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public int getSlotUsage() {
     return executorClaims.get();
   }
 
   @Override
+  /**
+   * Processes the next operation in the pipeline stage Provides thread-safe access through synchronization mechanisms.
+   */
   protected int claimsRequired(ExecutionContext executionContext) {
     return workerContext.commandExecutionClaims(executionContext.command);
   }
@@ -119,6 +169,9 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void close() {
     super.close();
     // might want to move this to actual teardown of the stage

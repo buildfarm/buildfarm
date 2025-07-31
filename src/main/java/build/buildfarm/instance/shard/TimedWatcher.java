@@ -1,3 +1,12 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param expiresAt the expiresAt parameter
+ */
+/**
+ * Removes expired entries from the cache to free space
+ * @param now the now parameter
+ * @return the boolean result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

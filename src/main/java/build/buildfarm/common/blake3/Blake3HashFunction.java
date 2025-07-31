@@ -44,37 +44,75 @@ public final class Blake3HashFunction implements HashFunction {
 
   /* The following methods implement the {HashFunction} interface. */
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param input the input parameter
+   * @return the hashcode result
+   */
   public <T> HashCode hashObject(T instance, Funnel<? super T> funnel) {
     return newHasher().putObject(instance, funnel).hash();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param input the input parameter
+   * @param charset the charset parameter
+   * @return the hashcode result
+   */
   public HashCode hashUnencodedChars(CharSequence input) {
     int len = input.length();
     return newHasher(len * 2).putUnencodedChars(input).hash();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param input the input parameter
+   * @return the hashcode result
+   */
   public HashCode hashString(CharSequence input, Charset charset) {
     return newHasher().putString(input, charset).hash();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param input the input parameter
+   * @return the hashcode result
+   */
   public HashCode hashInt(int input) {
     return newHasher(4).putInt(input).hash();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param input the input parameter
+   * @return the hashcode result
+   */
   public HashCode hashLong(long input) {
     return newHasher(8).putLong(input).hash();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param input the input parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   * @return the hashcode result
+   */
   public HashCode hashBytes(byte[] input) {
     return hashBytes(input, 0, input.length);
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param input the input parameter
+   * @return the hashcode result
+   */
   public HashCode hashBytes(byte[] input, int off, int len) {
     checkPositionIndexes(off, off + len, input.length);
     return newHasher(len).putBytes(input, off, len).hash();

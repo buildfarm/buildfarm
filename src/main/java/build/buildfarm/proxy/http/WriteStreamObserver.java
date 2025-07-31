@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param request the request parameter
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +28,10 @@ import io.grpc.stub.StreamObserver;
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private final WriteObserverSource writeObserverSource;
   private final StreamObserver<WriteResponse> responseObserver;
+  /**
+   * Persists data to storage or external destination
+   * @param request the request parameter
+   */
   private WriteObserver write = null;
 
   WriteStreamObserver(
@@ -44,6 +52,10 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   */
   public void onNext(WriteRequest request) {
     checkState(
         request.getFinishWrite() || request.getData().size() != 0,
@@ -63,6 +75,9 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void onError(Throwable t) {
     responseObserver.onError(t);
   }

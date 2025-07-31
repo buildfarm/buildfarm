@@ -1,3 +1,13 @@
+/**
+ * Carries request context and tracing information
+ * @param headers the headers parameter
+ * @return the requestmetadata result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param onMetadata the onMetadata parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +51,11 @@ public final class TracingMetadataUtils {
       ProtoUtils.keyForProto(RequestMetadata.getDefaultInstance());
 
   /** Fetches a {@link RequestMetadata} defined on the current context, or the default instance. */
+  /**
+   * Carries request context and tracing information
+   * @param metadata the metadata parameter
+   * @return the clientinterceptor result
+   */
   public static RequestMetadata fromCurrentContext() {
     RequestMetadata metadata = CONTEXT_KEY.get();
     if (metadata == null) {
@@ -67,6 +82,13 @@ public final class TracingMetadataUtils {
   public static class ServerHeadersInterceptor implements ServerInterceptor {
     private final Consumer<RequestMetadata> onMetadata;
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param call the call parameter
+     * @param headers the headers parameter
+     * @param next the next parameter
+     * @return the listener<reqt> result
+     */
     public ServerHeadersInterceptor(Consumer<RequestMetadata> onMetadata) {
       this.onMetadata = onMetadata;
     }

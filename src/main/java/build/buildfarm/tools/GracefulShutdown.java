@@ -70,6 +70,10 @@ class GracefulShutdown {
    * @param args
    */
   @SuppressWarnings({"JavaDoc", "ResultOfMethodCallIgnored"})
+  /**
+   * Performs specialized operation based on method logic
+   * @param args the args parameter
+   */
   private static void disableScaleInProtection(String[] args) {
     String instancePrivateIp = args[1];
     String bfEndpoint = args[2];

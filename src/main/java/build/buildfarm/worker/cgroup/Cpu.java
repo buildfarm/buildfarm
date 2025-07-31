@@ -1,3 +1,13 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param CGroupVersion.CGROUPS_V1 the CGroupVersion.CGROUPS_V1 parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param CGroupVersion.CGROUPS_V1 the CGroupVersion.CGROUPS_V1 parameter
+ * @return the else result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,8 +28,17 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import java.io.IOException;
 
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @return the int result
+ */
 public class Cpu extends Controller {
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param periodMicroseconds the periodMicroseconds parameter
+   * @param quotaMicroseconds the quotaMicroseconds parameter
+   */
   private static final int CPU_GRANULARITY = 100_000; // microseconds (μS)
 
   Cpu(Group group) {

@@ -1,3 +1,24 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param backoffSupplier the backoffSupplier parameter
+ * @param isRetriable the isRetriable parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param backoffSupplier the backoffSupplier parameter
+ * @param isRetriable the isRetriable parameter
+ * @param retryScheduler the retryScheduler parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param timeMillis the timeMillis parameter
+ */
 // Copyright 2016 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -92,6 +113,10 @@ public class Retrier {
               }
 
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               * @return the long result
+               */
               public int getRetryAttempts() {
                 return 0;
               }
@@ -198,6 +223,13 @@ public class Retrier {
   @SuppressWarnings("Guava")
   private final Predicate<Status> isRetriable;
 
+  /**
+   * Executes a build action on the worker Executes asynchronously and returns a future for completion tracking.
+   * @param t the t parameter
+   * @param call the call parameter
+   * @param backoff the backoff parameter
+   * @return the listenablefuture<t> result
+   */
   private final ListeningScheduledExecutorService retryScheduler;
 
   @SuppressWarnings("Guava")
@@ -276,6 +308,10 @@ public class Retrier {
    * Executes an {@link AsyncCallable}, retrying execution in case of failure with the given
    * backoff.
    */
+  /**
+   * Creates and initializes a new instance Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+   * @return the backoff result
+   */
   public <T> ListenableFuture<T> executeAsync(AsyncCallable<T> call, Backoff backoff) {
     try {
       return Futures.catchingAsync(
@@ -323,11 +359,18 @@ public class Retrier {
      * @param backoffSupplier Delegate Backoff generator
      */
     @SuppressWarnings("Guava")
+    /**
+     * Performs specialized operation based on method logic
+     */
     public ProgressiveBackoff(Supplier<Backoff> backoffSupplier) {
       this.backoffSupplier = backoffSupplier;
       currentBackoff = backoffSupplier.get();
     }
 
+    /**
+     * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 2 outputs.
+     * @return the long result
+     */
     public void reset() {
       if (currentBackoff != null) {
         retries += currentBackoff.getRetryAttempts();
@@ -336,6 +379,10 @@ public class Retrier {
     }
 
     @Override
+    /**
+     * Retrieves a blob from the Content Addressable Storage
+     * @return the int result
+     */
     public long nextDelayMillis() {
       if (currentBackoff == null) {
         currentBackoff = backoffSupplier.get();

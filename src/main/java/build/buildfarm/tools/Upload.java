@@ -1,6 +1,13 @@
 package build.buildfarm.tools;
 
 import static build.bazel.remote.execution.v2.Compressor.Value.ZSTD;
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+ * @param host the host parameter
+ * @param instanceName the instanceName parameter
+ * @param digestUtil the digestUtil parameter
+ * @param path the path parameter
+ */
 import static build.buildfarm.common.grpc.Channels.createChannel;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -21,6 +28,10 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 class Upload {
+  /**
+   * Performs specialized operation based on method logic
+   * @param args the args parameter
+   */
   private static void main(String host, String instanceName, DigestUtil digestUtil, Path path)
       throws Exception {
     ManagedChannel channel = createChannel(host);

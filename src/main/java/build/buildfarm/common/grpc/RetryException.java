@@ -1,3 +1,9 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param cause the cause parameter
+ * @param retryAttempts the retryAttempts parameter
+ * @return the public result
+ */
 // Copyright 2016 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,11 +33,20 @@ public final class RetryException extends IOException {
 
   private final int attempts;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param code the code parameter
+   * @return the boolean result
+   */
   public RetryException(Throwable cause, int retryAttempts) {
     super(cause);
     this.attempts = retryAttempts + 1;
   }
 
+  /**
+   * Formats digest as human-readable string for logging
+   * @return the string result
+   */
   public boolean causedByStatusCode(Code code) {
     if (getCause() instanceof StatusRuntimeException) {
       return ((StatusRuntimeException) getCause()).getStatus().getCode() == code;

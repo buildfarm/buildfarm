@@ -30,7 +30,15 @@ import java.util.concurrent.Executors;
  *     its threading thing, IO should be all async, and we only have as many threads as cores in a
  *     single per-process pool.
  */
+/**
+ * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+ * @return the executorservice result
+ */
 public class BuildfarmExecutors {
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+   * @return the executorservice result
+   */
   public static ExecutorService getScanCachePool() {
     int nThreads = SystemProcessors.get();
     String threadNameFormat = "scan-cache-pool-%d";
@@ -38,6 +46,10 @@ public class BuildfarmExecutors {
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the executorservice result
+   */
   public static ExecutorService getComputeCachePool() {
     int nThreads = SystemProcessors.get();
     String threadNameFormat = "compute-cache-pool-%d";
@@ -45,6 +57,10 @@ public class BuildfarmExecutors {
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the executorservice result
+   */
   public static ExecutorService getRemoveDirectoryPool() {
     int nThreads = 32;
     String threadNameFormat = "remove-directory-pool-%d";
@@ -52,6 +68,10 @@ public class BuildfarmExecutors {
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the executorservice result
+   */
   public static ExecutorService getSubscriberPool() {
     int nThreads = 32;
     String threadNameFormat = "subscriber-service-pool-%d";
@@ -59,12 +79,20 @@ public class BuildfarmExecutors {
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the executorservice result
+   */
   public static ExecutorService getDequeuePool() {
     String threadNameFormat = "dequeue-pool-%d";
     return Executors.newCachedThreadPool(
         new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the listeningexecutorservice result
+   */
   public static ExecutorService getPipelinePool() {
     int nThreads = 8;
     String threadNameFormat = "pipeline-pool-%d";
@@ -72,6 +100,10 @@ public class BuildfarmExecutors {
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the listeningexecutorservice result
+   */
   public static ListeningExecutorService getTransformServicePool() {
     int nThreads = 24;
     String threadNameFormat = "transform-service-pool-%d";
@@ -81,6 +113,10 @@ public class BuildfarmExecutors {
     return listeningDecorator(pool);
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the executorservice result
+   */
   public static ListeningExecutorService getActionCacheFetchServicePool() {
     int nThreads = 24;
     String threadNameFormat = "action-cache-pool-%d";

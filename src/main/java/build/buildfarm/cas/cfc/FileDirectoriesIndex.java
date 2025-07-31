@@ -1,3 +1,17 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param digest the digest parameter
+ * @return the path result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param directory the directory parameter
+ * @return the iterable<string> result
+ */
+/**
+ * Removes data or cleans up resources Performs side effects including logging and state modifications.
+ * @param directories the directories parameter
+ */
 package build.buildfarm.cas.cfc;
 
 import static com.google.common.io.MoreFiles.asCharSink;
@@ -32,6 +46,11 @@ abstract class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param directory the directory parameter
+   * @param entries the entries parameter
+   */
   public Iterable<String> directoryEntries(Digest directory) throws IOException {
     try {
       return asCharSource(path(directory), UTF_8).readLines();
@@ -41,6 +60,10 @@ abstract class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   @Override
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param directory the directory parameter
+   */
   public void put(Digest directory, Iterable<String> entries) throws IOException {
     asCharSink(path(directory), UTF_8).writeLines(entries);
   }

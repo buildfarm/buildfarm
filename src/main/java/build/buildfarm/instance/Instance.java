@@ -1,3 +1,17 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param publicName the publicName parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @param pageSize the pageSize parameter
+ * @param pageToken the pageToken parameter
+ * @param filter the filter parameter
+ * @param onOperation the onOperation parameter
+ * @return the or something similar
+  string result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,6 +70,10 @@ import java.util.function.Consumer;
 public interface Instance {
   String getName();
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param response the response parameter
+   */
   void start(String publicName) throws IOException;
 
   void stop() throws InterruptedException;

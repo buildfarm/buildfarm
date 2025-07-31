@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the public result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,19 +29,31 @@ public class WaitingLogManager extends LogManager {
   private boolean resetCalled = false;
 
   @GuardedBy("this")
+  /**
+   * Performs specialized operation based on method logic
+   */
   private boolean released = false;
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public WaitingLogManager() {
     instance = this;
   }
 
   @Override
+  /**
+   * Returns resources to the shared pool
+   */
   public synchronized void reset() {
     resetCalled = true;
     reset0();
   }
 
   @GuardedBy("this")
+  /**
+   * Returns resources to the shared pool
+   */
   private void reset0() {
     if (released && resetCalled) {
       super.reset();

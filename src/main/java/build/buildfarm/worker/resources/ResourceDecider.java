@@ -1,3 +1,23 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param 0 the 0 parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param 0 the 0 parameter
+ * @return the avoid 0 cores, just in general, since it informs our claim result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param 0 the 0 parameter
+ * @return the executestagewidth result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param 0 the 0 parameter
+ * @return the max result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -82,6 +102,11 @@ public final class ResourceDecider {
    * @param allowBringYourOwnContainer Whether or not the feature of "bringing your own containers"
    *     is allowed.
    * @param sandbox Settings on whether to use a sandbox."
+   */
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches.
+   * @param limits the limits parameter
+   * @param sandbox the sandbox parameter
    */
   private static void adjustLimits(
       ResourceLimits limits,
@@ -176,6 +201,10 @@ public final class ResourceDecider {
     resolveEnvironmentVariables(limits);
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param limits the limits parameter
+   */
   private static void decideSandboxUsage(ResourceLimits limits, SandboxSettings sandbox) {
     // Decide which sandbox limitations are enabled by default acording to the deployment's
     // configuration.
@@ -203,6 +232,11 @@ public final class ResourceDecider {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param command the command parameter
+   * @param limits the limits parameter
+   */
   private static void adjustContainerFlags(ResourceLimits limits) {
     // bazelbuild/bazel-toolchains provides container images that start with "docker://".
     // However, docker is unable to fetch images that have this as a prefix in the URI.
@@ -224,6 +258,11 @@ public final class ResourceDecider {
     limits.description.add("resource limiting disabled because of choosing docker");
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param command the command parameter
+   * @param limits the limits parameter
+   */
   private static void adjustDebugFlags(Command command, ResourceLimits limits) {
     if (!limits.debugTarget.isEmpty()) {
       handleTargetDebug(command, limits);
@@ -232,6 +271,11 @@ public final class ResourceDecider {
     }
   }
 
+  /**
+   * Processes the operation according to configured logic
+   * @param command the command parameter
+   * @param limits the limits parameter
+   */
   private static void handleTargetDebug(Command command, ResourceLimits limits) {
     // When debugging particular targets, disable debugging on non-matches.
     if (!commandMatchesDebugTarget(command, limits)) {
@@ -241,6 +285,12 @@ public final class ResourceDecider {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param command the command parameter
+   * @param limits the limits parameter
+   * @return the boolean result
+   */
   private static void handleTestDebug(Command command, ResourceLimits limits) {
     // When debugging tests, disable debugging on non-tests.
     if (limits.debugTestsOnly && !CommandUtils.isTest(command)) {

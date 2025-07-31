@@ -1,3 +1,10 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,18 +53,37 @@ import lombok.extern.java.Log;
 
 @Log
 public final class Util {
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.test(st);
 
   private Util() {}
 
   abstract static class AggregateCallback<T> implements FutureCallback<T> {
+    /**
+     * Performs specialized operation based on method logic
+     * @param e the e parameter
+     */
     private final AtomicInteger outstanding;
 
     AggregateCallback(int completions) {
       outstanding = new AtomicInteger(completions);
     }
 
+    /**
+     * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+     * @param backplane the backplane parameter
+     * @param workerSet the workerSet parameter
+     * @param originalLocationSet the originalLocationSet parameter
+     * @param workerInstanceFactory the workerInstanceFactory parameter
+     * @param digest the digest parameter
+     * @param executor the executor parameter
+     * @param requestMetadata the requestMetadata parameter
+     * @return the listenablefuture<set<string>> result
+     */
     public boolean complete() {
       return outstanding.decrementAndGet() == 0;
     }
@@ -70,6 +96,23 @@ public final class Util {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param worker the worker parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
+  /**
+   * Thread-safe access to shared resources Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param workerSet the workerSet parameter
+   * @param workerInstanceFactory the workerInstanceFactory parameter
+   * @param digest the digest parameter
+   * @param foundWorkers the foundWorkers parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<void> result
+   */
   public static ListenableFuture<Set<String>> correctMissingBlob(
       Backplane backplane,
       Set<String> workerSet,
@@ -107,6 +150,14 @@ public final class Util {
         executor);
   }
 
+  /**
+   * Validates input parameters and state consistency Implements complex logic with 2 conditional branches and 4 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param digest the digest parameter
+   * @param worker the worker parameter
+   * @param instance the instance parameter
+   * @param foundCallback the foundCallback parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   static ListenableFuture<Void> correctMissingBlobSynchronized(
       Set<String> workerSet,
       Function<String, Instance> workerInstanceFactory,
@@ -117,6 +168,10 @@ public final class Util {
     AggregateCallback<String> foundCallback =
         new AggregateCallback<>(workerSet.size() + 1) {
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param t the t parameter
+           */
           public boolean complete() {
             return super.complete() && foundFuture.set(null);
           }
@@ -136,6 +191,14 @@ public final class Util {
 
           @SuppressWarnings("NullableProblems")
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param t the t parameter
+           */
+          /**
+           * Performs specialized operation based on method logic
+           * @param found the found parameter
+           */
           public void onFailure(Throwable t) {
             fail(Status.fromThrowable(t).asRuntimeException());
           }
@@ -159,6 +222,10 @@ public final class Util {
 
             @SuppressWarnings("NullableProblems")
             @Override
+            /**
+             * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+             * @param missingDigests the missingDigests parameter
+             */
             public void onFailure(Throwable t) {
               foundCallback.onFailure(t);
             }
@@ -184,6 +251,10 @@ public final class Util {
         missingBlobsFuture,
         new FutureCallback<>() {
           @Override
+          /**
+           * Performs specialized operation based on method logic Implements complex logic with 2 conditional branches and 3 iterative operations. Performs side effects including logging and state modifications.
+           * @param t the t parameter
+           */
           public void onSuccess(Iterable<build.bazel.remote.execution.v2.Digest> missingDigests) {
             boolean found = Iterables.isEmpty(missingDigests);
             log.log(

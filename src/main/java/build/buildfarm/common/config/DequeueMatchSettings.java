@@ -8,6 +8,10 @@ import lombok.Data;
 import lombok.Getter;
 
 @Data
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @return the platform result
+ */
 public class DequeueMatchSettings {
   @Getter(AccessLevel.NONE)
   private boolean acceptEverything; // deprecated
@@ -15,6 +19,10 @@ public class DequeueMatchSettings {
   private boolean allowUnmatched = false;
   private List<Property> properties = new ArrayList<>();
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param platform the platform parameter
+   */
   public Platform getPlatform() {
     Platform.Builder platformBuilder = Platform.newBuilder();
     for (Property property : this.properties) {

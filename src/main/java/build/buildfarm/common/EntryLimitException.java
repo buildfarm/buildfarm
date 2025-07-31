@@ -1,3 +1,14 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param size the size parameter
+ * @param maxEntrySize the maxEntrySize parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param message the message parameter
+ * @return the public result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

@@ -105,6 +105,11 @@ public class ResourceParser {
    * @return The resource type derived from the URI.
    * @note Suggested return identifier: request.
    */
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches. Includes input validation and error handling for robustness.
+   * @param resource the resource parameter
+   * @param compression the compression parameter
+   */
   public static UploadBlobRequest parseUploadBlobRequest(String resourceName) {
     // Find the index of the keyword.  This will give us an initial index to extract information
     // from.
@@ -125,6 +130,11 @@ public class ResourceParser {
     return builder.build();
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param resource the resource parameter
+   * @param digest the digest parameter
+   */
   private static void addCompressorName(
       ImmutableList.Builder<String> resource, Compressor.Value compression) {
     if (compression == Compressor.Value.IDENTITY) {
@@ -146,6 +156,11 @@ public class ResourceParser {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param resource the resource parameter
+   * @param blob the blob parameter
+   */
   private static void addDigestResource(ImmutableList.Builder<String> resource, Digest digest) {
     resource.add(digest.getHash());
     resource.add(String.format("%d", digest.getSizeBytes()));

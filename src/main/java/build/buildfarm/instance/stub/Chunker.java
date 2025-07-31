@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param toOffset the toOffset parameter
+ * @return the else result
+ */
 // Copyright 2016 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -99,6 +104,13 @@ public final class Chunker {
 
   // Set to true on the first call to next(). This is so that the Chunker can open its data source
   // lazily on the first call to next(), as opposed to opening it in the constructor or on reset().
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the long result
+   */
   private boolean initialized;
 
   Chunker(Supplier<InputStream> dataSupplier, long size, int chunkSize) {
@@ -159,6 +171,10 @@ public final class Chunker {
    * returned.
    */
   @SuppressWarnings("JavaDoc")
+  /**
+   * Constructs digest from hash string and size information
+   * @return the builder result
+   */
   public Chunk next() throws IOException {
     if (hasNext()) {
       throw new NoSuchElementException();
@@ -230,11 +246,21 @@ public final class Chunker {
   }
 
   /** Builder class for the Chunker */
+  /**
+   * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param data the data parameter
+   * @return the builder result
+   */
   public static class Builder {
     private int chunkSize = getDefaultChunkSize();
     private long size;
     private Supplier<InputStream> inputStream;
 
+    /**
+     * Stores a blob in the Content Addressable Storage
+     * @param data the data parameter
+     * @return the builder result
+     */
     public Builder setInput(byte[] data) {
       checkState(inputStream == null);
       size = data.length;
@@ -242,10 +268,22 @@ public final class Chunker {
       return this;
     }
 
+    /**
+     * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+     * @param size the size parameter
+     * @param in the in parameter
+     * @return the builder result
+     */
     public Builder setInput(ByteString data) {
       return setInput(data.size(), data.newInput());
     }
 
+    /**
+     * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+     * @param size the size parameter
+     * @param file the file parameter
+     * @return the builder result
+     */
     public Builder setInput(long size, InputStream in) {
       checkState(inputStream == null);
       checkNotNull(in);
@@ -254,6 +292,11 @@ public final class Chunker {
       return this;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param chunkSize the chunkSize parameter
+     * @return the builder result
+     */
     public Builder setInput(long size, Path file) {
       checkState(inputStream == null);
       this.size = size;
@@ -268,6 +311,10 @@ public final class Chunker {
       return this;
     }
 
+    /**
+     * Constructs digest from hash string and size information Includes input validation and error handling for robustness.
+     * @return the chunker result
+     */
     public Builder setChunkSize(int chunkSize) {
       this.chunkSize = chunkSize;
       return this;

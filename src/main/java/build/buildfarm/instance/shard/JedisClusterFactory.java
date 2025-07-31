@@ -125,6 +125,13 @@ public class JedisClusterFactory {
    * @note Overloaded.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
+  /**
+   * Creates and initializes a new instance
+   * @param hostAndPorts the hostAndPorts parameter
+   * @param jedisClientConfig the jedisClientConfig parameter
+   * @param poolConfig the poolConfig parameter
+   * @return the unifiedjedis result
+   */
   private static void deleteNodeExistingKeys(UnifiedJedis node) {
     String nextCursor = "0";
     Set<String> matchingKeys = new HashSet<>();

@@ -49,6 +49,14 @@ public class RedisMap {
    * @details The name is used by the redis cluster client to access the map data. If two maps had
    *     the same name, they would be instances of the same underlying redis map.
    */
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param mapCursor the mapCursor parameter
+   * @param count the count parameter
+   * @param match the match parameter
+   * @return the scanresult<string> result
+   */
   private final String name;
 
   /**
@@ -101,6 +109,13 @@ public class RedisMap {
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
    * @note Overloaded.
    */
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param jedis the jedis parameter
+   * @param key the key parameter
+   * @param value the value parameter
+   * @return the boolean result
+   */
   public void insert(UnifiedJedis jedis, String key, String value, long timeout_s) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
@@ -122,6 +137,11 @@ public class RedisMap {
     jedis.set(createKeyName(key), value, setParams);
   }
 
+  /**
+   * Removes data or cleans up resources
+   * @param pipeline the pipeline parameter
+   * @param key the key parameter
+   */
   public boolean putIfAbsent(UnifiedJedis jedis, String key, String value) {
     SetParams setParams = SetParams.setParams().nx().ex(expiration_s);
     return "OK".equals(jedis.set(createKeyName(key), value, setParams));
@@ -218,6 +238,13 @@ public class RedisMap {
    * @return Whether the key exists or not.
    * @note Suggested return identifier: exists.
    */
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param mapCursor the mapCursor parameter
+   * @param count the count parameter
+   * @return the scanresult<string> result
+   */
   public boolean exists(UnifiedJedis jedis, String key) {
     return jedis.exists(createKeyName(key));
   }
@@ -229,6 +256,22 @@ public class RedisMap {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 7 conditional branches and 3 iterative operations.
+   * @param cluster the cluster parameter
+   * @param mapCursor the mapCursor parameter
+   * @param count the count parameter
+   * @param match the match parameter
+   * @return the scanresult<string> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param mapCursor the mapCursor parameter
+   * @param count the count parameter
+   * @param match the match parameter
+   * @return the scanresult<string> result
+   */
   public int size(UnifiedJedis jedis) {
     return ScanCount.get(jedis, name + ":*", 1000);
   }
@@ -239,6 +282,12 @@ public class RedisMap {
    * @param key The name of the key.
    * @return The key name to use in redis.
    * @note Suggested return identifier: keyName.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param cursor the cursor parameter
+   * @param remaining the remaining parameter
+   * @return the scanresult<string> result
    */
   protected String createKeyName(String key) {
     return name + ":" + key;
@@ -316,6 +365,11 @@ public class RedisMap {
     int prefixLen = name.length() + 1;
     return new OffsetScanner<String>() {
       @Override
+      /**
+       * Transforms data between different representations
+       * @param result the result parameter
+       * @return the iterable<string> result
+       */
       protected ScanResult<String> scan(String cursor, int remaining) {
         return jedis.scan(cursor, scanParams);
       }

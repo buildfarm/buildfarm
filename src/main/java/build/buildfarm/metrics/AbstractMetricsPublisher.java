@@ -1,3 +1,18 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param clusterId the clusterId parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the public result
+ */
+/**
+ * Carries request context and tracing information Performs side effects including logging and state modifications.
+ * @param operation the operation parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the operationrequestmetadata result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,6 +86,11 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
 
   private final String clusterId;
 
+  /**
+   * Carries request context and tracing information Includes input validation and error handling for robustness.
+   * @param operation the operation parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   public AbstractMetricsPublisher(String clusterId) {
     this.clusterId = clusterId;
   }
@@ -88,6 +108,11 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
   public abstract void publishMetric(String metricName, Object metricValue);
 
   @VisibleForTesting
+  /**
+   * Carries request context and tracing information Performs side effects including logging and state modifications.
+   * @param operationRequestMetadata the operationRequestMetadata parameter
+   * @return the string result
+   */
   protected OperationRequestMetadata populateRequestMetadata(
       Operation operation, RequestMetadata requestMetadata) {
     try {

@@ -1,3 +1,49 @@
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param root the root parameter
+ * @param maxSizeInBytes the maxSizeInBytes parameter
+ * @param maxEntrySizeInBytes the maxEntrySizeInBytes parameter
+ * @param hexBucketLevels the hexBucketLevels parameter
+ * @param storeFileDirsIndexInMemory the storeFileDirsIndexInMemory parameter
+ * @param execRootFallback the execRootFallback parameter
+ * @param expireService the expireService parameter
+ * @param accessRecorder the accessRecorder parameter
+ * @param storage the storage parameter
+ * @param directoriesIndexDbName the directoriesIndexDbName parameter
+ * @param zstdBufferPool the zstdBufferPool parameter
+ * @param onPut the onPut parameter
+ * @param onExpire the onExpire parameter
+ * @param delegate the delegate parameter
+ * @param delegateSkipLoad the delegateSkipLoad parameter
+ * @param externalInputStreamFactory the externalInputStreamFactory parameter
+ * @return the public result
+ */
+/**
+ * Thread-safe access to shared resources
+ * @return the attempt to atomically synchronize result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the directory result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the else result
+ */
+/**
+ * Thread-safe access to shared resources
+ * @return the we saw null entries in the built immutable list without synchronization result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param directory the directory parameter
+ * @param existsDeadline the existsDeadline parameter
+ /**
+  * Performs specialized operation based on method logic
+  * @return the long result
+  */
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -77,6 +123,23 @@ public class LegacyDirectoryCFC extends CASFileCache {
           .register();
 
   public static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
+  /**
+   * Stores a blob in the Content Addressable Storage Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+   * @param cacheScanResults the cacheScanResults parameter
+   * @return the list<path> result
+   */
+  /**
+   * Removes data or cleans up resources
+   * @param branchDir the branchDir parameter
+   * @param name the name parameter
+   * @return the boolean result
+   */
+  /**
+   * Loads data from storage or external source Performs side effects including logging and state modifications.
+   * @param onStartPut the onStartPut parameter
+   * @param removeDirectoryService the removeDirectoryService parameter
+   * @return the cacheloadresults result
+   */
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private final boolean execRootFallback;
@@ -90,6 +153,26 @@ public class LegacyDirectoryCFC extends CASFileCache {
     return directoryStorage.size();
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param time the time parameter
+   * @param unit the unit parameter
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   * @return the boolean result
+   */
+  /**
+   * Creates and initializes a new instance Includes input validation and error handling for robustness.
+   * @return the condition result
+   */
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   */
   public LegacyDirectoryCFC(
       Path root,
       long maxSizeInBytes,
@@ -150,6 +233,9 @@ public class LegacyDirectoryCFC extends CASFileCache {
     private final AtomicBoolean locked = new AtomicBoolean(false);
 
     @Override
+    /**
+     * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+     */
     public void lock() {
       for (; ; ) {
         try {
@@ -164,6 +250,11 @@ public class LegacyDirectoryCFC extends CASFileCache {
     @Override
     public void lockInterruptibly() throws InterruptedException {
       // attempt to atomically synchronize
+      /**
+       * Performs specialized operation based on method logic
+       * @param key the key parameter
+       * @return the lock result
+       */
       synchronized (locked) {
         while (!locked.compareAndSet(/* expected= */ false, /* update= */ true)) {
           locked.wait();
@@ -207,6 +298,15 @@ public class LegacyDirectoryCFC extends CASFileCache {
      */
     private final Cache<Path, Lock> mutexes = Caffeine.newBuilder().weakValues().build();
 
+    /**
+     * Stores a blob in the Content Addressable Storage Implements complex logic with 7 conditional branches and 2 iterative operations. Processes 2 input sources and produces 2 outputs.
+     * @param digestUtil the digestUtil parameter
+     * @param path the path parameter
+     * @param sortedDirent the sortedDirent parameter
+     * @param fileKeys the fileKeys parameter
+     * @param inputsBuilder the inputsBuilder parameter
+     * @return the directory result
+     */
     private synchronized Lock acquire(Path key) {
       return mutexes.get(key, path -> new SharedLock());
     }
@@ -262,6 +362,12 @@ public class LegacyDirectoryCFC extends CASFileCache {
                 directoriesIndex.put(digest, inputsBuilder.build());
                 directoryStorage.put(digest, e);
               } else {
+                /**
+                 * Updates reference counts for cache entry lifecycle Provides thread-safe access through synchronization mechanisms.
+                 * @param inputFiles the inputFiles parameter
+                 * @param inputDirectories the inputDirectories parameter
+                 * @param digestFunction the digestFunction parameter
+                 */
                 synchronized (invalidDirectories) {
                   invalidDirectories.add(dirPath);
                 }
@@ -277,6 +383,12 @@ public class LegacyDirectoryCFC extends CASFileCache {
     return invalidDirectories.build();
   }
 
+  /**
+   * Updates reference counts for cache entry lifecycle Includes input validation and error handling for robustness.
+   * @param inputFiles the inputFiles parameter
+   * @param inputDirectories the inputDirectories parameter
+   * @param digestFunction the digestFunction parameter
+   */
   private Directory computeDirectory(
       DigestUtil digestUtil,
       Path path,
@@ -351,6 +463,19 @@ public class LegacyDirectoryCFC extends CASFileCache {
     return b.build();
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param digest the digest parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param service the service parameter
+   * @return the listenablefuture<pathresult> result
+   */
+  /**
+   * Removes expired entries from the cache to free space Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param entry the entry parameter
+   * @param service the service parameter
+   * @return the list<listenablefuture<void>> result
+   */
   public synchronized void decrementReferences(
       Iterable<String> inputFiles,
       Iterable<build.bazel.remote.execution.v2.Digest> inputDirectories,
@@ -366,6 +491,17 @@ public class LegacyDirectoryCFC extends CASFileCache {
   }
 
   @GuardedBy("this")
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 2 conditional branches and 3 iterative operations. Includes input validation and error handling for robustness.
+   * @param filePath the filePath parameter
+   * @param cacheFilePath the cacheFilePath parameter
+   */
+  /**
+   * Removes expired entries from the cache to free space Performs side effects including logging and state modifications.
+   * @param digest the digest parameter
+   * @param service the service parameter
+   * @return the listenablefuture<void> result
+   */
   private void decrementReferencesSynchronized(
       Iterable<String> inputFiles,
       Iterable<build.bazel.remote.execution.v2.Digest> inputDirectories,
@@ -431,6 +567,14 @@ public class LegacyDirectoryCFC extends CASFileCache {
     return Directories.remove(getDirectoryPath(digest), fileStore, service);
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 3 conditional branches and 3 iterative operations. Performs side effects including logging and state modifications.
+   * @param digestFunction the digestFunction parameter
+   * @param path the path parameter
+   * @param directory the directory parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @return the boolean result
+   */
   private void linkCachedFile(Path filePath, Path cacheFilePath) throws IOException {
     // = Hardlink Limitations =
     // Creating hardlinks is fast and saves space within the CAS.
@@ -499,6 +643,14 @@ public class LegacyDirectoryCFC extends CASFileCache {
     return putFuture;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param digestFunction the digestFunction parameter
+   * @param path the path parameter
+   * @param dirEntry the dirEntry parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @return the boolean result
+   */
   private boolean directoryExists(
       DigestFunction.Value digestFunction,
       Path path,
@@ -528,6 +680,14 @@ public class LegacyDirectoryCFC extends CASFileCache {
     return true;
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Implements complex logic with 7 conditional branches and 7 iterative operations. Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param path the path parameter
+   * @param digest the digest parameter
+   * @param directoriesByDigest the directoriesByDigest parameter
+   * @param service the service parameter
+   * @return the listenablefuture<pathresult> result
+   */
   private boolean directoryEntryExists(
       DigestFunction.Value digestFunction,
       Path path,

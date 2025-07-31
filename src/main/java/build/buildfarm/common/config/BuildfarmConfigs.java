@@ -1,3 +1,18 @@
+/**
+ * Creates and initializes a new instance
+ * @param configsBasePath the configsBasePath parameter
+ * @return the public result
+ */
+/**
+ * Constructs digest from hash string and size information
+ * @param configsBasePath the configsBasePath parameter
+ * @param loaderOptions the loaderOptions parameter
+ * @return the public result
+ */
+/**
+ * Constructs digest from hash string and size information
+ * @return the private result
+ */
 package build.buildfarm.common.config;
 
 import build.buildfarm.common.DigestUtil;
@@ -33,6 +48,11 @@ import org.yaml.snakeyaml.nodes.Tag;
 
 @Data
 @Log
+/**
+ * Creates and initializes a new instance Includes input validation and error handling for robustness.
+ * @param node the node parameter
+ * @return the object result
+ */
 public final class BuildfarmConfigs {
   private static BuildfarmConfigs buildfarmConfigs;
   private static Constructor constructor;
@@ -61,6 +81,10 @@ public final class BuildfarmConfigs {
   }
 
   private static class BuildfarmConfigsConstructor extends Constructor {
+    /**
+     * Retrieves a blob from the Content Addressable Storage
+     * @return the buildfarmconfigs result
+     */
     public BuildfarmConfigsConstructor(String configsBasePath, LoaderOptions loaderOptions) {
       super(loaderOptions);
       yamlConstructors.put(new Tag("!include"), new ImportConstruct(configsBasePath));
@@ -80,6 +104,11 @@ public final class BuildfarmConfigs {
 
   private BuildfarmConfigs() {}
 
+  /**
+   * Loads data from storage or external source Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param configLocation the configLocation parameter
+   * @return the buildfarmconfigs result
+   */
   public static BuildfarmConfigs getInstance() {
     if (buildfarmConfigs == null) {
       buildfarmConfigs = new BuildfarmConfigs();
@@ -87,6 +116,11 @@ public final class BuildfarmConfigs {
     return buildfarmConfigs;
   }
 
+  /**
+   * Loads data from storage or external source Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param args the args parameter
+   * @return the buildfarmconfigs result
+   */
   public static BuildfarmConfigs loadConfigs(Path configLocation) throws IOException {
     Path parent = configLocation.getParent();
     if (parent == null || !Files.isDirectory(parent)) {
@@ -127,6 +161,11 @@ public final class BuildfarmConfigs {
       throw new RuntimeException(e);
     }
     if (!Strings.isNullOrEmpty(options.publicName)) {
+      /**
+       * Loads data from storage or external source Implements complex logic with 5 conditional branches. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+       * @param args the args parameter
+       * @return the buildfarmconfigs result
+       */
       buildfarmConfigs.getServer().setPublicName(options.publicName);
     }
     if (options.port > 0) {
@@ -142,6 +181,12 @@ public final class BuildfarmConfigs {
     return buildfarmConfigs;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param clazz the clazz parameter
+   * @param args the args parameter
+   * @return the optionsparser result
+   */
   public static BuildfarmConfigs loadWorkerConfigs(String[] args) throws ConfigurationException {
     OptionsParser parser = getOptionsParser(ShardWorkerOptions.class, args);
     ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
@@ -170,6 +215,11 @@ public final class BuildfarmConfigs {
     return buildfarmConfigs;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param parser the parser parameter
+   * @return the path result
+   */
   private static OptionsParser getOptionsParser(Class clazz, String[] args)
       throws ConfigurationException {
     OptionsParser parser = OptionsParser.newOptionsParser(clazz);
@@ -183,6 +233,10 @@ public final class BuildfarmConfigs {
     return parser;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param configs the configs parameter
+   */
   private static Path getConfigurationPath(OptionsParser parser) throws ConfigurationException {
     // source config from env variable
     if (!Strings.isNullOrEmpty(System.getenv("CONFIG_PATH"))) {
@@ -200,6 +254,10 @@ public final class BuildfarmConfigs {
     return Path.of(residue.getFirst());
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param configs the configs parameter
+   */
   private static void adjustServerConfigs(BuildfarmConfigs configs) {
     configs
         .getServer()
@@ -208,6 +266,10 @@ public final class BuildfarmConfigs {
     adjustRedisUri(configs);
   }
 
+  /**
+   * Executes a build action on the worker Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param configs the configs parameter
+   */
   private static void adjustWorkerConfigs(BuildfarmConfigs configs) {
     configs
         .getWorker()
@@ -227,6 +289,10 @@ public final class BuildfarmConfigs {
     checkExecutionWrapperAvailability(configs);
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param configs the configs parameter
+   */
   private static void adjustExecuteStageWidth(BuildfarmConfigs configs) {
     if (!Strings.isNullOrEmpty(System.getenv("EXECUTION_STAGE_WIDTH"))) {
       configs
@@ -250,6 +316,12 @@ public final class BuildfarmConfigs {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param publicName the publicName parameter
+   * @param port the port parameter
+   * @return the string result
+   */
   private static void adjustInputFetchStageWidth(BuildfarmConfigs configs) {
     if (configs.getWorker().getInputFetchStageWidth() == 0) {
       configs
@@ -262,6 +334,10 @@ public final class BuildfarmConfigs {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param configs the configs parameter
+   */
   private static String adjustPublicName(String publicName, int port) {
     // use configured value
     if (!Strings.isNullOrEmpty(publicName)) {
@@ -289,6 +365,10 @@ public final class BuildfarmConfigs {
     return publicName;
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param storage the storage parameter
+   */
   private static void adjustRedisUri(BuildfarmConfigs configs) {
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
@@ -298,6 +378,11 @@ public final class BuildfarmConfigs {
     }
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param configs the configs parameter
+   * @return the executionwrapperproperties result
+   */
   private static void deriveCasStorage(Cas storage) {
     if (storage.getMaxSizeBytes() == 0) {
       try {
@@ -313,6 +398,10 @@ public final class BuildfarmConfigs {
   }
 
   @SuppressWarnings("PMD.ConfusingArgumentToVarargsMethod")
+  /**
+   * Validates input parameters and state consistency Performs side effects including logging and state modifications.
+   * @param configs the configs parameter
+   */
   private static ExecutionWrapperProperties createExecutionWrapperProperties(
       BuildfarmConfigs configs) {
     // Create a mapping from the execution wrappers to the features they enable.

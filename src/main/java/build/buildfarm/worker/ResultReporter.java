@@ -1,3 +1,10 @@
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param executionContext the executionContext parameter
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,6 +58,11 @@ class ResultReporter implements Runnable {
   private final ExecutionContext executionContext;
   private final ReportResultStage owner;
   private final Executor pollerExecutor;
+  /**
+   * Performs specialized operation based on method logic
+   * @param stopwatch the stopwatch parameter
+   * @return the long result
+   */
   private boolean success = false;
 
   ResultReporter(
@@ -104,6 +116,10 @@ class ResultReporter implements Runnable {
     }
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param executionContext the executionContext parameter
+   */
   private long runInterruptibly(Stopwatch stopwatch) throws InterruptedException {
     workerContext.resumePoller(
         executionContext.poller,
@@ -120,6 +136,11 @@ class ResultReporter implements Runnable {
     }
   }
 
+  /**
+   * Polls for available operations from the backplane Implements complex logic with 7 conditional branches and 4 iterative operations. Performs side effects including logging and state modifications.
+   * @param stopwatch the stopwatch parameter
+   * @return the long result
+   */
   private void putOperation(ExecutionContext executionContext) throws InterruptedException {
     Operation operation =
         executionContext.operation.toBuilder()
@@ -141,6 +162,10 @@ class ResultReporter implements Runnable {
     }
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param completedExecution the completedExecution parameter
+   */
   private long reportPolled(Stopwatch stopwatch) throws InterruptedException {
     String operationName = executionContext.operation.getName();
 

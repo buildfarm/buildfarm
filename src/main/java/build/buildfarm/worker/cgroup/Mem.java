@@ -22,20 +22,36 @@ public class Mem extends Controller {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the long result
+   */
   public String getControllerName() {
     return "memory";
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param limitBytes the limitBytes parameter
+   */
   public long getMemoryLimit() throws IOException {
     open();
     return readLong("memory.limit_in_bytes");
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the long result
+   */
   public void setMemoryLimit(long limitBytes) throws IOException {
     open();
     writeLong("memory.limit_in_bytes", limitBytes);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param limitBytes the limitBytes parameter
+   */
   public long getMemorySwapLimit() throws IOException {
     open();
     return readLong("memory.memsw.limit_in_bytes");

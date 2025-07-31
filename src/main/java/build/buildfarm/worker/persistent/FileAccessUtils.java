@@ -1,3 +1,9 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param writeTo the writeTo parameter
+ * @return the file lock
+  private static pathlock result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

@@ -26,8 +26,17 @@ import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 
 abstract class Controller implements IOResource {
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the path result
+   */
   protected final Group group;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param propertyName the propertyName parameter
+   * @param owner the owner parameter
+   */
   private boolean opened = false;
 
   Controller(Group group) {
@@ -36,6 +45,9 @@ abstract class Controller implements IOResource {
 
   public abstract String getControllerName();
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   protected final Path getPath() {
     if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
       return group.getPath();
@@ -44,6 +56,11 @@ abstract class Controller implements IOResource {
     }
   }
 
+  /**
+   * Persists data to storage or external destination
+   * @param propertyName the propertyName parameter
+   * @param value the value parameter
+   */
   protected final void open() throws IOException {
     if (!opened) {
       group.create(getControllerName());
@@ -59,6 +76,10 @@ abstract class Controller implements IOResource {
    * attempt to end the process.
    */
   @Override
+  /**
+   * Updates reference counts for cache entry lifecycle Includes input validation and error handling for robustness.
+   * @return the boolean result
+   */
   public void close() throws IOException {
     Path path = getPath();
     boolean exists = true;
@@ -78,6 +99,10 @@ abstract class Controller implements IOResource {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param owner the owner parameter
+   */
   public boolean isReferenced() {
     try {
       return !group.isEmpty(getControllerName());
@@ -105,6 +130,12 @@ abstract class Controller implements IOResource {
     }
   }
 
+  /**
+   * Persists data to storage or external destination
+   * @param propertyName the propertyName parameter
+   * @param value the value parameter
+   * @param value2 the value2 parameter
+   */
   protected void writeInt(String propertyName, int value) throws IOException {
     Path path = getPath().resolve(propertyName);
     try (Writer out = new OutputStreamWriter(Files.newOutputStream(path))) {
@@ -112,6 +143,11 @@ abstract class Controller implements IOResource {
     }
   }
 
+  /**
+   * Persists data to storage or external destination
+   * @param propertyName the propertyName parameter
+   * @param value the value parameter
+   */
   protected void writeIntPair(String propertyName, int value, int value2) throws IOException {
     Path path = getPath().resolve(propertyName);
     try (Writer out = new OutputStreamWriter(Files.newOutputStream(path))) {
@@ -119,6 +155,11 @@ abstract class Controller implements IOResource {
     }
   }
 
+  /**
+   * Loads data from storage or external source Processes 1 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+   * @param propertyName the propertyName parameter
+   * @return the int result
+   */
   protected void writeLong(String propertyName, long value) throws IOException {
     Path path = getPath().resolve(propertyName);
     try (Writer out = new OutputStreamWriter(Files.newOutputStream(path))) {

@@ -1,3 +1,27 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
+/**
+ * Formats digest as human-readable string for logging
+ * @param e the e parameter
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param attributes the attributes parameter
+ * @return the bypass accessibility checking to get our key components result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the return new result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param userName the userName parameter
+ * @param fileSystem the fileSystem parameter
+ * @return the userprincipal result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -59,6 +83,11 @@ public final class Utils {
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param e the e parameter
+   * @return the string result
+   */
   private static jnr.ffi.Runtime runtime() {
     return jnr.ffi.Runtime.getRuntime(libc.get());
   }
@@ -71,6 +100,11 @@ public final class Utils {
     IOException(""),
     NoSuchFileException("no such file");
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param followSymlinks the followSymlinks parameter
+     * @return the linkoption[] result
+     */
     private final String description;
 
     IOErrorFormatter(String description) {
@@ -85,6 +119,13 @@ public final class Utils {
     }
   }
 
+  /**
+   * Loads data from storage or external source
+   * @param path the path parameter
+   * @param followSymlinks the followSymlinks parameter
+   * @param fileStore the fileStore parameter
+   * @return the list<dirent> result
+   */
   public static String formatIOError(IOException e) {
     IOErrorFormatter formatter;
     try {
@@ -101,11 +142,23 @@ public final class Utils {
   // This isn't generally safe; we rely on the file system APIs not modifying the array.
   private static final LinkOption[] NOFOLLOW_LINKS_OPTION = {LinkOption.NOFOLLOW_LINKS};
 
+  /**
+   * Loads data from storage or external source
+   * @param path the path parameter
+   * @param followSymlinks the followSymlinks parameter
+   * @return the list<posixdirent> result
+   */
   private static LinkOption[] linkOpts(boolean followSymlinks) {
     return followSymlinks ? NO_LINK_OPTION : NOFOLLOW_LINKS_OPTION;
   }
 
   /* listing paths / dirents */
+  /**
+   * Loads data from storage or external source
+   * @param posix the posix parameter
+   * @param path the path parameter
+   * @return the list<jnrdirent> result
+   */
   public static List<Dirent> readdir(Path path, boolean followSymlinks, FileStore fileStore)
       throws IOException {
     List<Dirent> dirents = new ArrayList<>();
@@ -119,6 +172,14 @@ public final class Utils {
     return dirents;
   }
 
+  /**
+   * Loads data from storage or external source Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications.
+   * @param libc the libc parameter
+   * @param runtime the runtime parameter
+   * @param path the path parameter
+   * @param fileStore the fileStore parameter
+   * @return the list<namedfilekey> result
+   */
   public static List<PosixDirent> posixReaddir(Path path, boolean followSymlinks)
       throws IOException {
     List<PosixDirent> dirents = new ArrayList<>();
@@ -142,6 +203,23 @@ public final class Utils {
     return dirents;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param path the path parameter
+   * @param fileStore the fileStore parameter
+   * @return the namedfilekey result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage Processes 2 input sources and produces 1 outputs.
+   * @param path the path parameter
+   * @param stat the stat parameter
+   * @return the object result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param path the path parameter
+   * @return the list<path> result
+   */
   private static List<NamedFileKey> ffiReaddir(
       LibC libc, jnr.ffi.Runtime runtime, Path path, FileStore fileStore) throws IOException {
     List<NamedFileKey> dirents = new ArrayList<>();
@@ -175,6 +253,12 @@ public final class Utils {
     return dirents;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param path the path parameter
+   * @param fileStore the fileStore parameter
+   * @return the list<namedfilekey> result
+   */
   public static List<Path> listDir(Path path) throws IOException {
     List<Path> files = new ArrayList<>();
     try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
@@ -185,6 +269,12 @@ public final class Utils {
     return files;
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+   * @param path the path parameter
+   * @param fileStore the fileStore parameter
+   * @return the list<namedfilekey> result
+   */
   public static Object getFileKey(Path path, @Nullable FileStatus stat) throws IOException {
     Object fileKey = stat == null ? null : stat.fileKey();
     if (fileKey == null) {
@@ -209,6 +299,21 @@ public final class Utils {
     return dirents;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param obj the obj parameter
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the int result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param obj the obj parameter
+   * @param fieldName the fieldName parameter
+   * @return the int result
+   */
   public static List<NamedFileKey> listDirentSorted(Path path, FileStore fileStore)
       throws IOException {
     final List<NamedFileKey> dirents;
@@ -251,11 +356,22 @@ public final class Utils {
     }
 
     @Override
+    /**
+     * Formats digest as human-readable string for logging
+     * @return the string result
+     */
     public int hashCode() {
       return volSerialNumber + fileIndexHigh + fileIndexLow;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic Processes 2 input sources and produces 4 outputs. Includes input validation and error handling for robustness.
+     * @param path the path parameter
+     * @param followSymlinks the followSymlinks parameter
+     * @param fileStore the fileStore parameter
+     * @return the filestatus result
+     */
     public boolean equals(Object obj) {
       if (obj == this) return true;
       if (!(obj instanceof WindowsFileKey other)) return false;
@@ -276,6 +392,14 @@ public final class Utils {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public static FileStatus stat(final Path path, final boolean followSymlinks, FileStore fileStore)
       throws IOException {
     final BasicFileAttributes attributes;
@@ -289,11 +413,19 @@ public final class Utils {
     }
     return new FileStatus() {
       @Override
+      /**
+       * Performs specialized operation based on method logic
+       * @return the boolean result
+       */
       public boolean isFile() {
         return attributes.isRegularFile() || isSpecialFile();
       }
 
       @Override
+      /**
+       * Performs specialized operation based on method logic
+       * @return the boolean result
+       */
       public boolean isSpecialFile() {
         return attributes.isOther();
       }
@@ -314,6 +446,10 @@ public final class Utils {
       }
 
       @Override
+      /**
+       * Performs specialized operation based on method logic
+       * @return the object result
+       */
       public long getLastModifiedTime() {
         return attributes.lastModifiedTime().toMillis();
       }
@@ -325,6 +461,10 @@ public final class Utils {
       }
 
       @Override
+      /**
+       * Loads data from storage or external source
+       * @return the boolean result
+       */
       public Object fileKey() {
         if (attributes instanceof DosFileAttributes) {
           return new WindowsFileKey((DosFileAttributes) attributes);
@@ -351,6 +491,18 @@ public final class Utils {
   }
 
   /* other */
+  /**
+   * Performs specialized operation based on method logic Processes 2 input sources and produces 2 outputs.
+   * @param path the path parameter
+   * @param followSymlinks the followSymlinks parameter
+   * @return the posixfileattributes result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param posix the posix parameter
+   * @param path the path parameter
+   * @return the filestat result
+   */
   private static Dirent.Type direntTypeFromStat(FileStatus stat) {
     if (stat == null) {
       return Dirent.Type.UNKNOWN;
@@ -371,6 +523,13 @@ public final class Utils {
   }
 
   /* Getting file attributes from path */
+  /**
+   * Performs specialized operation based on method logic
+   * @param path the path parameter
+   * @param followSymlinks the followSymlinks parameter
+   * @param fileStore the fileStore parameter
+   * @return the filestatus result
+   */
   public static FileStat jnrStatNullable(POSIX posix, String path) {
     try {
       return posix.stat(path);
@@ -379,6 +538,11 @@ public final class Utils {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param path the path parameter
+   * @return the long result
+   */
   public static PosixFileAttributes posixStatNullable(Path path, boolean followSymlinks) {
     try {
       return Files.readAttributes(path, PosixFileAttributes.class, linkOpts(followSymlinks));
@@ -387,6 +551,12 @@ public final class Utils {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param posix the posix parameter
+   * @param path the path parameter
+   * @return the long result
+   */
   public static FileStatus statNullable(Path path, boolean followSymlinks, FileStore fileStore) {
     try {
       return stat(path, followSymlinks, fileStore);
@@ -396,6 +566,11 @@ public final class Utils {
   }
 
   /* Getting inode value from path */
+  /**
+   * Performs specialized operation based on method logic
+   * @param path the path parameter
+   * @return the boolean result
+   */
   public static long getInode(Path path) {
     try {
       return (long) Files.getAttribute(path, "unix:ino");
@@ -404,12 +579,23 @@ public final class Utils {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param posix the posix parameter
+   * @param path the path parameter
+   * @return the boolean result
+   */
   public static long jnrGetInode(POSIX posix, String path) {
     FileStat fs = posix.lstat(path);
     return fs.ino();
   }
 
   /* Testing if path is a directory */
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+   * @param future the future parameter
+   * @return the t result
+   */
   public static Boolean isDir(String path) {
     File f = new File(path);
     return f.isDirectory();
@@ -421,6 +607,11 @@ public final class Utils {
     return fd > 0;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs. Includes input validation and error handling for robustness.
+   * @param future the future parameter
+   * @return the t result
+   */
   public static <T> T getInterruptiblyOrIOException(ListenableFuture<T> future)
       throws IOException, InterruptedException {
     try {
@@ -461,6 +652,11 @@ public final class Utils {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Processes 2 input sources and produces 1 outputs. Performs side effects including logging and state modifications.
+   * @param dir the dir parameter
+   * @return the list<path> result
+   */
   public static @Nullable UserPrincipal getUser(String userName, FileSystem fileSystem)
       throws IOException {
     if (Strings.isNullOrEmpty(userName)) {

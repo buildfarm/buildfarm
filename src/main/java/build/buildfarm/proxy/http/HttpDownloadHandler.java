@@ -1,3 +1,13 @@
+/**
+ * Retrieves data from distributed storage
+ * @param credentials the credentials parameter
+ * @return the public result
+ */
+/**
+ * Manages network connections for gRPC communication Implements complex logic with 9 conditional branches. Includes input validation and error handling for robustness.
+ * @param ctx the ctx parameter
+ * @param msg the msg parameter
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -42,8 +52,19 @@ final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
   private OutputStream out;
   private boolean keepAlive = HttpVersion.HTTP_1_1.isKeepAliveDefault();
   private boolean downloadSucceeded;
+  /**
+   * Constructs digest from hash string and size information
+   * @param request the request parameter
+   * @return the httprequest result
+   */
   private HttpResponse response;
 
+  /**
+   * Persists data to storage or external destination Includes input validation and error handling for robustness.
+   * @param ctx the ctx parameter
+   * @param msg the msg parameter
+   * @param promise the promise parameter
+   */
   public HttpDownloadHandler(Credentials credentials) {
     super(credentials);
   }
@@ -130,6 +151,10 @@ final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
             });
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param ctx the ctx parameter
+   */
   private HttpRequest buildRequest(DownloadCommand request) {
     HttpRequest httpRequest =
         new DefaultFullHttpRequest(
@@ -142,6 +167,11 @@ final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
     return httpRequest;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   * @param ctx the ctx parameter
+   */
   private void succeedAndReset(ChannelHandlerContext ctx) {
     try {
       succeedAndResetUserPromise();
@@ -151,6 +181,11 @@ final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   * @param ctx the ctx parameter
+   */
   private void failAndClose(Throwable t, ChannelHandlerContext ctx) {
     try {
       failAndResetUserPromise(t);
@@ -159,6 +194,10 @@ final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param ctx the ctx parameter
+   */
   private void failAndReset(Throwable t, ChannelHandlerContext ctx) {
     try {
       failAndResetUserPromise(t);

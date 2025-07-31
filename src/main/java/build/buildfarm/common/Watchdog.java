@@ -1,3 +1,9 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param petTimeout the petTimeout parameter
+ * @param runnable the runnable parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,6 +32,9 @@ public class Watchdog implements Runnable {
   private boolean done;
   private long start;
 
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+   */
   public Watchdog(Duration petTimeout, InterruptingRunnable runnable) {
     this.runnable = runnable;
     this.petTimeout = petTimeout;
@@ -36,8 +45,15 @@ public class Watchdog implements Runnable {
 
   @Override
   @SuppressWarnings("CatchMayIgnoreException")
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void run() {
     try {
+      /**
+       * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+       * @param timeout the timeout parameter
+       */
       synchronized (this) {
         start = System.nanoTime();
         while (!stopped && timeoutNanos > 0) {
@@ -60,6 +76,9 @@ public class Watchdog implements Runnable {
     reset(petTimeout);
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   private synchronized void reset(Duration timeout) {
     start = System.nanoTime();
     timeoutNanos = Durations.toNanos(timeout);

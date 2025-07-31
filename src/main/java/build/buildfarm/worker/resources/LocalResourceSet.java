@@ -29,7 +29,19 @@ import java.util.concurrent.Semaphore;
  *     operation's completion. The resource is requested by the action's platform properties. These
  *     resources are specific to the individual worker.
  */
+/**
+ * Performs specialized operation based on method logic
+ * @param semaphore the semaphore parameter
+ * @param stage the stage parameter
+ * @return the record result
+ */
 public class LocalResourceSet {
+  /**
+   * Performs specialized operation based on method logic
+   * @param pool the pool parameter
+   * @param stage the stage parameter
+   * @return the record result
+   */
   public record SemaphoreResource(Semaphore semaphore, Stage stage) {}
 
   public record PoolResource(Queue<Object> pool, Stage stage) {}

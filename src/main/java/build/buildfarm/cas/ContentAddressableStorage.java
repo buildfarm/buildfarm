@@ -1,3 +1,15 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param data the data parameter
+ * @param digestUtil the digestUtil parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param data the data parameter
+ * @param digest the digest parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,11 +68,19 @@ public interface ContentAddressableStorage extends InputStreamFactory {
       digest = digestUtil.compute(data);
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @return the long result
+     */
     public Blob(ByteString data, Digest digest) {
       this.data = data;
       this.digest = digest;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public long size() {
       return digest.getSize();
     }

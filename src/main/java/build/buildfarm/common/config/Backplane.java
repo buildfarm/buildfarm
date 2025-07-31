@@ -1,3 +1,15 @@
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @return the string result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @return the string result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @return the string result
+ */
 package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;

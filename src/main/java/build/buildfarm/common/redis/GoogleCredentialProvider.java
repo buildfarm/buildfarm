@@ -1,3 +1,13 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param refreshDuration the refreshDuration parameter
+ * @param lifetime the lifetime parameter
+ * @return the public result
+ */
 // Copyright 2024 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,12 +60,20 @@ public class GoogleCredentialProvider implements RedisCredentialsProvider, Runna
 
   private volatile RedisCredentials credentials;
   private volatile Instant lastRefreshInstant;
+  /**
+   * Removes expired entries from the cache to free space
+   * @return the boolean result
+   */
   private volatile Exception lastException;
 
   public GoogleCredentialProvider() throws Exception {
     this(Duration.ofMinutes(5), Duration.ofMinutes(60));
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @return the rediscredentials result
+   */
   public GoogleCredentialProvider(Duration refreshDuration, Duration lifetime) throws Exception {
     this.googleCredentials =
         GoogleCredentials.getApplicationDefault()
@@ -72,6 +90,9 @@ public class GoogleCredentialProvider implements RedisCredentialsProvider, Runna
     service.scheduleWithFixedDelay(this, 10, 10, TimeUnit.SECONDS);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public RedisCredentials get() {
     if (hasTokenExpired()) {
       throw new RuntimeException("Background IAM token refresh failed", lastException);
@@ -79,6 +100,9 @@ public class GoogleCredentialProvider implements RedisCredentialsProvider, Runna
     return this.credentials;
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   */
   private boolean hasTokenExpired() {
     if (this.lastRefreshInstant == null || this.lifetime == null) {
       return true;
@@ -88,6 +112,9 @@ public class GoogleCredentialProvider implements RedisCredentialsProvider, Runna
 
   // To be invoked by customer app on shutdown
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   public void close() {
     service.shutdown();
   }

@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+ * @param entryPathStrategy the entryPathStrategy parameter
+ * @return the public result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,14 +35,27 @@ import javax.annotation.concurrent.GuardedBy;
  * usage.
  */
 class MemoryFileDirectoriesIndex extends FileDirectoriesIndex {
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param entry the entry parameter
+   * @return the set<digest> result
+   */
   private final ConcurrentHashMap<String, Set<String>> data;
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public MemoryFileDirectoriesIndex(EntryPathStrategy entryPathStrategy) {
     super(entryPathStrategy);
     data = new ConcurrentHashMap<>();
   }
 
   @Override
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param entry the entry parameter
+   * @return the set<digest> result
+   */
   public void close() {}
 
   @GuardedBy("this")
@@ -52,6 +70,11 @@ class MemoryFileDirectoriesIndex extends FileDirectoriesIndex {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param directory the directory parameter
+   * @param entries the entries parameter
+   */
   public synchronized Set<Digest> removeEntry(String entry) throws IOException {
     Set<Digest> directories = removeEntryDirectories(entry);
     super.removeDirectories(directories);
@@ -59,6 +82,10 @@ class MemoryFileDirectoriesIndex extends FileDirectoriesIndex {
   }
 
   @Override
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param directory the directory parameter
+   */
   public void put(Digest directory, Iterable<String> entries) throws IOException {
     super.put(directory, entries);
     String digest = DigestUtil.toString(directory);
@@ -70,6 +97,9 @@ class MemoryFileDirectoriesIndex extends FileDirectoriesIndex {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public synchronized void remove(Digest directory) throws IOException {
     super.remove(directory);
 

@@ -1,3 +1,16 @@
+/**
+ * Retrieves data from distributed storage Includes input validation and error handling for robustness.
+ * @param uri the uri parameter
+ * @param casDownload the casDownload parameter
+ * @param hash the hash parameter
+ * @param out the out parameter
+ * @param downloadContent the downloadContent parameter
+ * @return the protected result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the uri result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,18 +48,34 @@ final class DownloadCommand {
     this.downloadContent = downloadContent;
   }
 
+  /**
+   * Retrieves data from distributed storage
+   * @return the boolean result
+   */
   public URI uri() {
     return uri;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the string result
+   */
   public boolean casDownload() {
     return casDownload;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the outputstream result
+   */
   public String hash() {
     return hash;
   }
 
+  /**
+   * Retrieves data from distributed storage
+   * @return the boolean result
+   */
   public OutputStream out() {
     return out;
   }

@@ -1,3 +1,15 @@
+/**
+ * gRPC service client for remote communication
+ * @return the private result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the else result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +28,11 @@ package build.buildfarm.instance.shard;
 
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+/**
+ * Creates and initializes a new instance
+ * @param timeout the timeout parameter
+ * @return the loadingcache<string, stubinstance> result
+ */
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import build.buildfarm.common.grpc.Channels;
@@ -34,9 +51,21 @@ import io.grpc.ManagedChannel;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Loads data from storage or external source
+ * @param worker the worker parameter
+ * @return the stubinstance result
+ */
 public final class WorkerStubs {
   private WorkerStubs() {}
 
+  /**
+   * Manages network connections for gRPC communication Performs side effects including logging and state modifications.
+   * @param worker the worker parameter
+   * @param active the active parameter
+   * @param onAllIdle the onAllIdle parameter
+   * @return the managedchannel result
+   */
   public static LoadingCache<String, StubInstance> create(Duration timeout) {
     return CacheBuilder.newBuilder()
         .expireAfterAccess(10, TimeUnit.MINUTES)
@@ -44,12 +73,21 @@ public final class WorkerStubs {
             new CacheLoader<>() {
               @SuppressWarnings("NullableProblems")
               @Override
+              /**
+               * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+               */
               public StubInstance load(String worker) {
                 return newStubInstance(worker, timeout);
               }
             });
   }
 
+  /**
+   * gRPC service client for remote communication Executes asynchronously and returns a future for completion tracking.
+   * @param worker the worker parameter
+   * @param timeout the timeout parameter
+   * @return the stubinstance result
+   */
   private static ManagedChannel createChannel(
       String worker, AtomicInteger active, Runnable onAllIdle) {
     ManagedChannel channel = Channels.createChannel(worker);
@@ -76,6 +114,10 @@ public final class WorkerStubs {
     return channel;
   }
 
+  /**
+   * gRPC service client for remote communication
+   * @return the retrier result
+   */
   private static StubInstance newStubInstance(String worker, Duration timeout) {
     AtomicInteger active = new AtomicInteger(2); // one for each channel
     SettableFuture<Void> idle = SettableFuture.create();
@@ -95,6 +137,10 @@ public final class WorkerStubs {
     return instance;
   }
 
+  /**
+   * gRPC service client for remote communication
+   * @return the listeningscheduledexecutorservice result
+   */
   private static Retrier newStubRetrier() {
     return new Retrier(
         Backoff.exponential(
@@ -106,6 +152,10 @@ public final class WorkerStubs {
         Retrier.DEFAULT_IS_RETRIABLE);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param instance the instance parameter
+   */
   private static ListeningScheduledExecutorService newStubRetryService() {
     return listeningDecorator(newSingleThreadScheduledExecutor());
   }

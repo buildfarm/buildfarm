@@ -1,3 +1,12 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @return the return new result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param children the children parameter
+ * @return the private result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,6 +43,11 @@ import java.util.Stack;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param directoryName the directoryName parameter
+ * @return the outputdirectory result
+ */
 public class OutputDirectory {
   private static final OutputDirectory defaultInstance = new OutputDirectory(ImmutableMap.of());
 
@@ -41,6 +55,10 @@ public class OutputDirectory {
   //
   // Per the test encyclopedia initial conditions:
   // https://docs.bazel.build/versions/master/test-encyclopedia.html#initial-conditions
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the outputdirectory result
+   */
   private static final Set<String> OUTPUT_DIRECTORY_ENV_VARS =
       ImmutableSet.of(
           "TEST_TMPDIR", "TEST_UNDECLARED_OUTPUTS_DIR", "TEST_UNDECLARED_OUTPUTS_ANNOTATIONS_DIR");
@@ -72,8 +90,18 @@ public class OutputDirectory {
     this.children = children;
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param envVars the envVars parameter
+   * @return the iterable<outputdirectoryentry> result
+   */
   private static final class OutputDirectoryEntry implements Comparable<OutputDirectoryEntry> {
     public final String outputDirectory;
+    /**
+     * Performs specialized operation based on method logic
+     * @param other the other parameter
+     * @return the int result
+     */
     public final boolean isRecursive;
 
     OutputDirectoryEntry(String outputDirectory, boolean isRecursive) {
@@ -87,6 +115,13 @@ public class OutputDirectory {
     }
   }
 
+  /**
+   * Transforms data between different representations
+   * @param outputFiles the outputFiles parameter
+   * @param outputDirs the outputDirs parameter
+   * @param envVars the envVars parameter
+   * @return the outputdirectory result
+   */
   private static Iterable<OutputDirectoryEntry> envVarOutputDirectoryEntries(
       Iterable<EnvironmentVariable> envVars) {
     ImmutableList.Builder<OutputDirectoryEntry> entries = ImmutableList.builder();
@@ -105,6 +140,11 @@ public class OutputDirectory {
     return entries.build();
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param name the name parameter
+   * @return the builder result
+   */
   public static OutputDirectory parse(
       Iterable<String> outputFiles,
       Iterable<String> outputDirs,
@@ -128,10 +168,19 @@ public class OutputDirectory {
             envVarOutputDirectoryEntries(envVars)));
   }
 
+  /**
+   * Transforms data between different representations Implements complex logic with 3 conditional branches and 3 iterative operations. Includes input validation and error handling for robustness.
+   * @param outputDirs the outputDirs parameter
+   * @return the outputdirectory result
+   */
   private static final class Builder {
     final Map<String, Builder> children = new HashMap<>();
     boolean isRecursive = false;
 
+    /**
+     * Constructs digest from hash string and size information
+     * @return the outputdirectory result
+     */
     public Builder addChild(String name) {
       Preconditions.checkState(!isRecursive, "recursive builder already has all children");
       Builder childBuilder = new Builder();
@@ -144,6 +193,10 @@ public class OutputDirectory {
       this.isRecursive = isRecursive;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param root the root parameter
+     */
     public OutputDirectory build() {
       if (isRecursive) {
         return OutputDirectory.getRecursiveInstance();
@@ -201,6 +254,11 @@ public class OutputDirectory {
     return builder.build();
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param directoryName the directoryName parameter
+   * @return the outputdirectory result
+   */
   public void stamp(Path root) throws IOException {
     if (children == null || children.isEmpty()) {
       Files.createDirectories(root);
@@ -211,6 +269,10 @@ public class OutputDirectory {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public OutputDirectory getChild(String directoryName) {
     return children.get(directoryName);
   }

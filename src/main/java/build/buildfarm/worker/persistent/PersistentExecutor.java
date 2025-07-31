@@ -98,6 +98,12 @@ public class PersistentExecutor {
    * @param resultBuilder
    * @return
    */
+  /**
+   * Transforms data between different representations Includes input validation and error handling for robustness.
+   * @param cmdStr the cmdStr parameter
+   * @param argsList the argsList parameter
+   * @return the immutablelist<string> result
+   */
   public static Code runOnPersistentWorker(
       WorkFilesContext context,
       String operationName,
@@ -269,6 +275,11 @@ public class PersistentExecutor {
    *     persistent worker daemon.
    */
   @VisibleForTesting
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param argsList the argsList parameter
+   * @return the string result
+   */
   static String generatePersistentWorkerCommand(List<String> args) {
     // Strip out the `@...` argfiles.
     List<String> filteredArgs = new ArrayList<>();

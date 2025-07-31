@@ -1,3 +1,18 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param storage the storage parameter
+ * @param matchStage the matchStage parameter
+ * @param inputFetchStage the inputFetchStage parameter
+ * @param executeActionStage the executeActionStage parameter
+ * @param reportResultStage the reportResultStage parameter
+ * @param completeStage the completeStage parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the fixme deliver full local storage chain result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,8 +48,24 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final SuperscalarPipelineStage inputFetchStage;
   private final SuperscalarPipelineStage executeActionStage;
   private final SuperscalarPipelineStage reportResultStage;
+  /**
+   * Performs specialized operation based on method logic
+   * @param stage the stage parameter
+   * @return the stageinformation result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param name the name parameter
+   * @param operationName the operationName parameter
+   * @return the stageinformation result
+   */
   private final PutOperationStage completeStage;
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Implements complex logic with 2 conditional branches and 3 iterative operations.
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public WorkerProfileService(
       @Nullable CASFileCache storage,
       PipelineStage matchStage,

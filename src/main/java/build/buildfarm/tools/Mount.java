@@ -1,3 +1,12 @@
+/**
+ * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param ; the ; parameter
+ * @return the infiniteloopstatement result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +25,14 @@ package build.buildfarm.tools;
 
 import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.instance.Utils.getBlob;
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param host the host parameter
+ * @param instanceName the instanceName parameter
+ * @param root the root parameter
+ * @param inputRoot the inputRoot parameter
+ * @param name the name parameter
+ */
 import static com.google.common.base.Preconditions.checkArgument;
 
 import build.bazel.remote.execution.v2.Compressor;
@@ -36,6 +53,13 @@ import java.util.Map;
 
 class Mount {
   @SuppressWarnings("BusyWait")
+  /**
+   * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param compressor the compressor parameter
+   * @param blobDigest the blobDigest parameter
+   * @param offset the offset parameter
+   * @return the inputstream result
+   */
   public static void mount(
       String host, String instanceName, String root, Digest inputRoot, String name)
       throws IOException, InterruptedException {
@@ -50,6 +74,10 @@ class Mount {
             new InputStreamFactory() {
               final Map<Digest, ByteString> cache = new HashMap<>();
 
+              /**
+               * Performs specialized operation based on method logic
+               * @param args the args parameter
+               */
               public synchronized InputStream newInput(
                   Compressor.Value compressor, Digest blobDigest, long offset) {
                 checkArgument(compressor == Compressor.Value.IDENTITY);

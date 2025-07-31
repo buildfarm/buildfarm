@@ -1,3 +1,82 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param instance the instance parameter
+ * @return the public result
+ */
+/**
+ * Loads data from storage or external source Implements complex logic with 8 conditional branches and 1 iterative operations. Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param in the in parameter
+ * @param limit the limit parameter
+ * @param target the target parameter
+ */
+/**
+ * Performs specialized operation based on method logic Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @return the readresponse result
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Handles streaming responses from gRPC calls Performs side effects including logging and state modifications.
+ * @param name the name parameter
+ * @param compressor the compressor parameter
+ * @param offset the offset parameter
+ * @param delegate the delegate parameter
+ * @return the servercallstreamobserver<readresponse> result
+ */
+/**
+ * Handles streaming responses from gRPC calls
+ * @param responseObserver the responseObserver parameter
+ * @return the servercallstreamobserver<bytestring> result
+ */
+/**
+ * Loads data from storage or external source
+ * @param instance the instance parameter
+ * @param downloadBlobRequest the downloadBlobRequest parameter
+ * @param offset the offset parameter
+ * @param limit the limit parameter
+ * @param responseObserver the responseObserver parameter
+ */
+/**
+ * Loads data from storage or external source
+ * @param instance the instance parameter
+ * @param downloadBlobRequest the downloadBlobRequest parameter
+ * @param offset the offset parameter
+ * @param limit the limit parameter
+ * @param responseObserver the responseObserver parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param 0 the 0 parameter
+ * @return the else result
+ */
+/**
+ * Loads data from storage or external source Performs side effects including logging and state modifications.
+ * @param instance the instance parameter
+ * @param resourceName the resourceName parameter
+ * @param offset the offset parameter
+ * @param limit the limit parameter
+ * @param responseObserver the responseObserver parameter
+ */
+/**
+ * Loads data from storage or external source
+ * @param resourceName the resourceName parameter
+ * @param offset the offset parameter
+ * @param limit the limit parameter
+ * @param responseObserver the responseObserver parameter
+ */
+/**
+ * Persists data to storage or external destination Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+ * @return the return new result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+ * @param resourceName the resourceName parameter
+ * @return the write result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -70,6 +149,12 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   * @param instance the instance parameter
+   * @param digest the digest parameter
+   * @return the write result
+   */
   static class UnexpectedEndOfStreamException extends IOException {
     private final long remaining;
     private final long limit;
@@ -89,6 +174,14 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param t the t parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param response the response parameter
+   */
   public ByteStreamService(Instance instance) {
     this.instance = instance;
     this.deadlineAfter = configs.getServer().getBytestreamTimeout();
@@ -99,6 +192,11 @@ public class ByteStreamService extends ByteStreamImplBase {
       private final byte[] buf = new byte[CHUNK_SIZE];
       private final boolean unlimited = limit == 0;
       private long remaining = limit;
+      /**
+       * Performs specialized operation based on method logic
+       * @param responseObserver the responseObserver parameter
+       * @return the servercallstreamobserver<writeresponse> result
+       */
       private boolean complete = false;
 
       ReadResponse next() throws IOException {
@@ -123,6 +221,20 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
 
       @Override
+      /**
+       * Performs specialized operation based on method logic
+       */
+      /**
+       * Performs specialized operation based on method logic
+       * @param t the t parameter
+       */
+      /**
+       * Performs specialized operation based on method logic
+       * @param data the data parameter
+       */
+      /**
+       * Performs specialized operation based on method logic
+       */
       public void run() {
         if (!complete) {
           copy();
@@ -226,6 +338,16 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
 
       @Override
+      /**
+       * Persists data to storage or external destination Performs side effects including logging and state modifications.
+       * @param request the request parameter
+       * @param responseObserver the responseObserver parameter
+       */
+      /**
+       * Loads data from storage or external source Performs side effects including logging and state modifications.
+       * @param request the request parameter
+       * @param responseObserver the responseObserver parameter
+       */
       public void onCompleted() {
         responseObserver.onCompleted();
       }
@@ -352,6 +474,26 @@ public class ByteStreamService extends ByteStreamImplBase {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param offset the offset parameter
+   * @param deadlineAfter the deadlineAfter parameter
+   * @param deadlineAfterUnits the deadlineAfterUnits parameter
+   * @param onReadyHandler the onReadyHandler parameter
+   * @return the listenablefuture<feedbackoutputstream> result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param offset the offset parameter
+   * @param deadlineAfter the deadlineAfter parameter
+   * @param deadlineAfterUnits the deadlineAfterUnits parameter
+   * @param onReadyHandler the onReadyHandler parameter
+   * @return the feedbackoutputstream result
+   */
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @return the boolean result
+   */
   public void queryWriteStatus(
       QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
@@ -382,14 +524,33 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param instance the instance parameter
+   * @param resourceName the resourceName parameter
+   * @return the write result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param instance the instance parameter
+   * @param resourceName the resourceName parameter
+   * @return the write result
+   */
   static Write getBlobWrite(Instance instance, Digest digest) {
     return new Write() {
       @Override
+      /**
+       * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+       */
       public long getCommittedSize() {
         return isComplete() ? digest.getSize() : 0;
       }
 
       @Override
+      /**
+       * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+       * @return the listenablefuture<long> result
+       */
       public boolean isComplete() {
         try {
           return instance.containsBlob(
@@ -420,6 +581,11 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
 
       @Override
+      /**
+       * Persists data to storage or external destination
+       * @param responseObserver the responseObserver parameter
+       * @return the streamobserver<writerequest> result
+       */
       public ListenableFuture<Long> getFuture() {
         throw new RuntimeException("cannot add listener to blob write");
       }

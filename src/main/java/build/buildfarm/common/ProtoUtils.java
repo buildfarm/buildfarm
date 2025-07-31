@@ -28,6 +28,12 @@ import lombok.extern.java.Log;
  * @details Performs validation and error reporting of proto data.
  */
 @Log
+/**
+ * Transforms data between different representations Performs side effects including logging and state modifications.
+ * @param queuedOperationBlob the queuedOperationBlob parameter
+ * @param queueEntry the queueEntry parameter
+ * @return the queuedoperation result
+ */
 public class ProtoUtils {
   public static QueuedOperation parseQueuedOperation(
       ByteString queuedOperationBlob, QueueEntry queueEntry) {

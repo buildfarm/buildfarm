@@ -1,3 +1,28 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @return the ensure that only one error put attempt occurs
+  private void result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param consumer the consumer parameter
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 2 conditional branches and 4 iterative operations. Performs side effects including logging and state modifications.
+ * @param limits the limits parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the allow debugging before an execution result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the run the action under docker result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the allow debugging after an execution result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -83,6 +108,11 @@ class Executor {
   private final ExecuteActionStage owner;
   private final java.util.concurrent.Executor pollerExecutor;
   private int exitCode = INCOMPLETE_EXIT_CODE;
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param ignoreFailure the ignoreFailure parameter
+   * @return the boolean result
+   */
   private boolean wasErrored = false;
   private boolean polling = false;
 
@@ -105,6 +135,12 @@ class Executor {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 3 conditional branches and 3 iterative operations.
+   * @param stopwatch the stopwatch parameter
+   * @param limits the limits parameter
+   * @return the long result
+   */
   private boolean putOperation(boolean ignoreFailure) throws InterruptedException {
     Operation operation =
         executionContext.operation.toBuilder()
@@ -131,6 +167,12 @@ class Executor {
     return operationUpdateSuccess;
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 1 iterative operations.
+   * @param settings the settings parameter
+   * @param action the action parameter
+   * @return the duration result
+   */
   private long runInterruptible(Stopwatch stopwatch, ResourceLimits limits)
       throws InterruptedException {
     Timestamp executionStartTimestamp = Timestamps.now();
@@ -186,6 +228,12 @@ class Executor {
     }
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param claim the claim parameter
+   * @param properties the properties parameter
+   * @return the map<string, interpolator> result
+   */
   private static Duration decideTimeout(TimeoutSettings settings, Action action) {
     // First we need to acquire the appropriate timeout duration for the action.
     // We begin with a default configured timeout.
@@ -228,6 +276,12 @@ class Executor {
     }
   }
 
+  /**
+   * Transforms data between different representations Implements complex logic with 4 conditional branches and 1 iterative operations.
+   * @param wrapper the wrapper parameter
+   * @param interpolations the interpolations parameter
+   * @return the iterable<string> result
+   */
   private static Map<String, Interpolator> createInterpolations(
       Claim claim, Iterable<Property> properties) {
     Map<String, Interpolator> interpolations = new HashMap<>();
@@ -247,6 +301,14 @@ class Executor {
     return interpolations;
   }
 
+  /**
+   * Executes a build action on the worker Implements complex logic with 7 conditional branches and 1 iterative operations. Performs side effects including logging and state modifications.
+   * @param limits the limits parameter
+   * @param policies the policies parameter
+   * @param timeout the timeout parameter
+   * @param stopwatch the stopwatch parameter
+   * @return the long result
+   */
   private static Iterable<String> transformWrapper(
       ExecutionWrapper wrapper, Map<String, Interpolator> interpolations) {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
@@ -278,6 +340,17 @@ class Executor {
     return arguments.build();
   }
 
+  /**
+   * Executes a build action on the worker Implements complex logic with 10 conditional branches and 8 iterative operations. Performs side effects including logging and state modifications.
+   * @param operationName the operationName parameter
+   * @param execDir the execDir parameter
+   * @param arguments the arguments parameter
+   * @param environmentVariables the environmentVariables parameter
+   * @param limits the limits parameter
+   * @param timeout the timeout parameter
+   * @param resultBuilder the resultBuilder parameter
+   * @return the code result
+   */
   private long executePolled(
       ResourceLimits limits,
       Iterable<ExecutionPolicy> policies,

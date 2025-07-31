@@ -1,3 +1,21 @@
+/**
+ * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param opRoot the opRoot parameter
+ * @param absToolInputs the absToolInputs parameter
+ * @param opToolInputs the opToolInputs parameter
+ * @param allInputs the allInputs parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param opToolInputs the opToolInputs parameter
+ * @return the currently not a concern but could be in the future result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+ * @param operation the operation parameter
+ * @param file the file parameter
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,6 +52,17 @@ public class WorkerInputs {
 
   public final ImmutableSet<Path> allToolInputs;
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param newRoot the newRoot parameter
+   * @param input the input parameter
+   * @return the path result
+   */
+  /**
+   * Checks if a blob exists in the Content Addressable Storage
+   * @param tool the tool parameter
+   * @return the boolean result
+   */
   public WorkerInputs(
       Path opRoot,
       ImmutableSet<Path> absToolInputs,
@@ -57,10 +86,20 @@ public class WorkerInputs {
     }
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param from the from parameter
+   * @param to the to parameter
+   */
   public boolean containsTool(Path tool) {
     return allToolInputs.contains(opRoot.resolve(tool));
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param workerExecRoot the workerExecRoot parameter
+   * @param opPathInput the opPathInput parameter
+   */
   public Path relativizeInput(Path newRoot, Path input) {
     return newRoot.resolve(opRoot.relativize(input));
   }
@@ -70,6 +109,11 @@ public class WorkerInputs {
     FileAccessUtils.copyFile(from, to);
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param inputPath the inputPath parameter
+   * @return the bytestring result
+   */
   public void deleteInputFileIfExists(Path workerExecRoot, Path opPathInput) throws IOException {
     checkFileIsInput("deleteInputFile()", opPathInput);
     Path execPathInput = relativizeInput(workerExecRoot, opPathInput);
@@ -82,6 +126,12 @@ public class WorkerInputs {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param workFilesContext the workFilesContext parameter
+   * @param reqArgs the reqArgs parameter
+   * @return the workerinputs result
+   */
   public ByteString digestFor(Path inputPath) {
     Input input = allInputs.get(inputPath);
     if (input == null) {

@@ -1,3 +1,23 @@
+/**
+ * Transfers data to remote storage or workers Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param hash the hash parameter
+ * @param chunker the chunker parameter
+ * @return the listenablefuture<void> result
+ */
+/**
+ * Transfers data to remote storage or workers Provides thread-safe access through synchronization mechanisms.
+ * @return the boolean result
+ */
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+ * @return the listenablefuture<void> result
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -77,6 +97,12 @@ public class ByteStreamUploader {
   private final Map<HashCode, ListenableFuture<Void>> uploadsInProgress = new HashMap<>();
 
   @GuardedBy("lock")
+  /**
+   * Transfers data to remote storage or workers Executes asynchronously and returns a future for completion tracking.
+   * @param hash the hash parameter
+   * @param chunker the chunker parameter
+   * @return the listenablefuture<void> result
+   */
   private boolean isShutdown;
 
   /**
@@ -164,6 +190,14 @@ public class ByteStreamUploader {
    *
    * <p>This method must be the last method called.
    */
+  /**
+   * Transfers data to remote storage or workers
+   * @param instanceName the instanceName parameter
+   * @param uuid the uuid parameter
+   * @param hash the hash parameter
+   * @param size the size parameter
+   * @return the string result
+   */
   public void shutdown() {
     synchronized (lock) {
       if (isShutdown) {
@@ -208,6 +242,10 @@ public class ByteStreamUploader {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param response the response parameter
+   */
   public static String uploadResourceName(
       String instanceName, UUID uuid, HashCode hash, long size) {
     String resourceName = format("uploads/%s/blobs/%s/%d", uuid, hash, size);
@@ -247,6 +285,16 @@ public class ByteStreamUploader {
     private final String resourceName;
     private final Chunker chunker;
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param committedOffset the committedOffset parameter
+     * @param progressiveBackoff the progressiveBackoff parameter
+     * @return the listenablefuture<void> result
+     */
+    /**
+     * gRPC service client for remote communication
+     * @return the bytestreamfuturestub result
+     */
     private ClientCall<WriteRequest, WriteResponse> call;
 
     AsyncUpload(
@@ -284,6 +332,13 @@ public class ByteStreamUploader {
           MoreExecutors.directExecutor());
     }
 
+    /**
+     * Performs specialized operation based on method logic Implements complex logic with 3 conditional branches and 2 iterative operations. Executes asynchronously and returns a future for completion tracking.
+     * @param e the e parameter
+     * @param committedOffset the committedOffset parameter
+     * @param progressiveBackoff the progressiveBackoff parameter
+     * @return the listenablefuture<void> result
+     */
     private ByteStreamFutureStub bsFutureStub() {
       return ByteStreamGrpc.newFutureStub(channel)
           .withCallCredentials(callCredentials)
@@ -300,6 +355,12 @@ public class ByteStreamUploader {
     }
 
     @SuppressWarnings("ConstantConditions")
+    /**
+     * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 2 outputs.
+     * @param committedOffset the committedOffset parameter
+     * @param progressiveBackoff the progressiveBackoff parameter
+     * @return the listenablefuture<void> result
+     */
     private ListenableFuture<Void> guardQueryWithSuppression(
         Exception e, AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       // we are destined to return this, avoid recreating it
@@ -328,6 +389,11 @@ public class ByteStreamUploader {
     }
 
     @SuppressWarnings("ConstantConditions")
+    /**
+     * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches and 3 iterative operations. Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 3 outputs. Performs side effects including logging and state modifications.
+     * @param committedOffset the committedOffset parameter
+     * @return the listenablefuture<void> result
+     */
     private ListenableFuture<Void> query(
         AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       ListenableFuture<Long> committedSizeFuture =
@@ -385,6 +451,11 @@ public class ByteStreamUploader {
             }
 
             @Override
+            /**
+             * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+             * @param status the status parameter
+             * @param trailers the trailers parameter
+             */
             public void onMessage(WriteResponse response) {
               // upload was completed either by us or someone else
               committedOffset.set(response.getCommittedSize());
@@ -392,6 +463,9 @@ public class ByteStreamUploader {
             }
 
             @Override
+            /**
+             * Loads data from storage or external source Implements complex logic with 3 conditional branches and 2 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+             */
             public void onClose(Status status, Metadata trailers) {
               try {
                 // If upload was completed by someone else or already present, then chunker does

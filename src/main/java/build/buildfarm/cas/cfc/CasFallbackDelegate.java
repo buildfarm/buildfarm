@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param fileCacheDelegate the fileCacheDelegate parameter
+ * @return the start delegate if we specifically have a casfilecache result
+ */
 // Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

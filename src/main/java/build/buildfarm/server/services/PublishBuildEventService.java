@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param request the request parameter
+ * @param responseObserver the responseObserver parameter
+ */
 // Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,10 +34,23 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
+/**
+ * Constructs digest from hash string and size information
+ * @param responseObserver the responseObserver parameter
+ * @return the streamobserver<publishbuildtooleventstreamrequest> result
+ */
 public class PublishBuildEventService extends PublishBuildEventImplBase {
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param in the in parameter
+   */
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param in the in parameter
+   */
   public void publishLifecycleEvent(
       PublishLifecycleEventRequest request, StreamObserver<Empty> responseObserver) {
     responseObserver.onNext(Empty.getDefaultInstance());
@@ -44,6 +62,10 @@ public class PublishBuildEventService extends PublishBuildEventImplBase {
       StreamObserver<PublishBuildToolEventStreamResponse> responseObserver) {
     return new StreamObserver<PublishBuildToolEventStreamRequest>() {
       @Override
+      /**
+       * Performs specialized operation based on method logic
+       * @param err the err parameter
+       */
       public void onNext(PublishBuildToolEventStreamRequest in) {
         StreamId streamId = in.getOrderedBuildEvent().getStreamId();
         long sequenceNumber = in.getOrderedBuildEvent().getSequenceNumber();
@@ -56,6 +78,9 @@ public class PublishBuildEventService extends PublishBuildEventImplBase {
       }
 
       @Override
+      /**
+       * Performs specialized operation based on method logic
+       */
       public void onError(Throwable err) {
         responseObserver.onError(new StatusException(Status.fromThrowable(err)));
       }

@@ -1,3 +1,201 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @param identifier the identifier parameter
+ * @param onStop the onStop parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @param backplane the backplane parameter
+ * @param onStop the onStop parameter
+ * @param actionCacheFetchService the actionCacheFetchService parameter
+ * @return the private result
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches and 6 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+ * @param name the name parameter
+ * @param backplane the backplane parameter
+ * @param actionCache the actionCache parameter
+ * @param runDispatchedMonitor the runDispatchedMonitor parameter
+ * @param dispatchedMonitorIntervalSeconds the dispatchedMonitorIntervalSeconds parameter
+ * @param runOperationQueuer the runOperationQueuer parameter
+ * @param maxEntrySizeBytes the maxEntrySizeBytes parameter
+ * @param maxCpu the maxCpu parameter
+ * @param maxRequeueAttempts the maxRequeueAttempts parameter
+ * @param maxActionTimeout the maxActionTimeout parameter
+ * @param useDenyList the useDenyList parameter
+ * @param mergeExecutions the mergeExecutions parameter
+ * @param onStop the onStop parameter
+ * @param workerStubs the workerStubs parameter
+ * @param actionCacheFetchService the actionCacheFetchService parameter
+ * @param ensureOutputsPresent the ensureOutputsPresent parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param Scannable<>( the Scannable<>( parameter
+ * @return the new result
+ */
+/**
+ * Loads data from storage or external source Implements complex logic with 3 conditional branches and 5 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+ * @param Runnable( the Runnable( parameter
+ * @return the new result
+ */
+/**
+ * Processes the next operation in the pipeline stage Implements complex logic with 3 conditional branches and 2 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+ * @return the listenablefuture<void> result
+ */
+/**
+ * Completion handler for asynchronous operations
+ * @return the workerslistfuture,
+                  new result
+ */
+/**
+ * Completion handler for asynchronous operations
+ * @return the populatedworkerlistfuture,
+        new result
+ */
+/**
+ * Completion handler for asynchronous operations
+ * @param rand the rand parameter
+ * @return the public result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @return the string result
+ */
+/**
+ * Creates and initializes a new instance Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param reason the reason parameter
+ * @param rootDigest the rootDigest parameter
+ * @param pageToken the pageToken parameter
+ * @return the tokenizableiterator<directoryentry> result
+ */
+/**
+ * Completion handler for asynchronous operations
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the boolean result
+ */
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 3 outputs. Performs side effects including logging and state modifications.
+ * @param reason the reason parameter
+ * @param directoryBlobDigest the directoryBlobDigest parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the listenablefuture<directory> result
+ */
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 2 outputs.
+ * @param commandBlobDigest the commandBlobDigest parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the listenablefuture<command> result
+ */
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 2 outputs.
+ * @param actionBlobDigest the actionBlobDigest parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the listenablefuture<action> result
+ */
+/**
+ * Executes a build action on the worker
+ * @param executeEntry the executeEntry parameter
+ * @param stage the stage parameter
+ * @return the executeoperationmetadata result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param operationName the operationName parameter
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param operationName the operationName parameter
+ * @param currentAttempt the currentAttempt parameter
+ * @param maxRequeueAttempts the maxRequeueAttempts parameter
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param operationName the operationName parameter
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param operationName the operationName parameter
+ * @return the string result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param executeEntry the executeEntry parameter
+ * @param errorMessage the errorMessage parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param actionKey the actionKey parameter
+ * @param watcher the watcher parameter
+ * @return the default case for action, default here result
+ */
+/**
+ * Creates and initializes a new instance
+ * @param actionKey the actionKey parameter
+ * @param watcher the watcher parameter
+ * @return the actionresultwatcher result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param execution the execution parameter
+ * @param watcher the watcher parameter
+ * @return the listenablefuture<void> result
+ */
+/**
+ * Transforms data between different representations
+ * @param filter the filter parameter
+ * @return the filter<operation> result
+ */
+/**
+ * Transforms data between different representations
+ * @param filter the filter parameter
+ * @return the filter<operation> result
+ */
+/**
+ * Transforms data between different representations
+ * @param filter the filter parameter
+ * @return the filter<operation> result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the filter<operation> result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param keyMatch the keyMatch parameter
+ * @return the scannable<string> result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param keyMatch the keyMatch parameter
+ * @return the filter<operation> result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the token location name did not exist in list result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param null the null parameter
+ * @return the construct nextpagetoken result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,6 +243,11 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
+/**
+ * Creates and initializes a new instance Includes input validation and error handling for robustness.
+ * @param identifier the identifier parameter
+ * @return the backplane result
+ */
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
 import build.bazel.remote.execution.v2.Action;
@@ -183,6 +386,34 @@ import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
 
 @Log
+/**
+ * Performs specialized operation based on method logic
+ * @param limit the limit parameter
+ * @param pageToken the pageToken parameter
+ * @param onDispatchedOperation the onDispatchedOperation parameter
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param limit the limit parameter
+ * @param pageToken the pageToken parameter
+ * @param onOperation the onOperation parameter
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param limit the limit parameter
+ * @param pageToken the pageToken parameter
+ * @param onToolInvocationId the onToolInvocationId parameter
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param limit the limit parameter
+ * @param pageToken the pageToken parameter
+ * @param onCorrelatedInvocationsId the onCorrelatedInvocationsId parameter
+ * @return the string result
+ */
 public class ServerInstance extends NodeInstance {
   private static final ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
 
@@ -308,6 +539,13 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param limit the limit parameter
+   * @param pageToken the pageToken parameter
+   * @param onKey the onKey parameter
+   * @return the string result
+   */
   public ServerInstance(String name, String identifier, Runnable onStop)
       throws InterruptedException, ConfigurationException {
     this(
@@ -317,6 +555,14 @@ public class ServerInstance extends NodeInstance {
         /* actionCacheFetchService= */ BuildfarmExecutors.getActionCacheFetchServicePool());
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param stopwatch the stopwatch parameter
+   */
+  /**
+   * Updates internal state or external resources
+   * @param queues the queues parameter
+   */
   private ServerInstance(
       String name,
       Backplane backplane,
@@ -406,6 +652,10 @@ public class ServerInstance extends NodeInstance {
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+           * @param result the result parameter
+           */
           public String scan(
               int limit, String pageToken, Consumer<String> onCorrelatedInvocationsId)
               throws IOException {
@@ -418,6 +668,10 @@ public class ServerInstance extends NodeInstance {
     this.toolInvocations =
         new Scannable<>() {
           @Override
+          /**
+           * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+           * @param t the t parameter
+           */
           public String getName() {
             return "correlatedInvocations";
           }
@@ -438,6 +692,9 @@ public class ServerInstance extends NodeInstance {
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+           */
           public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
               throws IOException {
             Backplane.ScanResult<Operation> result = backplane.scanExecutions(pageToken, limit);
@@ -471,6 +728,10 @@ public class ServerInstance extends NodeInstance {
               }
 
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               * @param publicName the publicName parameter
+               */
               public String scan(int limit, String pageToken, Consumer<String> onKey)
                   throws IOException {
                 Backplane.ScanResult<String> scanResult =
@@ -569,6 +830,9 @@ public class ServerInstance extends NodeInstance {
                         queueFuture,
                         new FutureCallback<>() {
                           @Override
+                          /**
+                           * Performs specialized operation based on method logic Implements complex logic with 10 conditional branches. Performs side effects including logging and state modifications.
+                           */
                           public void onSuccess(Void result) {
                             log.log(Level.FINER, "successfully queued " + operationName);
                             // nothing
@@ -599,6 +863,20 @@ public class ServerInstance extends NodeInstance {
                 }
 
                 @Override
+                /**
+                 * Identifies which blobs are missing from the CAS
+                 * @param blobDigests the blobDigests parameter
+                 * @param digestFunction the digestFunction parameter
+                 * @param requestMetadata the requestMetadata parameter
+                 * @return the listenablefuture<iterable<digest>> result
+                 */
+                /**
+                 * Checks if a blob exists in the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+                 * @param digest the digest parameter
+                 * @param result the result parameter
+                 * @param requestMetadata the requestMetadata parameter
+                 * @return the boolean result
+                 */
                 public void run() {
                   log.log(Level.FINER, "OperationQueuer: Running");
                   try {
@@ -672,6 +950,13 @@ public class ServerInstance extends NodeInstance {
             "Prometheus Metrics Collector");
   }
 
+  /**
+   * Identifies which blobs are missing from the CAS Executes asynchronously and returns a future for completion tracking.
+   * @param nonEmptyDigests the nonEmptyDigests parameter
+   * @param digestFunction the digestFunction parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<iterable<digest>> result
+   */
   private void updateQueueSizes(List<QueueStatus> queues) {
     if (queueSize != null) {
       for (QueueStatus queueStatus : queues) {
@@ -682,6 +967,27 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param digestAndWorkersMap the digestAndWorkersMap parameter
+   * @param digestFunction the digestFunction parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param digest the digest parameter
+   * @param originalWorkerSetWithDigest the originalWorkerSetWithDigest parameter
+   * @param activeWorkers the activeWorkers parameter
+   * @param workersStartTime the workersStartTime parameter
+   * @return the set<string> result
+   */
+  /**
+   * Identifies which blobs are missing from the CAS Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param nonEmptyDigests the nonEmptyDigests parameter
+   * @param digestFunction the digestFunction parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<iterable<digest>> result
+   */
   private void ensureCanQueue(Stopwatch stopwatch) throws IOException, InterruptedException {
     while (!backplane.canQueue()) {
       stopwatch.stop();
@@ -797,6 +1103,22 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 6 conditional branches. Performs side effects including logging and state modifications.
+   * @param t the t parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param nextChunk the nextChunk parameter
+   */
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 6 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications.
+   * @param t the t parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param missingDigests the missingDigests parameter
+   */
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> blobDigests,
       DigestFunction.Value digestFunction,
@@ -847,6 +1169,18 @@ public class ServerInstance extends NodeInstance {
   // have the blobs.  To do this, we get all the worker nodes that are participating in the CAS
   // as a random list to begin our search.  If there are no workers available, tell the client all
   // blobs are missing.
+  /**
+   * Identifies which blobs are missing from the CAS Implements complex logic with 7 conditional branches and 2 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param requestId the requestId parameter
+   * @param blobDigests the blobDigests parameter
+   * @param digestFunction the digestFunction parameter
+   * @param workers the workers parameter
+   * @param responses the responses parameter
+   * @param originalSize the originalSize parameter
+   * @param executor the executor parameter
+   * @param missingDigestsFuture the missingDigestsFuture parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   private ListenableFuture<Iterable<Digest>> findMissingBlobsQueryingEachWorker(
       Iterable<Digest> nonEmptyDigests,
       DigestFunction.Value digestFunction,
@@ -941,6 +1275,16 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
+  /**
+   * Loads data from storage or external source Implements complex logic with 6 conditional branches. Performs side effects including logging and state modifications.
+   * @param compressor the compressor parameter
+   * @param blobDigest the blobDigest parameter
+   * @param workers the workers parameter
+   * @param offset the offset parameter
+   * @param count the count parameter
+   * @param blobObserver the blobObserver parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   private Set<String> filterAndAdjustWorkersForDigest(
       build.buildfarm.v1test.Digest digest,
       Set<String> originalWorkerSetWithDigest,
@@ -1030,6 +1374,15 @@ public class ServerInstance extends NodeInstance {
         workerMissingBlobsFuture,
         new FutureCallback<>() {
           @Override
+          /**
+           * Retrieves a blob from the Content Addressable Storage
+           * @param digests the digests parameter
+           * @param digestFunction the digestFunction parameter
+           * @return the listenablefuture<list<response>> result
+           */
+          /**
+           * Performs specialized operation based on method logic
+           */
           public void onSuccess(Iterable<Digest> missingDigests) {
             if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
               missingDigestsFuture.set(missingDigests);
@@ -1054,6 +1407,15 @@ public class ServerInstance extends NodeInstance {
           }
 
           @Override
+          /**
+           * Retrieves a blob from the Content Addressable Storage Implements complex logic with 2 conditional branches and 4 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+           * @param compressor the compressor parameter
+           * @param blobDigest the blobDigest parameter
+           * @param offset the offset parameter
+           * @param count the count parameter
+           * @param blobObserver the blobObserver parameter
+           * @param requestMetadata the requestMetadata parameter
+           */
           public void onFailure(Throwable t) {
             responses.add(
                 new FindMissingResponseEntry(
@@ -1106,6 +1468,15 @@ public class ServerInstance extends NodeInstance {
         executor);
   }
 
+  /**
+   * gRPC service client for remote communication Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param worker the worker parameter
+   * @return the instance result
+   */
+  /**
+   * Persists data to storage or external destination
+   * @return the instance result
+   */
   private void fetchBlobFromWorker(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest blobDigest,
@@ -1125,6 +1496,10 @@ public class ServerInstance extends NodeInstance {
               long received = 0;
 
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               * @param nextChunk the nextChunk parameter
+               */
               public void onNext(ByteString nextChunk) {
                 blobObserver.onNext(nextChunk);
                 received += nextChunk.size();
@@ -1132,6 +1507,14 @@ public class ServerInstance extends NodeInstance {
               }
 
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               * @param workers the workers parameter
+               */
+              /**
+               * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+               * @param t the t parameter
+               */
               public void onError(Throwable t) {
                 Status status = Status.fromThrowable(t);
                 if (status.getCode() == Code.UNAVAILABLE
@@ -1192,6 +1575,10 @@ public class ServerInstance extends NodeInstance {
               }
 
               @Override
+              /**
+               * Performs specialized operation based on method logic
+               * @param t the t parameter
+               */
               public void onCompleted() {
                 blobObserver.onCompleted();
                 casHitCounter.inc();
@@ -1201,6 +1588,13 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param workers the workers parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   */
   public ListenableFuture<List<Response>> getAllBlobsFuture(
       Iterable<Digest> digests, DigestFunction.Value digestFunction) {
     Executor contextExecutor = Context.current().fixedContextExecutor(directExecutor());
@@ -1234,6 +1628,14 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param workersList the workersList parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   */
   public void getBlob(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest blobDigest,
@@ -1295,6 +1697,16 @@ public class ServerInstance extends NodeInstance {
           }
 
           @Override
+          /**
+           * Stores a blob in the Content Addressable Storage
+           * @param compressor the compressor parameter
+           * @param digest the digest parameter
+           * @param offset the offset parameter
+           * @param deadlineAfter the deadlineAfter parameter
+           * @param deadlineAfterUnits the deadlineAfterUnits parameter
+           * @param requestMetadata the requestMetadata parameter
+           * @return the inputstream result
+           */
           public void onError(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.NOT_FOUND && !triedCheck) {
@@ -1331,6 +1743,14 @@ public class ServerInstance extends NodeInstance {
                   workersListFuture,
                   new WorkersCallback(rand) {
                     @Override
+                    /**
+                     * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+                     * @param compressor the compressor parameter
+                     * @param digest the digest parameter
+                     * @param uuid the uuid parameter
+                     * @param requestMetadata the requestMetadata parameter
+                     * @return the write result
+                     */
                     public void onQueue(Deque<String> workers) {
                       ctx.run(
                           () -> {
@@ -1403,6 +1823,14 @@ public class ServerInstance extends NodeInstance {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param t the t parameter
+     */
+    /**
+     * Performs specialized operation based on method logic
+     * @param entry the entry parameter
+     */
     public void onSuccess(List<String> workersList) {
       if (workersList.isEmpty()) {
         onFailure(Status.NOT_FOUND.withDescription("No workers found.").asException());
@@ -1412,6 +1840,19 @@ public class ServerInstance extends NodeInstance {
       }
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param digest the digest parameter
+     * @param directory the directory parameter
+     */
+    /**
+     * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+     * @param reason the reason parameter
+     * @param inputRoot the inputRoot parameter
+     * @param service the service parameter
+     * @param requestMetadata the requestMetadata parameter
+     * @return the listenablefuture<tree> result
+     */
     protected abstract void onQueue(Deque<String> workers);
   }
 
@@ -1440,6 +1881,11 @@ public class ServerInstance extends NodeInstance {
     return worker;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param value the value parameter
+   * @return the listenablefuture<v> result
+   */
   private Instance workerStub(String worker) {
     try {
       StubInstance stubInstance = workerStubs.get(worker);
@@ -1493,6 +1939,14 @@ public class ServerInstance extends NodeInstance {
     return 1024;
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+   * @param digest the digest parameter
+   * @param parser the parser parameter
+   * @param executor the executor parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<t> result
+   */
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
       String reason, build.buildfarm.v1test.Digest rootDigest, String pageToken) {
     return new TreeIterator(
@@ -1527,6 +1981,21 @@ public class ServerInstance extends NodeInstance {
   }
 
   abstract static class TreeCallback implements FutureCallback<DirectoryEntry> {
+    /**
+     * Constructs digest from hash string and size information
+     * @param operationName the operationName parameter
+     * @param action the action parameter
+     * @param digestFunction the digestFunction parameter
+     * @param service the service parameter
+     * @param requestMetadata the requestMetadata parameter
+     * @return the listenablefuture<queuedoperation> result
+     */
+    /**
+     * Removes data or cleans up resources Performs side effects including logging and state modifications.
+     * @param worker the worker parameter
+     * @param t the t parameter
+     * @param context the context parameter
+     */
     private final SettableFuture<Void> future;
 
     TreeCallback(SettableFuture<Void> future) {
@@ -1548,6 +2017,18 @@ public class ServerInstance extends NodeInstance {
     }
 
     @Override
+    /**
+     * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+     * @param name the name parameter
+     * @param offset the offset parameter
+     * @param requestMetadata the requestMetadata parameter
+     * @return the inputstream result
+     */
+    /**
+     * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+     * @param name the name parameter
+     * @return the write result
+     */
     public void onFailure(Throwable t) {
       future.setException(t);
     }
@@ -1603,6 +2084,34 @@ public class ServerInstance extends NodeInstance {
     return transform(future, (result) -> tree.build(), service);
   }
 
+  /**
+   * Transfers data to remote storage or workers
+   * @param digestUtil the digestUtil parameter
+   * @param queuedOperation the queuedOperation parameter
+   * @param executeEntry the executeEntry parameter
+   * @param service the service parameter
+   * @param timeout the timeout parameter
+   * @return the listenablefuture<queuedoperationresult> result
+   */
+  /**
+   * Transforms data between different representations Performs side effects including logging and state modifications.
+   * @param operationName the operationName parameter
+   * @param action the action parameter
+   * @param commandDigest the commandDigest parameter
+   * @param inputRootDigest the inputRootDigest parameter
+   * @param queuedOperationBuilder the queuedOperationBuilder parameter
+   * @param service the service parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<queuedoperation> result
+   */
+  /**
+   * Carries request context and tracing information
+   * @param action the action parameter
+   * @param executeOperationMetadata the executeOperationMetadata parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @param queuedOperationDigest the queuedOperationDigest parameter
+   * @return the queuedoperationmetadata result
+   */
   private static <V> ListenableFuture<V> notFoundNull(ListenableFuture<V> value) {
     return catchingAsync(
         value,
@@ -1644,6 +2153,20 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Validates input parameters and state consistency
+   * @param digestFunction the digestFunction parameter
+   * @param action the action parameter
+   * @param command the command parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param onInputDigest the onInputDigest parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
+  /**
+   * Validates input parameters and state consistency Implements complex logic with 6 conditional branches and 3 iterative operations.
+   * @param platform the platform parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
   protected <T> ListenableFuture<T> expect(
       build.buildfarm.v1test.Digest digest,
       Parser<T> parser,
@@ -1692,6 +2215,14 @@ public class ServerInstance extends NodeInstance {
     return toListenableFuture(digestToActionCache.get(actionBlobDigest, getCallback));
   }
 
+  /**
+   * Asynchronous computation result handler Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   * @param digest the digest parameter
+   * @param content the content parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @param timeout the timeout parameter
+   * @return the listenablefuture<long> result
+   */
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
     try {
       if (backplane.removeWorker(worker, format("%s: %s", context, t.getMessage()))) {
@@ -1713,6 +2244,14 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param t the t parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param committedSize the committedSize parameter
+   */
   public InputStream newOperationStreamInput(
       String name, long offset, RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
@@ -1749,6 +2288,14 @@ public class ServerInstance extends NodeInstance {
         .build();
   }
 
+  /**
+   * Constructs digest from hash string and size information
+   * @param operationName the operationName parameter
+   * @param actionDigest the actionDigest parameter
+   * @param service the service parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<queuedoperation> result
+   */
   private ListenableFuture<QueuedOperation> transformQueuedOperation(
       String operationName,
       Action action,
@@ -1828,6 +2375,10 @@ public class ServerInstance extends NodeInstance {
         service);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   private ListenableFuture<Long> writeBlobFuture(
       build.buildfarm.v1test.Digest digest,
       ByteString content,
@@ -1847,6 +2398,14 @@ public class ServerInstance extends NodeInstance {
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+           * @param t the t parameter
+           */
+          /**
+           * Performs specialized operation based on method logic
+           * @param result the result parameter
+           */
           public void onFailure(Throwable t) {
             writtenFuture.setException(t);
           }
@@ -1861,6 +2420,13 @@ public class ServerInstance extends NodeInstance {
     return writtenFuture;
   }
 
+  /**
+   * Validates input parameters and state consistency Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param operation the operation parameter
+   * @param queueEntry the queueEntry parameter
+   * @param timeout the timeout parameter
+   * @return the listenablefuture<void> result
+   */
   private ListenableFuture<QueuedOperation> buildQueuedOperation(
       String operationName,
       build.buildfarm.v1test.Digest actionDigest,
@@ -1977,6 +2543,13 @@ public class ServerInstance extends NodeInstance {
         digestFunction, action, command, directoriesIndex, onInputDigest, preconditionFailure);
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 8 conditional branches. Performs side effects including logging and state modifications.
+   * @param queueEntry the queueEntry parameter
+   * @param executeEntry the executeEntry parameter
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
   private ListenableFuture<Void> validateAndRequeueOperation(
       Operation operation, QueueEntry queueEntry, Duration timeout) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
@@ -2060,6 +2633,16 @@ public class ServerInstance extends NodeInstance {
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Implements complex logic with 6 conditional branches and 1 iterative operations. Performs side effects including logging and state modifications.
+           * @param execution the execution parameter
+           */
+          /**
+           * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+           * @param queueEntry the queueEntry parameter
+           * @param timeout the timeout parameter
+           * @return the listenablefuture<void> result
+           */
           public void onFailure(Throwable t) {
             requeueFailureCounter.inc();
             log.log(Level.SEVERE, "failed to requeue: " + operationName, t);
@@ -2173,6 +2756,16 @@ public class ServerInstance extends NodeInstance {
   }
 
   @VisibleForTesting
+  /**
+   * Executes a build action on the worker
+   * @param actionDigest the actionDigest parameter
+   * @param skipCacheLookup the skipCacheLookup parameter
+   * @param executionPolicy the executionPolicy parameter
+   * @param resultsCachePolicy the resultsCachePolicy parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @param watcher the watcher parameter
+   * @return the listenablefuture<void> result
+   */
   public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry, Duration timeout) {
     ListenableFuture<Void> future;
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
@@ -2214,6 +2807,23 @@ public class ServerInstance extends NodeInstance {
   private class ActionResultWatcher implements Watcher {
     private final ActionKey actionKey;
     private final Watcher watcher;
+    /**
+     * Performs specialized operation based on method logic Implements complex logic with 7 conditional branches and 1 iterative operations.
+     * @param actionDigest the actionDigest parameter
+     * @param skipCacheLookup the skipCacheLookup parameter
+     * @param executionPolicy the executionPolicy parameter
+     * @param resultsCachePolicy the resultsCachePolicy parameter
+     * @param requestMetadata the requestMetadata parameter
+     * @param watcher the watcher parameter
+     * @param ignoreMerge the ignoreMerge parameter
+     * @return the listenablefuture<void> result
+     */
+    /**
+     * Validates input parameters and state consistency Implements complex logic with 5 conditional branches.
+     * @param execution the execution parameter
+     * @param actionKey the actionKey parameter
+     * @return the operation result
+     */
     private boolean writeThrough = true; // default case for action, default here
 
     ActionResultWatcher(ActionKey actionKey, Watcher watcher) {
@@ -2268,6 +2878,9 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   public ListenableFuture<Void> execute(
       build.buildfarm.v1test.Digest actionDigest,
       boolean skipCacheLookup,
@@ -2313,6 +2926,16 @@ public class ServerInstance extends NodeInstance {
     return null;
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param actionDigest the actionDigest parameter
+   * @param skipCacheLookup the skipCacheLookup parameter
+   * @param executionPolicy the executionPolicy parameter
+   * @param resultsCachePolicy the resultsCachePolicy parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @param ignoreMerge the ignoreMerge parameter
+   * @return the operation result
+   */
   private ListenableFuture<Void> mergeOrSchedule(
       build.buildfarm.v1test.Digest actionDigest,
       boolean skipCacheLookup,
@@ -2368,6 +2991,19 @@ public class ServerInstance extends NodeInstance {
         execution, newActionResultWatcher(DigestUtil.asActionKey(actionDigest), watcher));
   }
 
+  /**
+   * Asynchronous computation result handler Performs side effects including logging and state modifications.
+   * @param operation the operation parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @param status the status parameter
+   * @param errorFuture the errorFuture parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionDigest the actionDigest parameter
+   * @param description the description parameter
+   * @return the executeresponse result
+   */
   private Operation schedule(
       build.buildfarm.v1test.Digest actionDigest,
       boolean skipCacheLookup,
@@ -2439,6 +3075,13 @@ public class ServerInstance extends NodeInstance {
     return operation;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionResult the actionResult parameter
+   * @param actionKey the actionKey parameter
+   * @param operation the operation parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   private static ExecuteResponse denyActionResponse(
       build.buildfarm.v1test.Digest actionDigest, String description) {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
@@ -2458,6 +3101,13 @@ public class ServerInstance extends NodeInstance {
         .build();
   }
 
+  /**
+   * Asynchronous computation result handler
+   * @param actionKey the actionKey parameter
+   * @param operation the operation parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @return the listenablefuture<boolean> result
+   */
   private <T> void errorOperationFuture(
       Operation operation,
       RequestMetadata requestMetadata,
@@ -2469,6 +3119,13 @@ public class ServerInstance extends NodeInstance {
           int attempt = 1;
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+           * @param executeEntry the executeEntry parameter
+           * @param poller the poller parameter
+           * @param timeout the timeout parameter
+           * @return the listenablefuture<void> result
+           */
           public void run() {
             try {
               errorOperation(operation, requestMetadata, status);
@@ -2492,6 +3149,14 @@ public class ServerInstance extends NodeInstance {
         });
   }
 
+  /**
+   * Asynchronous computation result handler Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param actionKey the actionKey parameter
+   * @param operation the operation parameter
+   * @param requestMetadata the requestMetadata parameter
+   * @param ctx the ctx parameter
+   * @return the listenablefuture<boolean> result
+   */
   private void deliverCachedActionResult(
       ActionResult actionResult,
       ActionKey actionKey,
@@ -2554,6 +3219,15 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
+  /**
+   * Transforms data between different representations Implements complex logic with 5 conditional branches and 2 iterative operations. Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param executeEntry the executeEntry parameter
+   * @param poller the poller parameter
+   * @param operation the operation parameter
+   * @param stopwatch the stopwatch parameter
+   * @param timeout the timeout parameter
+   * @return the listenablefuture<void> result
+   */
   private ListenableFuture<Boolean> checkCacheFutureCancellable(
       ActionKey actionKey,
       Operation operation,
@@ -2590,6 +3264,14 @@ public class ServerInstance extends NodeInstance {
   }
 
   @VisibleForTesting
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param t the t parameter
+   */
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param profiledQueuedMetadata the profiledQueuedMetadata parameter
+   */
   public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
     build.buildfarm.v1test.Digest actionDigest = executeEntry.getActionDigest();
     ExecuteOperationMetadata metadata =
@@ -2632,6 +3314,11 @@ public class ServerInstance extends NodeInstance {
         operationTransformService);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @return the operation result
+   */
   private ListenableFuture<Void> transformAndQueue(
       ExecuteEntry executeEntry,
       Poller poller,
@@ -2788,6 +3475,20 @@ public class ServerInstance extends NodeInstance {
         queuedOperationCommittedFuture,
         new FutureCallback<>() {
           @Override
+          /**
+           * Retrieves a blob from the Content Addressable Storage
+           * @param name the name parameter
+           * @return the operation result
+           */
+          /**
+           * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+           * @param operation the operation parameter
+           * @return the boolean result
+           */
+          /**
+           * Performs specialized operation based on method logic
+           * @return the backplanestatus result
+           */
           public void onSuccess(ProfiledQueuedOperationMetadata profiledQueuedMetadata) {
             QueuedOperationMetadata queuedOperationMetadata =
                 profiledQueuedMetadata.getQueuedOperationMetadata();
@@ -2829,6 +3530,10 @@ public class ServerInstance extends NodeInstance {
           }
 
           @Override
+          /**
+           * Removes data or cleans up resources Performs side effects including logging and state modifications.
+           * @param name the name parameter
+           */
           public void onFailure(Throwable t) {
             poller.pause();
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
@@ -2867,6 +3572,12 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionId the executionId parameter
+   * @param watcher the watcher parameter
+   * @return the listenablefuture<void> result
+   */
   public boolean putOperation(Operation operation) {
     if (isErrored(operation)) {
       try {
@@ -2889,6 +3600,15 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the casindexresults result
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param request the request parameter
+   * @return the getclientstarttimeresult result
+   */
   public void deleteOperation(String name) {
     try {
       backplane.deleteOperation(name);
@@ -2911,6 +3631,13 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param limit the limit parameter
+   * @param pageToken the pageToken parameter
+   * @param onOperation the onOperation parameter
+   * @return the string result
+   */
   public ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher) {
     String operationName = bindExecutions(executionId);
     Operation execution = getOperation(operationName);
@@ -2927,6 +3654,11 @@ public class ServerInstance extends NodeInstance {
         execution, newActionResultWatcher(DigestUtil.asActionKey(actionDigest), watcher));
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param name the name parameter
+   * @return the operation result
+   */
   private static Operation stripExecution(Operation operation) {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     if (metadata == null) {
@@ -2936,11 +3668,22 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the cachecapabilities result
+   */
   protected Logger getLogger() {
     return log;
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param limit the limit parameter
+   * @param pageToken the pageToken parameter
+   * @param onCorrelatedInvocationsId the onCorrelatedInvocationsId parameter
+   * @return the string result
+   */
   public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     try {
       return backplane.getClientStartTime(request);
@@ -2966,6 +3709,13 @@ public class ServerInstance extends NodeInstance {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param limit the limit parameter
+     * @param pageToken the pageToken parameter
+     * @param onToolInvocationId the onToolInvocationId parameter
+     * @return the string result
+     */
     public String getName() {
       return "toolInvocationId=" + toolInvocationId;
     }
@@ -2990,6 +3740,13 @@ public class ServerInstance extends NodeInstance {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param limit the limit parameter
+     * @param pageToken the pageToken parameter
+     * @param onOperation the onOperation parameter
+     * @return the string result
+     */
     public String getName() {
       return scope + "=" + value;
     }
@@ -3017,6 +3774,13 @@ public class ServerInstance extends NodeInstance {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @param limit the limit parameter
+     * @param pageToken the pageToken parameter
+     * @param onOperation the onOperation parameter
+     * @return the string result
+     */
     public String scan(int limit, String pageToken, Consumer<String> onToolInvocationId)
         throws IOException {
       Backplane.ScanResult<String> result =
@@ -3027,6 +3791,14 @@ public class ServerInstance extends NodeInstance {
   }
 
   static class OperationNameScannable implements Scannable<Operation> {
+    /**
+     * Performs specialized operation based on method logic Implements complex logic with 8 conditional branches and 2 iterative operations. Includes input validation and error handling for robustness.
+     * @param pageSize the pageSize parameter
+     * @param pageToken the pageToken parameter
+     * @param filter the filter parameter
+     * @param onResult the onResult parameter
+     * @return the string result
+     */
     private final Scannable<String> delegate;
 
     OperationNameScannable(Scannable<String> delegate) {
@@ -3064,6 +3836,13 @@ public class ServerInstance extends NodeInstance {
                 }
 
                 @Override
+                /**
+                 * Performs specialized operation based on method logic
+                 * @param limit the limit parameter
+                 * @param pageToken the pageToken parameter
+                 * @param onKey the onKey parameter
+                 * @return the string result
+                 */
                 public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
                     throws IOException {
                   return dispatchedOperations.scan(
@@ -3116,6 +3895,15 @@ public class ServerInstance extends NodeInstance {
       }
 
       @Override
+      /**
+       * Performs specialized operation based on method logic
+       * @param name the name parameter
+       * @param pageSize the pageSize parameter
+       * @param pageToken the pageToken parameter
+       * @param filter the filter parameter
+       * @param onOperation the onOperation parameter
+       * @return the string result
+       */
       public String scan(int limit, String pageToken, Consumer<String> onKey) throws IOException {
         Backplane.ScanResult<String> scanResult =
             backplane.scanCorrelatedInvocationIndexEntries(pageToken, limit, keyMatch);
@@ -3130,6 +3918,11 @@ public class ServerInstance extends NodeInstance {
         ImmutableList.of(new OperationNameScannable(indexEntriesScannable(keyMatch))));
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param requestMetadata the requestMetadata parameter
+   * @return the boolean result
+   */
   private <T> String listFilter(
       int pageSize, String pageToken, Filter<T> filter, Consumer<T> onResult) throws IOException {
     // sequence pageToken prefix
@@ -3187,6 +3980,10 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param workerName the workerName parameter
+   */
   public String listOperations(
       String name, int pageSize, String pageToken, String filter, Consumer<Operation> onOperation)
       throws IOException {
@@ -3206,6 +4003,11 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param name the name parameter
+   * @return the listenablefuture<workerprofilemessage> result
+   */
   public void deregisterWorker(String workerName) {
     try {
       backplane.deregisterWorker(workerName);
@@ -3238,11 +4040,21 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 2 outputs.
+   * @param names the names parameter
+   * @return the listenablefuture<batchworkerprofilesresponse> result
+   */
   public ListenableFuture<WorkerProfileMessage> getWorkerProfile(String name) {
     return workerStub(name).getWorkerProfile(name);
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 12 conditional branches and 3 iterative operations.
+   * @param uri the uri parameter
+   * @return the string result
+   */
   public ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names) {
     Iterable<ListenableFuture<WorkerProfileMessage>> profiles =
         Iterables.transform(names, this::getWorkerProfile);
@@ -3268,6 +4080,12 @@ public class ServerInstance extends NodeInstance {
             directExecutor());
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param toolInvocationId the toolInvocationId parameter
+   * @param correlatedInvocationsId the correlatedInvocationsId parameter
+   * @param toolDetails the toolDetails parameter
+   */
   public String indexCorrelatedInvocations(URI uri) throws IOException {
     // policy might not be right to apply outside of here
     // definitely correct for directing backplane though
@@ -3334,6 +4152,13 @@ public class ServerInstance extends NodeInstance {
     return id;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionId the actionId parameter
+   * @param toolInvocationId the toolInvocationId parameter
+   * @param actionMnemonic the actionMnemonic parameter
+   * @param targetId the targetId parameter
+   */
   public void addToolInvocationId(
       String toolInvocationId, String correlatedInvocationsId, ToolDetails toolDetails)
       throws IOException {

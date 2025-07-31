@@ -1,3 +1,10 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @param fileStatus the fileStatus parameter
+ * @param fileKey the fileKey parameter
+ * @return the public result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

@@ -1,3 +1,23 @@
+/**
+ * Returns resources to the shared pool
+ * @param name the name parameter
+ * @param amount the amount parameter
+ * @param stage the stage parameter
+ * @return the record result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @param claims the claims parameter
+ * @param stage the stage parameter
+ * @return the record result
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 6 conditional branches and 3 iterative operations.
+ * @param platform the platform parameter
+ * @param resourceSet the resourceSet parameter
+ * @return the claim result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,6 +69,10 @@ public class LocalResourceSetUtils {
 
   private record PoolLease(String name, List<Object> claims, Claim.Stage stage) {}
 
+  /**
+   * Returns resources to the shared pool Implements complex logic with 2 conditional branches and 3 iterative operations. Performs side effects including logging and state modifications.
+   * @param stage the stage parameter
+   */
   public static final class LocalResourceSetClaim implements Claim {
     private final List<SemaphoreLease> semaphores;
     private final List<PoolLease> pools;
@@ -62,6 +86,9 @@ public class LocalResourceSetUtils {
     }
 
     @Override
+    /**
+     * Returns resources to the shared pool Performs side effects including logging and state modifications.
+     */
     public synchronized void release(Stage stage) {
       // only remove resources that match the specified stage
       // O(n) search for staged resources
@@ -91,6 +118,10 @@ public class LocalResourceSetUtils {
 
     // safe for multiple sequential calls with removal to release
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the userprincipal result
+     */
     public synchronized void release() {
       while (!semaphores.isEmpty()) {
         SemaphoreLease semaphore = semaphores.removeFirst();
@@ -108,6 +139,11 @@ public class LocalResourceSetUtils {
     }
 
     @Override
+    /**
+     * Creates and initializes a new instance Includes input validation and error handling for robustness.
+     * @param resources the resources parameter
+     * @return the localresourceset result
+     */
     public UserPrincipal owner() {
       return null;
     }
@@ -118,6 +154,11 @@ public class LocalResourceSetUtils {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param resourceSet the resourceSet parameter
+   * @return the set<string> result
+   */
   public static LocalResourceSet create(Iterable<LimitedResource> resources) {
     LocalResourceSet resourceSet = new LocalResourceSet();
     for (LimitedResource resource : resources) {
@@ -158,6 +199,13 @@ public class LocalResourceSetUtils {
     return exhausted;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param resource the resource parameter
+   * @param resourceName the resourceName parameter
+   * @param amount the amount parameter
+   * @return the boolean result
+   */
   public static @Nullable Claim claimResources(Platform platform, LocalResourceSet resourceSet) {
     List<SemaphoreLease> semaphoreClaimed = new ArrayList<>();
     List<PoolLease> poolClaimed = new ArrayList<>();
@@ -208,6 +256,14 @@ public class LocalResourceSetUtils {
         : null;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param resource the resource parameter
+   * @param resourceName the resourceName parameter
+   * @param amount the amount parameter
+   * @param onClaimed the onClaimed parameter
+   * @return the boolean result
+   */
   private static boolean semaphoreAquire(Semaphore resource, String resourceName, int amount) {
     boolean wasAcquired = resource.tryAcquire(amount);
     if (wasAcquired) {
@@ -217,6 +273,12 @@ public class LocalResourceSetUtils {
     return wasAcquired;
   }
 
+  /**
+   * Returns resources to the shared pool
+   * @param resource the resource parameter
+   * @param resourceName the resourceName parameter
+   * @param amount the amount parameter
+   */
   private static boolean poolAcquire(
       Queue<Object> resource, String resourceName, int amount, Consumer<Object> onClaimed) {
     for (int i = 0; i < amount; i++) {
@@ -233,12 +295,23 @@ public class LocalResourceSetUtils {
     return true;
   }
 
+  /**
+   * Returns resources to the shared pool
+   * @param resource the resource parameter
+   * @param resourceName the resourceName parameter
+   * @param claims the claims parameter
+   */
   private static void semaphoreRelease(Semaphore resource, String resourceName, int amount) {
     resource.release(amount);
     metrics.resourceUsageMetric.labels(resourceName).dec(amount);
     metrics.requestersMetric.labels(resourceName).dec();
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param property the property parameter
+   * @return the int result
+   */
   private static void poolRelease(
       Queue<Object> resource, String resourceName, List<Object> claims) {
     claims.forEach(resource::add);
@@ -246,6 +319,11 @@ public class LocalResourceSetUtils {
     metrics.requestersMetric.labels(resourceName).dec();
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param propertyName the propertyName parameter
+   * @return the string result
+   */
   private static int getResourceRequestAmount(Platform.Property property) {
     // We support resource values that are not numbers and interpret them as a request for 1
     // resource.  For example "gpu:RTX-4090" is equivalent to resource:gpu:1".
@@ -256,6 +334,12 @@ public class LocalResourceSetUtils {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param resourceSet the resourceSet parameter
+   * @param property the property parameter
+   * @return the boolean result
+   */
   public static String getResourceName(String propertyName) {
     // We match to keys whether they are prefixed "resource:" or not.
     // "resource:gpu:1" requests the gpu resource in the same way that "gpu:1" does.

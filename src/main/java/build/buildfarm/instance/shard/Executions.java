@@ -1,3 +1,9 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param jedis the jedis parameter
+ * @param actionKey the actionKey parameter
+ * @return the operation result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +47,12 @@ import redis.clients.jedis.resps.ScanResult;
  */
 @Log
 public class Executions {
+  /**
+   * Transforms data between different representations
+   * @param jedis the jedis parameter
+   * @param scanResult the scanResult parameter
+   * @return the scanresult<operation> result
+   */
   private static final JsonFormat.Parser operationParser =
       JsonFormat.parser()
           .usingTypeRegistry(
@@ -51,6 +63,11 @@ public class Executions {
                   .build())
           .ignoringUnknownFields();
 
+  /**
+   * Transforms data between different representations Performs side effects including logging and state modifications.
+   * @param operationJson the operationJson parameter
+   * @return the operation result
+   */
   static JsonFormat.Parser getParser() {
     return operationParser;
   }
@@ -112,6 +129,21 @@ public class Executions {
    * @note Overloaded.
    * @note Suggested return identifier: operations.
    */
+  /**
+   * Searches for data matching specified criteria
+   * @param jedis the jedis parameter
+   * @param toolInvocationId the toolInvocationId parameter
+   * @param setCursor the setCursor parameter
+   * @param count the count parameter
+   * @return the scanresult<operation> result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param cursor the cursor parameter
+   * @param count the count parameter
+   * @return the scanresult<operation> result
+   */
   public Iterable<Operation> get(UnifiedJedis jedis, Iterable<String> names) {
     return transform(executions.get(jedis, names), entry -> Executions.parse(entry.getValue()));
   }
@@ -137,6 +169,12 @@ public class Executions {
                 executions.get(jedis, scanResult.getResult()), entry -> parse(entry.getValue()))));
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param jedis the jedis parameter
+   * @param name the name parameter
+   * @param operationJson the operationJson parameter
+   */
   public ScanResult<Operation> scan(UnifiedJedis jedis, String cursor, int count) {
     return parseScanResult(jedis, executions.scan(jedis, cursor, count));
   }
@@ -175,6 +213,11 @@ public class Executions {
     executions.remove(jedis, name);
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param actionKey the actionKey parameter
+   */
   public @Nullable Operation merge(UnifiedJedis jedis, String actionKey) {
     String name = actions.get(jedis, actionKey);
     if (name == null) {

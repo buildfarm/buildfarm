@@ -1,3 +1,21 @@
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 2 iterative operations. Includes input validation and error handling for robustness.
+ * @param directoryFetcher the directoryFetcher parameter
+ * @param rootDigest the rootDigest parameter
+ * @param pageToken the pageToken parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param digest the digest parameter
+ * @param directory the directory parameter
+ * @return the public result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param digest the digest parameter
+ * @return the directory result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,6 +54,9 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
   private final DigestFunction.Value digestFunction;
   private Deque<Digest> path;
   private final ArrayDeque<Digest> parentPath;
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   private final Stack<Iterator<Digest>> pointers;
 
   @FunctionalInterface
@@ -43,6 +64,10 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
     Directory fetch(build.buildfarm.v1test.Digest digest);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   public TreeIterator(
       DirectoryFetcher directoryFetcher,
       build.buildfarm.v1test.Digest rootDigest,
@@ -109,6 +134,10 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
     private final Digest digest;
     @Nullable private final Directory directory;
 
+    /**
+     * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+     * @return the directoryentry result
+     */
     public DirectoryEntry(Digest digest, @Nullable Directory directory) {
       this.digest = digest;
       this.directory = directory;
@@ -116,6 +145,10 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the string result
+   */
   public DirectoryEntry next() throws NoSuchElementException {
     Iterator<Digest> iter = pointers.peek();
     if (!iter.hasNext()) {
@@ -139,6 +172,11 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
     return new DirectoryEntry(digest, directory);
   }
 
+  /**
+   * Transforms data between different representations Includes input validation and error handling for robustness.
+   * @param bytes the bytes parameter
+   * @return the treeiteratortoken result
+   */
   private @Nullable Directory getDirectory(Digest digest) {
     if (digest.getSizeBytes() == 0) {
       return Directory.getDefaultInstance();
@@ -146,6 +184,10 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
     return directoryFetcher.fetch(DigestUtil.fromDigest(digest, digestFunction));
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the messagelite result
+   */
   private TreeIteratorToken parseToken(byte[] bytes) {
     try {
       return TreeIteratorToken.parseFrom(bytes);

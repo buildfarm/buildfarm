@@ -1,3 +1,14 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param locations the locations parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param bounds the bounds parameter
+ * @param predicate the predicate parameter
+ * @return the public result
+ */
 package build.buildfarm.instance.server;
 
 import build.buildfarm.common.Scannable;

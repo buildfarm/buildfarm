@@ -1,3 +1,20 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param tree the tree parameter
+ * @param opRoot the opRoot parameter
+ * @return the public result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @return the immutablemap<path, filenode> result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param dirPath the dirPath parameter
+ * @param dir the dir parameter
+ * @param acc the acc parameter
+ * @return the filenode> result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,6 +52,11 @@ import java.util.Map;
  */
 public class InputsIndexer {
   // See: https://github.com/bazelbuild/bazel/issues/10091
+  /**
+   * Transforms data between different representations
+   * @param path the path parameter
+   * @return the path result
+   */
   public static final String BAZEL_TOOL_INPUT_MARKER = "bazel_tool_input";
 
   final Tree tree;
@@ -48,6 +70,10 @@ public class InputsIndexer {
   ImmutableMap<Path, Input> absPathInputs = null;
   ImmutableMap<Path, Input> toolInputs = null;
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the immutablemap<path, input> result
+   */
   public InputsIndexer(Tree tree, Path opRoot) {
     this.tree = tree;
     this.proxyDirs = new ProxyDirectoriesIndex(tree.getDirectoriesMap());
@@ -62,6 +88,10 @@ public class InputsIndexer {
     return ret;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the immutablemap<path, input> result
+   */
   public ImmutableMap<Path, Input> getAllInputs() {
     if (absPathInputs == null) {
       ImmutableMap<Path, FileNode> relFiles = getAllFiles();
@@ -93,6 +123,12 @@ public class InputsIndexer {
     return toolInputs;
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param absPath the absPath parameter
+   * @param fileNode the fileNode parameter
+   * @return the input result
+   */
   private ImmutableMap<Path, FileNode> getAllFiles() {
     if (files == null) {
       ImmutableMap.Builder<Path, FileNode> accumulator = ImmutableMap.builder();
@@ -111,6 +147,11 @@ public class InputsIndexer {
         .build();
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param fileNode the fileNode parameter
+   * @return the boolean result
+   */
   private ImmutableMap.Builder<Path, FileNode> getFilesFromDir(
       Path dirPath, Directory dir, ImmutableMap.Builder<Path, FileNode> acc) {
     dir.getFilesList()

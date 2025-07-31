@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param instance the instance parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,11 +31,21 @@ import io.grpc.stub.StreamObserver;
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
   private final Instance instance;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public OperationQueueService(Instance instance) {
     this.instance = instance;
   }
 
   @Override
+  /**
+   * Polls for available operations from the backplane
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public void status(
       BackplaneStatusRequest request, StreamObserver<BackplaneStatus> responseObserver) {
     try {

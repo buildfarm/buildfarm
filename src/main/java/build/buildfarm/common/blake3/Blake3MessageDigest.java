@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the public result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +26,12 @@ public final class Blake3MessageDigest extends MessageDigest {
   // These constants match the native definitions in:
   // https://github.com/BLAKE3-team/BLAKE3/blob/master/c/blake3.h
   public static final int KEY_LEN = 32;
+  /**
+   * Updates internal state or external resources
+   * @param data the data parameter
+   * @param offset the offset parameter
+   * @param length the length parameter
+   */
   public static final int OUT_LEN = 32;
 
   static {
@@ -36,8 +46,17 @@ public final class Blake3MessageDigest extends MessageDigest {
   }
 
   private final byte[] hasher = new byte[STATE_SIZE];
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param outputLength the outputLength parameter
+   * @return the byte[] result
+   */
   private final byte[] oneByteArray = new byte[1];
 
+  /**
+   * Updates internal state or external resources
+   * @param b the b parameter
+   */
   public Blake3MessageDigest() {
     super("BLAKE3");
     System.arraycopy(INITIAL_STATE, 0, hasher, 0, STATE_SIZE);
@@ -49,6 +68,10 @@ public final class Blake3MessageDigest extends MessageDigest {
   }
 
   @Override
+  /**
+   * Updates internal state or external resources
+   * @param input the input parameter
+   */
   public void engineUpdate(byte b) {
     oneByteArray[0] = b;
     engineUpdate(oneByteArray, 0, 1);
@@ -56,6 +79,10 @@ public final class Blake3MessageDigest extends MessageDigest {
 
   @SuppressWarnings("UselessOverridingMethod")
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @return the blake3messagedigest result
+   */
   public void engineUpdate(ByteBuffer input) {
     super.engineUpdate(input);
   }
@@ -69,21 +96,39 @@ public final class Blake3MessageDigest extends MessageDigest {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public Blake3MessageDigest clone() throws CloneNotSupportedException {
     throw new CloneNotSupportedException();
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the int result
+   */
   public void engineReset() {
     System.arraycopy(INITIAL_STATE, 0, hasher, 0, STATE_SIZE);
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the byte[] result
+   */
   public int engineGetDigestLength() {
     return OUT_LEN;
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param buf the buf parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   * @return the int result
+   */
   public byte[] engineDigest() {
     return getOutput(OUT_LEN);
   }

@@ -34,8 +34,17 @@ import java.util.List;
 import redis.clients.jedis.UnifiedJedis;
 
 public class DistributedStateCreator {
+  /**
+   * Creates and initializes a new instance
+   * @param jedis the jedis parameter
+   * @return the distributedstate result
+   */
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
+  /**
+   * Creates and initializes a new instance
+   * @return the redismap result
+   */
   public static DistributedState create(UnifiedJedis jedis) {
     DistributedState state = new DistributedState();
 
@@ -80,10 +89,20 @@ public class DistributedStateCreator {
     return state;
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param jedis the jedis parameter
+   * @return the balancedredisqueue result
+   */
   private static RedisMap createActionCache() {
     return new RedisMap(configs.getBackplane().getActionCachePrefix());
   }
 
+  /**
+   * Creates and initializes a new instance Implements complex logic with 3 conditional branches and 4 iterative operations.
+   * @param jedis the jedis parameter
+   * @return the executionqueue result
+   */
   private static BalancedRedisQueue createPrequeue(UnifiedJedis jedis) {
     // Construct the prequeue so that elements are balanced across all redis nodes.
     return new BalancedRedisQueue(
@@ -93,6 +112,12 @@ public class DistributedStateCreator {
         getQueueDecorator());
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param jedis the jedis parameter
+   * @param queueName the queueName parameter
+   * @return the list<string> result
+   */
   private static ExecutionQueue createExecutionQueue(UnifiedJedis jedis) {
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
@@ -133,6 +158,11 @@ public class DistributedStateCreator {
     return new ExecutionQueue(provisionedQueues.build(), configs.getBackplane().getMaxQueueDepth());
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param provisions the provisions parameter
+   * @return the setmultimap<string, string> result
+   */
   static List<String> getQueueHashes(UnifiedJedis jedis, String queueName) {
     return RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
         jedis, RedisHashtags.existingHash(queueName));
@@ -152,22 +182,41 @@ public class DistributedStateCreator {
         : RedisQueue::decorate;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the string result
+   */
   private static Queue.QUEUE_TYPE getQueueType() {
     return configs.getBackplane().isPriorityQueue()
         ? Queue.QUEUE_TYPE.priority
         : Queue.QUEUE_TYPE.standard;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the string result
+   */
   private static String getQueuedOperationsListName() {
     String name = configs.getBackplane().getQueuedOperationsListName();
     return createFullQueueName(name, getQueueType());
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param pconfig the pconfig parameter
+   * @return the string result
+   */
   private static String getPreQueuedOperationsListName() {
     String name = configs.getBackplane().getPreQueuedOperationsListName();
     return createFullQueueName(name, getQueueType());
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param base the base parameter
+   * @param type the type parameter
+   * @return the string result
+   */
   private static String getQueueName(Queue pconfig) {
     String name = pconfig.getName();
     return createFullQueueName(name, getQueueType());

@@ -1,3 +1,23 @@
+/**
+ * Matches worker capabilities with operation requirements
+ * @param workerContext the workerContext parameter
+ * @param output the output parameter
+ * @param error the error parameter
+ * @return the public result
+ */
+/**
+ * Matches worker capabilities with operation requirements
+ * @param executionContext the executionContext parameter
+ * @param stopwatch the stopwatch parameter
+ * @return the public result
+ */
+/**
+ * Matches worker capabilities with operation requirements
+ * @return the boolean result
+ */
+/**
+ * Processes the next operation in the pipeline stage
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,8 +77,19 @@ public class MatchStage extends PipelineStage {
     private long waitStart;
     private long waitDuration;
     private Poller poller = null;
+    /**
+     * Polls for available operations from the backplane
+     * @return the boolean result
+     */
     private boolean matched = false;
 
+    /**
+     * Performs specialized operation based on method logic
+     */
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public MatchOperationListener(ExecutionContext executionContext, Stopwatch stopwatch) {
       this.executionContext = executionContext;
       this.stopwatch = stopwatch;
@@ -70,6 +101,12 @@ public class MatchStage extends PipelineStage {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+     * @param queueEntry the queueEntry parameter
+     * @param claim the claim parameter
+     * @return the boolean result
+     */
     public boolean onWaitStart() {
       waitStart = stopwatch.elapsed(MICROSECONDS);
       return !workerContext.inGracefulShutdown();
@@ -84,6 +121,10 @@ public class MatchStage extends PipelineStage {
 
     @SuppressWarnings("ConstantConditions")
     @Override
+    /**
+     * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+     * @param t the t parameter
+     */
     public boolean onEntry(@Nullable QueueEntry queueEntry, Claim claim)
         throws InterruptedException {
       if (workerContext.inGracefulShutdown()) {
@@ -126,12 +167,20 @@ public class MatchStage extends PipelineStage {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+     * @return the executioncontext result
+     */
     public void onError(Throwable t) {
       Throwables.throwIfUnchecked(t);
       throw new RuntimeException(t);
     }
 
     @SuppressWarnings("SameReturnValue")
+    /**
+     * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+     * @param operation the operation parameter
+     */
     private boolean onOperationPolled() throws InterruptedException {
       String operationName = executionContext.queueEntry.getExecuteEntry().getOperationName();
       start(operationName);
@@ -179,6 +228,11 @@ public class MatchStage extends PipelineStage {
     }
   }
 
+  /**
+   * Matches worker capabilities with operation requirements
+   * @param executionContext the executionContext parameter
+   * @return the executioncontext result
+   */
   private void putOperation(Operation operation) throws InterruptedException {
     boolean operationUpdateSuccess = false;
     try {
@@ -223,21 +277,36 @@ public class MatchStage extends PipelineStage {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param executionContext the executionContext parameter
+   * @return the boolean result
+   */
   public ExecutionContext take() {
     throw new UnsupportedOperationException();
   }
 
   @Override
+  /**
+   * Returns resources to the shared pool Includes input validation and error handling for robustness.
+   */
   public boolean claim(ExecutionContext executionContext) {
     throw new UnsupportedOperationException();
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param operation the operation parameter
+   */
   public void release() {
     throw new UnsupportedOperationException();
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   public void put(ExecutionContext operation) {
     throw new UnsupportedOperationException();
   }

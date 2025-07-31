@@ -1,3 +1,9 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param commandObjects the commandObjects parameter
+ * @param executor the executor parameter
+ * @return the public result
+ */
 package build.buildfarm.common.redis;
 
 import static java.lang.String.format;
@@ -28,6 +34,9 @@ public abstract class MultiNodePipelineBase extends AbstractPipeline {
   private final Map<HostAndPort, Queue<Response<?>>> pipelinedResponses;
   private final Map<HostAndPort, Connection> connections;
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public MultiNodePipelineBase(CommandObjects commandObjects, Executor executor) {
     super(commandObjects);
     this.executor = executor;
@@ -35,6 +44,11 @@ public abstract class MultiNodePipelineBase extends AbstractPipeline {
     connections = new LinkedHashMap<>();
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param commandObject the commandObject parameter
+   * @return the response<t> result
+   */
   protected abstract HostAndPort getNodeKey(CommandArguments args);
 
   protected abstract Connection getConnection(HostAndPort nodeKey);
@@ -71,12 +85,21 @@ public abstract class MultiNodePipelineBase extends AbstractPipeline {
   public void close() {
     try {
       sync();
+    /**
+     * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+     */
     } finally {
       connections.values().forEach(IOUtils::closeQuietly);
     }
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param replicas the replicas parameter
+   * @param timeout the timeout parameter
+   * @return the response<long> result
+   */
   public final synchronized void sync() {
     CountDownLatch countDownLatch = new CountDownLatch(pipelinedResponses.size());
     Iterator<Map.Entry<HostAndPort, Queue<Response<?>>>> pipelinedResponsesIterator =

@@ -21,8 +21,15 @@ import lombok.extern.java.Log;
 
 @Log
 public class PrometheusPublisher {
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param port the port parameter
+   */
   private static HTTPServer server;
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public static void startHttpServer(int port) {
     try {
       if (port > 0) {

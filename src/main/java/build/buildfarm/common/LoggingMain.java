@@ -1,3 +1,11 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param applicationName the applicationName parameter
+ /**
+  * Performs specialized operation based on method logic
+  */
+ * @return the protected result
+ */
 package build.buildfarm.common;
 
 public abstract class LoggingMain {

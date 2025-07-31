@@ -1,3 +1,19 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param options the options parameter
+ * @param creds the creds parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param serverBuilder the serverBuilder parameter
+ * @param creds the creds parameter
+ * @param options the options parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,6 +59,9 @@ public class HttpProxy extends LoggingMain {
 
   private final Server server;
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   private HealthStatusManager healthStatusManager;
 
   public HttpProxy(HttpProxyOptions options, @Nullable Credentials creds)
@@ -50,6 +69,9 @@ public class HttpProxy extends LoggingMain {
     this(ServerBuilder.forPort(options.port), creds, options);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public HttpProxy(
       ServerBuilder<?> serverBuilder, @Nullable Credentials creds, HttpProxyOptions options)
       throws URISyntaxException, SSLException {
@@ -75,6 +97,9 @@ public class HttpProxy extends LoggingMain {
             .build();
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void start() throws IOException {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
@@ -98,12 +123,20 @@ public class HttpProxy extends LoggingMain {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param parser the parser parameter
+   */
   private void blockUntilShutdown() throws InterruptedException {
     if (server != null) {
       server.awaitTermination();
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param args the args parameter
+   */
   private static void printUsage(OptionsParser parser) {
     System.out.println("Usage: [OPTIONS]");
     System.out.println(

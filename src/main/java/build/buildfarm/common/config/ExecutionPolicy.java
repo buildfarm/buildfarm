@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @return the public result
+ */
 package build.buildfarm.common.config;
 
 import lombok.Data;

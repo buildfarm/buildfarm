@@ -1,3 +1,10 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param jedis the jedis parameter
+ * @param name the name parameter
+ * @param listPageSize the listPageSize parameter
+ * @return the public result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -101,6 +108,11 @@ public class RedisQueue implements Queue<String> {
    * @note Suggested return identifier: wasRemoved.
    */
   @Override
+  /**
+   * Removes data or cleans up resources
+   * @param pipeline the pipeline parameter
+   * @param val the val parameter
+   */
   public boolean removeFromDequeue(String val) {
     return jedis.lrem(getDequeueName(), -1, val) != 0;
   }
@@ -164,6 +176,11 @@ public class RedisQueue implements Queue<String> {
    * @details Checks the current length of the queue.
    * @return The current length of the queue.
    * @note Suggested return identifier: length.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param pipeline the pipeline parameter
+   * @return the supplier<long> result
    */
   public long size() {
     return jedis.llen(name);

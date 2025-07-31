@@ -1,3 +1,16 @@
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param path the path parameter
+ * @param exceptions the exceptions parameter
+ * @return the string result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param path the path parameter
+ * @param digest the digest parameter
+ * @param exceptions the exceptions parameter
+ * @return the public result
+ */
 // Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

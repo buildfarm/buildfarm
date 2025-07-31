@@ -1,3 +1,13 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param AWSCredentials( the AWSCredentials( parameter
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic Processes 1 input sources and produces 1 outputs. Performs side effects including logging and state modifications.
+ * @param null the null parameter
+ * @return the extract access keys result
+ */
 // Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

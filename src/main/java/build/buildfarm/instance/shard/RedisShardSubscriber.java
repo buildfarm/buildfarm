@@ -1,3 +1,69 @@
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Manages network connections for gRPC communication Provides thread-safe access through synchronization mechanisms.
+ * @return the list<string> result
+ */
+/**
+ * Manages network connections for gRPC communication Provides thread-safe access through synchronization mechanisms.
+ * @return the list<string> result
+ */
+/**
+ * Removes expired entries from the cache to free space Provides thread-safe access through synchronization mechanisms.
+ * @param now the now parameter
+ * @return the list<string> result
+ */
+/**
+ * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+ * @param channel the channel parameter
+ * @param watcher the watcher parameter
+ * @return the listenablefuture<void> result
+ */
+/**
+ * Asynchronous computation result handler Performs side effects including logging and state modifications.
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ */
+/**
+ * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+ * @param channel the channel parameter
+ * @param watchFuture the watchFuture parameter
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param message the message parameter
+ */
+/**
+ * Updates internal state or external resources Performs side effects including logging and state modifications.
+ * @param workerChange the workerChange parameter
+ */
+/**
+ * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+ * @param workerChange the workerChange parameter
+ */
+/**
+ * Removes data or cleans up resources Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+ * @param workerChange the workerChange parameter
+ * @return the boolean result
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param channel the channel parameter
+ * @param message the message parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param channel the channel parameter
+ * @param reset the reset parameter
+ */
+/**
+ * Updates internal state or external resources Implements complex logic with 4 conditional branches and 1 iterative operations. Performs side effects including logging and state modifications.
+ * @param channel the channel parameter
+ * @param operationChange the operationChange parameter
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,6 +113,11 @@ import redis.clients.jedis.JedisPubSub;
 
 @Log
 class RedisShardSubscriber extends JedisPubSub {
+  /**
+   * Performs specialized operation based on method logic
+   * @param timestamp the timestamp parameter
+   * @return the instant result
+   */
   abstract static class TimedWatchFuture extends WatchFuture {
     private final TimedWatcher watcher;
 
@@ -70,6 +141,19 @@ class RedisShardSubscriber extends JedisPubSub {
   private final String workerChannel;
   private final Consumer<String> onWorkerRemoved;
   private final Executor executor;
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 3 conditional branches and 2 iterative operations. Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+   * @param channel the channel parameter
+   * @param operation the operation parameter
+   * @param shouldObserve the shouldObserve parameter
+   * @param expiresAt the expiresAt parameter
+   */
+  /**
+   * Removes expired entries from the cache to free space Performs side effects including logging and state modifications.
+   * @param channel the channel parameter
+   * @param now the now parameter
+   * @param force the force parameter
+   */
   private SettableFuture<Void> subscribeFuture = null;
 
   RedisShardSubscriber(
@@ -93,6 +177,11 @@ class RedisShardSubscriber extends JedisPubSub {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   * @param channel the channel parameter
+   * @param expiresAt the expiresAt parameter
+   */
   public List<String> subscribedChannels() {
     ImmutableList.Builder<String> channels = ImmutableList.builder();
     synchronized (watchers) {
@@ -120,6 +209,12 @@ class RedisShardSubscriber extends JedisPubSub {
     TimedWatchFuture watchFuture =
         new TimedWatchFuture(watcher) {
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param channel the channel parameter
+           * @param operation the operation parameter
+           * @param expiresAt the expiresAt parameter
+           */
           public void unwatch() {
             log.log(Level.FINER, format("unwatching %s", channel));
             RedisShardSubscriber.this.unwatch(channel, this);
@@ -145,6 +240,11 @@ class RedisShardSubscriber extends JedisPubSub {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param channel the channel parameter
+   * @param message the message parameter
+   */
   public void resetWatchers(String channel, Instant expiresAt) {
     List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     synchronized (watchers) {
@@ -176,6 +276,10 @@ class RedisShardSubscriber extends JedisPubSub {
     onOperation(channel, operation, (watcher) -> true, expiresAt);
   }
 
+  /**
+   * Manages network connections for gRPC communication
+   * @return the string[] result
+   */
   private void onOperation(
       String channel,
       @Nullable Operation operation,
@@ -208,6 +312,11 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param channel the channel parameter
+   * @param subscribedChannels the subscribedChannels parameter
+   */
   public void onMessage(String channel, String message) {
     if (channel.equals(workerChannel)) {
       onWorkerMessage(message);
@@ -305,6 +414,11 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+   * @param channel the channel parameter
+   * @param subscribedChannels the subscribedChannels parameter
+   */
   public void onSubscribe(String channel, int subscribedChannels) {
     if (subscribeFuture != null) {
       subscribeFuture.set(null);
@@ -312,6 +426,11 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   @Override
+  /**
+   * Validates input parameters and state consistency
+   * @param timeoutMillis the timeoutMillis parameter
+   * @return the boolean result
+   */
   public void onUnsubscribe(String channel, int subscribedChannels) {
     List<TimedWatchFuture> operationWatchers;
     synchronized (watchers) {
@@ -326,6 +445,11 @@ class RedisShardSubscriber extends JedisPubSub {
     this.subscribeFuture = future;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param client the client parameter
+   * @param channels the channels parameter
+   */
   public Boolean checkIfSubscribed(long timeoutMillis)
       throws ExecutionException, InterruptedException, TimeoutException {
     if (subscribeFuture != null) {

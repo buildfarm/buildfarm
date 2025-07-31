@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param simpleBlobStore the simpleBlobStore parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,11 +32,21 @@ import java.io.IOException;
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   private final SimpleBlobStore simpleBlobStore;
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public ActionCacheService(SimpleBlobStore simpleBlobStore) {
     this.simpleBlobStore = simpleBlobStore;
   }
 
   @Override
+  /**
+   * Updates internal state or external resources
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public void getActionResult(
       GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();

@@ -1,3 +1,12 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param SubscriptionState.SUBSCRIBED the SubscriptionState.SUBSCRIBED parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param timeoutMillis the timeoutMillis parameter
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,6 +65,10 @@ class RedisShardSubscription implements Runnable {
 
   private final AtomicReference<SubscriptionState> subscriptionState =
       new AtomicReference<>(SubscriptionState.NOT_SUBSCRIBED);
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 8 conditional branches. Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 1 outputs.
+   * @param update the update parameter
+   */
   private static final long DEFAULT_STOP_TIMEOUT = 1000;
 
   RedisShardSubscription(
@@ -71,6 +84,11 @@ class RedisShardSubscription implements Runnable {
     this.client = client;
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param isReset the isReset parameter
+   */
   private synchronized void manageState(SubscriptionAction update) {
     SubscriptionState currentState = subscriptionState.get();
     switch (update) {
@@ -99,6 +117,10 @@ class RedisShardSubscription implements Runnable {
     }
   }
 
+  /**
+   * Processes the next operation in the pipeline stage Performs side effects including logging and state modifications.
+   * @param isReset the isReset parameter
+   */
   private void subscribe(UnifiedJedis jedis, boolean isReset) {
     if (isReset) {
       onReset.accept(jedis);
@@ -123,6 +145,9 @@ class RedisShardSubscription implements Runnable {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   */
   private void iterate(boolean isReset) throws IOException {
     try {
       client.run(jedis -> subscribe(jedis, isReset));
@@ -152,6 +177,9 @@ class RedisShardSubscription implements Runnable {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void stop(long timeoutMillis) {
     manageState(SubscriptionAction.STOP);
     try {
@@ -183,6 +211,9 @@ class RedisShardSubscription implements Runnable {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   */
   public void stop() {
     stop(DEFAULT_STOP_TIMEOUT);
   }

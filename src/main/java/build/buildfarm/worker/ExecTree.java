@@ -1,3 +1,15 @@
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 11 conditional branches and 4 iterative operations. Includes input validation and error handling for robustness.
+ * @param start the start parameter
+ * @param digest the digest parameter
+ * @param visitor the visitor parameter
+ * @return the path result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param FileVisitResult.SKIP_SIBLINGS the FileVisitResult.SKIP_SIBLINGS parameter
+ * @return the for postvisitdirectory result
+ */
 package build.buildfarm.worker;
 
 import static com.google.common.base.Preconditions.checkNotNull;

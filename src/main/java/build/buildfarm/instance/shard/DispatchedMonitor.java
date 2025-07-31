@@ -1,3 +1,9 @@
+/**
+ * Processes the next operation in the pipeline stage
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +22,11 @@ package build.buildfarm.instance.shard;
 
 import static com.google.common.util.concurrent.Futures.successfulAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+/**
+ * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 2 outputs. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param future the future parameter
+ * @return the t result
+ */
 import static java.lang.String.format;
 
 import build.buildfarm.common.Scannable;
@@ -39,7 +50,18 @@ import lombok.extern.java.Log;
 class DispatchedMonitor implements Runnable {
   private final BooleanSupplier shouldStop;
   private final Scannable<DispatchedOperation> location;
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param o the o parameter
+   * @param now the now parameter
+   * @return the listenablefuture<void> result
+   */
   private final BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param o the o parameter
+   * @param now the now parameter
+   */
   private final int intervalSeconds;
 
   DispatchedMonitor(
@@ -53,6 +75,12 @@ class DispatchedMonitor implements Runnable {
     this.intervalSeconds = intervalSeconds;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param now the now parameter
+   * @param dispatchedOperation the dispatchedOperation parameter
+   * @param onFuture the onFuture parameter
+   */
   private ListenableFuture<Void> requeueDispatchedExecution(DispatchedOperation o, long now) {
     QueueEntry queueEntry = o.getQueueEntry();
     String operationName = queueEntry.getExecuteEntry().getOperationName();
@@ -71,6 +99,10 @@ class DispatchedMonitor implements Runnable {
     return requeuedFuture;
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @return the listenablefuture<list<void>> result
+   */
   private void logOverdueOperation(DispatchedOperation o, long now) {
     // log that the dispatched operation is overdue in order to indicate that it should be requeued.
     String operationName = o.getQueueEntry().getExecuteEntry().getOperationName();
@@ -92,6 +124,9 @@ class DispatchedMonitor implements Runnable {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   */
   private ListenableFuture<List<Void>> submitAll() {
     ImmutableList.Builder<ListenableFuture<Void>> requeuedFutures = ImmutableList.builder();
     try {

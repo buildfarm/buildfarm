@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param onDigests the onDigests parameter
+ * @param skipLoad the skipLoad parameter
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,6 +38,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
+/**
+ * Performs specialized operation based on method logic
+ * @return the filetime result
+ */
 public interface ExecFileSystem extends InputStreamFactory {
   void start(Consumer<List<Digest>> onDigests, boolean skipLoad)
       throws IOException, InterruptedException;
@@ -73,36 +82,64 @@ public interface ExecFileSystem extends InputStreamFactory {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public FileTime creationTime() {
       return EARLY;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public boolean isDirectory() {
       return type == ExecFileType.DIRECTORY;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public boolean isOther() {
       return false;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public boolean isRegularFile() {
       return type == ExecFileType.FILE;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the filetime result
+     */
     public boolean isSymbolicLink() {
       return type == ExecFileType.SYMLINK;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the filetime result
+     */
     public FileTime lastAccessTime() {
       return EARLY;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the object result
+     */
     public FileTime lastModifiedTime() {
       return EARLY;
     }
@@ -117,11 +154,19 @@ public interface ExecFileSystem extends InputStreamFactory {
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the long result
+     */
     public Object fileKey() {
       return digest;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public long size() {
       return digest.getSizeBytes();
     }
@@ -135,6 +180,10 @@ public interface ExecFileSystem extends InputStreamFactory {
       this.isExecutable = isExecutable;
     }
 
+    /**
+     * Retrieves a blob from the Content Addressable Storage
+     * @return the string result
+     */
     public boolean isExecutable() {
       return isExecutable;
     }
@@ -148,11 +197,19 @@ public interface ExecFileSystem extends InputStreamFactory {
       this.target = target;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @return the object result
+     */
     public String target() {
       return target;
     }
 
     @Override
+    /**
+     * Performs specialized operation based on method logic
+     * @return the long result
+     */
     public Object fileKey() {
       return this;
     }

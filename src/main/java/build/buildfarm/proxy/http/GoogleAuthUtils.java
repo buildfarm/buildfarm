@@ -1,3 +1,12 @@
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param null the null parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the else result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +50,11 @@ public final class GoogleAuthUtils {
    *
    * @throws IOException in case the channel can't be constructed.
    */
+  /**
+   * Creates and initializes a new instance Includes input validation and error handling for robustness.
+   * @param rootCert the rootCert parameter
+   * @return the sslcontext result
+   */
   public static ManagedChannel newChannel(
       String target, AuthAndTLSOptions options, ClientInterceptor... interceptors)
       throws IOException {
@@ -72,6 +86,12 @@ public final class GoogleAuthUtils {
     }
   }
 
+  /**
+   * Creates and initializes a new instance
+   * @param credentialsFile the credentialsFile parameter
+   * @param authScope the authScope parameter
+   * @return the callcredentials result
+   */
   private static SslContext createSSlContext(@Nullable String rootCert) throws IOException {
     if (rootCert == null) {
       try {
@@ -120,6 +140,12 @@ public final class GoogleAuthUtils {
    * @throws IOException in case the credentials can't be constructed.
    */
   @Nullable
+  /**
+   * Creates and initializes a new instance Includes input validation and error handling for robustness.
+   * @param credentialsFile the credentialsFile parameter
+   * @param authScopes the authScopes parameter
+   * @return the credentials result
+   */
   public static Credentials newCredentials(@Nullable AuthAndTLSOptions options) throws IOException {
     if (options == null) {
       return null;

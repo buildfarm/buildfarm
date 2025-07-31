@@ -1,3 +1,12 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param provisions.required the provisions.required parameter
+ * @return the we will consider this queue exhausted result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the fully wildcarded queues are always eligible result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -139,6 +148,11 @@ public class ProvisionedRedisQueue {
    * @param allowUserUnmatched Whether the user can provide extra platform properties and still
    *     match the queue.
    * @note Overloaded.
+   */
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 3 conditional branches and 2 iterative operations.
+   * @param exhausted the exhausted parameter
+   * @return the boolean result
    */
   public ProvisionedRedisQueue(
       String name,

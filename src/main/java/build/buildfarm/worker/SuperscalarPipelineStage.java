@@ -1,3 +1,13 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @param executorName the executorName parameter
+ * @param workerContext the workerContext parameter
+ * @param output the output parameter
+ * @param error the error parameter
+ * @param width the width parameter
+ * @return the public result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,8 +47,17 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
   private volatile boolean catastrophic = false;
 
   // ensure that only a single claim waits for available slots for core count
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   * @param count the count parameter
+   * @return the boolean result
+   */
   private final Object claimLock = new Object();
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @return the string result
+   */
   public SuperscalarPipelineStage(
       String name,
       String executorName,
@@ -68,6 +87,18 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
             Thread.ofPlatform().name(String.format("%s.%s", name, "poller")).factory());
   }
 
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Performs side effects including logging and state modifications.
+   * @param operationName the operationName parameter
+   * @param usecs the usecs parameter
+   * @param stallUSecs the stallUSecs parameter
+   * @param status the status parameter
+   */
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms.
+   * @param operationName the operationName parameter
+   * @param message the message parameter
+   */
   protected abstract int claimsRequired(ExecutionContext executionContext);
 
   @Override
@@ -79,7 +110,19 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     return executor.getActiveCount();
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the executioncontext result
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param executionContext the executionContext parameter
+   */
   public Iterable<String> getOperationNames() {
+    /**
+     * Returns resources to the shared pool
+     * @param queue the queue parameter
+     */
     synchronized (operationNames) {
       return new HashSet<>(operationNames);
     }
@@ -101,6 +144,11 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     }
   }
 
+  /**
+   * Returns resources to the shared pool
+   * @param operationName the operationName parameter
+   * @param slots the slots parameter
+   */
   synchronized void waitForReleaseOrCatastrophe(BlockingQueue<ExecutionContext> queue) {
     boolean interrupted = false;
     while (!catastrophic && isClaimed()) {
@@ -136,6 +184,11 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param executionContext the executionContext parameter
+   * @return the boolean result
+   */
   public ExecutionContext take() throws InterruptedException {
     boolean interrupted = false;
     InterruptedException exception;
@@ -160,6 +213,11 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     throw exception;
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param size the size parameter
+   * @return the string result
+   */
   protected synchronized void releaseClaim(String operationName, int slots) {
     // clear interrupted flag for take
     boolean interrupted = Thread.interrupted();
@@ -185,6 +243,10 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the boolean result
+   */
   protected String getUsage(int size) {
     return String.format("%s/%d", size, width);
   }
@@ -223,11 +285,17 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
   }
 
   @Override
+  /**
+   * Returns resources to the shared pool
+   */
   public boolean claim(ExecutionContext executionContext) throws InterruptedException {
     return claim(claimsRequired(executionContext));
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void release() {
     releaseClaim("unidentified operation", 1);
   }

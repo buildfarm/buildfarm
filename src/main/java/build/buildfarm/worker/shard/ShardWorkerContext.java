@@ -1,3 +1,112 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the boolean result
+ */
+/**
+ * Matches worker capabilities with operation requirements
+ * @return the boolean result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @return the boolean result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the boolean result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the boolean result
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the boolean result
+ */
+/**
+ * Polls for available operations from the backplane
+ * @param name the name parameter
+ * @param queueEntry the queueEntry parameter
+ * @param stage the stage parameter
+ * @param executor the executor parameter
+ * @return the poller result
+ */
+/**
+ * Polls for available operations from the backplane Implements complex logic with 1 conditional branches and 4 iterative operations. Performs side effects including logging and state modifications.
+ * @param poller the poller parameter
+ * @param name the name parameter
+ * @param queueEntry the queueEntry parameter
+ * @param stage the stage parameter
+ * @param onFailure the onFailure parameter
+ * @param deadline the deadline parameter
+ * @param executor the executor parameter
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 1 iterative operations.
+ * @param platform the platform parameter
+ * @return the claim result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the expand platform requirements with exec owner result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param provideOwnedClaim the provideOwnedClaim parameter
+ * @return the a little awkward wrapping with the early return here to preserve effective final result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the return new result
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications.
+ * @param listener the listener parameter
+ * @return the queueentry result
+ */
+/**
+ * Matches worker capabilities with operation requirements Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param operation the operation parameter
+ */
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param operationName the operationName parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the boolean result
+ */
+/**
+ * Creates and initializes a new instance Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+ * @param operationName the operationName parameter
+ * @return the string result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the new result
+ */
+/**
+ * Performs specialized operation based on method logic Implements complex logic with 4 conditional branches and 2 iterative operations. Performs side effects including logging and state modifications.
+ * @param limits the limits parameter
+ * @param operationName the operationName parameter
+ * @param owner the owner parameter
+ * @param arguments the arguments parameter
+ * @param workingDirectory the workingDirectory parameter
+ * @return the ioresource result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @return the return new result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +128,17 @@ import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.lang.String.format;
+/**
+ * Creates and initializes a new instance
+ * @return the retrier result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param policies the policies parameter
+ * @param name the name parameter
+ * @param executeStageWidth the executeStageWidth parameter
+ * @return the setmultimap<string, string> result
+ */
 import static java.util.concurrent.TimeUnit.DAYS;
 
 import build.bazel.remote.execution.v2.Action;
@@ -212,6 +332,11 @@ class ShardWorkerContext implements WorkerContext {
     provideOwnedClaim = this.resourceSet.poolResources.containsKey(EXEC_OWNER_RESOURCE_NAME);
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Processes 1 input sources and produces 2 outputs.
+   * @param digest the digest parameter
+   * @return the bytestring result
+   */
   private static Retrier createBackplaneRetrier() {
     return new Retrier(
         Backoff.exponential(
@@ -255,6 +380,11 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param queueEntry the queueEntry parameter
+   * @return the queuedoperation result
+   */
   public String getName() {
     return name;
   }
@@ -273,6 +403,17 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @return the userprincipal result
+   */
+  /**
+   * Returns resources to the shared pool
+   */
+  /**
+   * Returns resources to the shared pool
+   * @param stage the stage parameter
+   */
   public void resumePoller(
       Poller poller,
       String name,
@@ -330,6 +471,10 @@ class ShardWorkerContext implements WorkerContext {
 
   // FIXME make OwnedClaim with owner
   // how will this play out with persistent workers, should we have one per user?
+  /**
+   * Matches worker capabilities with operation requirements
+   * @param listener the listener parameter
+   */
   private @Nullable Claim acquireClaim(Platform platform) {
     // expand platform requirements with exec owner
     if (provideOwnedClaim) {
@@ -362,6 +507,10 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
+          /**
+           * Matches worker capabilities with operation requirements Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+           * @param listener the listener parameter
+           */
           public UserPrincipal owner() {
             if (owner != null) {
               return owner;
@@ -370,6 +519,23 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param queueEntry the queueEntry parameter
+           * @param claim the claim parameter
+           * @return the boolean result
+           */
+          /**
+           * Performs specialized operation based on method logic
+           */
+          /**
+           * Performs specialized operation based on method logic
+           * @return the boolean result
+           */
+          /**
+           * Matches worker capabilities with operation requirements
+           * @return the boolean result
+           */
           public Iterable<Entry<String, List<Object>>> getPools() {
             return claim.getPools();
           }
@@ -391,6 +557,22 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param operationName the operationName parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param queueEntry the queueEntry parameter
+   * @param claim the claim parameter
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param queueEntry the queueEntry parameter
+   * @param claim the claim parameter
+   * @return the boolean result
+   */
   private @Nullable QueueEntry takeEntryOffOperationQueue(MatchListener listener)
       throws IOException, InterruptedException {
     if (!listener.onWaitStart()) {
@@ -433,6 +615,10 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+           * @param t the t parameter
+           */
           public boolean onWaitStart() {
             return listener.onWaitStart();
           }
@@ -475,6 +661,22 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @return the boolean result
+           */
+          /**
+           * Performs specialized operation based on method logic
+           * @return the boolean result
+           */
+          /**
+           * Performs specialized operation based on method logic
+           * @return the boolean result
+           */
+          /**
+           * Performs specialized operation based on method logic
+           * @return the boolean result
+           */
           public void onError(Throwable t) {
             Throwables.throwIfUnchecked(t);
             throw new RuntimeException(t);
@@ -489,6 +691,35 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param resultBuilder the resultBuilder parameter
+   * @param digestUtil the digestUtil parameter
+   * @param outputPath the outputPath parameter
+   * @param workingDirectory the workingDirectory parameter
+   * @param entrySizeViolationType the entrySizeViolationType parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param nativePath the nativePath parameter
+   * @return the string result
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param resultBuilder the resultBuilder parameter
+   * @param digestUtil the digestUtil parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param digest the digest parameter
+   * @param file the file parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param digest the digest parameter
+   * @param content the content parameter
+   */
   private void requeue(String operationName) {
     QueueEntry queueEntry = activeOperations.remove(operationName);
     try {
@@ -553,6 +784,22 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionKey the actionKey parameter
+   */
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param name the name parameter
+   * @return the list<executionpolicy> result
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param actionDigest the actionDigest parameter
+   * @param resultBuilder the resultBuilder parameter
+   * @param actionRoot the actionRoot parameter
+   * @param command the command parameter
+   */
   public Duration getMaximumActionTimeout() {
     return maximumActionTimeout;
   }
@@ -599,6 +846,15 @@ class ShardWorkerContext implements WorkerContext {
     return nativePath;
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param resultBuilder the resultBuilder parameter
+   * @param digestUtil the digestUtil parameter
+   * @param outputDirPath the outputDirPath parameter
+   * @param workingDirectory the workingDirectory parameter
+   * @param entrySizeViolationType the entrySizeViolationType parameter
+   * @param preconditionFailure the preconditionFailure parameter
+   */
   private void uploadOutputFile(
       ActionResult.Builder resultBuilder,
       DigestUtil digestUtil,
@@ -672,6 +928,10 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @return the string result
+   */
   private void uploadOutputDirectory(
       ActionResult.Builder resultBuilder,
       DigestUtil digestUtil,
@@ -727,6 +987,22 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Creates and initializes a new instance
+   * @param operationName the operationName parameter
+   * @param directoriesIndex the directoriesIndex parameter
+   * @param digestFunction the digestFunction parameter
+   * @param action the action parameter
+   * @param command the command parameter
+   * @param owner the owner parameter
+   * @param workerExecutedMetadata the workerExecutedMetadata parameter
+   * @return the path result
+   */
+  /**
+   * Stores a blob in the Content Addressable Storage Performs side effects including logging and state modifications.
+   * @param operation the operation parameter
+   * @return the boolean result
+   */
   public void uploadOutputs(
       Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Command command)
       throws IOException, InterruptedException, StatusException {
@@ -769,6 +1045,14 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionId the actionId parameter
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param execDir the execDir parameter
+   */
   public void unmergeExecution(ActionKey actionKey) throws IOException, InterruptedException {
     createBackplaneRetrier()
         .execute(
@@ -779,6 +1063,11 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param actionKey the actionKey parameter
+   * @param actionResult the actionResult parameter
+   */
   public boolean putOperation(Operation operation) throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
@@ -789,6 +1078,11 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+   * @param name the name parameter
+   * @return the write result
+   */
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
@@ -826,6 +1120,9 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Creates and initializes a new instance
+   */
   public void putActionResult(ActionKey actionKey, ActionResult actionResult)
       throws IOException, InterruptedException {
     createBackplaneRetrier()
@@ -847,6 +1144,9 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   */
   public long getStandardErrorLimit() {
     return Size.mbToBytes(100);
   }
@@ -856,6 +1156,16 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param command the command parameter
+   * @return the resourcelimits result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param command the command parameter
+   * @return the int result
+   */
   public void createExecutionLimits() {
     if (shouldLimitCoreUsage() && configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
       createOperationExecutionLimits();
@@ -882,6 +1192,15 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 6 conditional branches and 1 iterative operations.
+   * @param operationName the operationName parameter
+   * @param owner the owner parameter
+   * @param arguments the arguments parameter
+   * @param command the command parameter
+   * @param workingDirectory the workingDirectory parameter
+   * @return the ioresource result
+   */
   public void destroyExecutionLimits() {
     if (configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
       try {
@@ -907,6 +1226,13 @@ class ShardWorkerContext implements WorkerContext {
     return commandExecutionSettings(command).cpu.claimed;
   }
 
+  /**
+   * Updates reference counts for cache entry lifecycle
+   * @return the boolean result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   */
   public ResourceLimits commandExecutionSettings(Command command) {
     return ResourceDecider.decideResourceLimitations(
         command,
@@ -940,6 +1266,9 @@ class ShardWorkerContext implements WorkerContext {
             public void close() {}
 
             @Override
+            /**
+             * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+             */
             public boolean isReferenced() {
               return false;
             }
@@ -981,6 +1310,12 @@ class ShardWorkerContext implements WorkerContext {
     return resource;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param limits the limits parameter
+   * @param workingDirectory the workingDirectory parameter
+   * @return the linuxsandboxoptions result
+   */
   private String getCgroups() {
     if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
       return configs.getExecutionWrappers().getCgroups2();
@@ -1030,6 +1365,11 @@ class ShardWorkerContext implements WorkerContext {
     return combineResources(resources);
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches and 2 iterative operations.
+   * @param arguments the arguments parameter
+   * @param options the options parameter
+   */
   private LinuxSandboxOptions decideLinuxSandboxOptions(
       ResourceLimits limits, Path workingDirectory) {
     // Construct the CLI options for this binary.
@@ -1070,6 +1410,13 @@ class ShardWorkerContext implements WorkerContext {
     return options;
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 5 conditional branches. Includes input validation and error handling for robustness.
+   * @param group the group parameter
+   * @param owner the owner parameter
+   * @param limits the limits parameter
+   * @param resources the resources parameter
+   */
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
     // Choose the sandbox which is built and deployed with the worker image.
@@ -1109,6 +1456,13 @@ class ShardWorkerContext implements WorkerContext {
     arguments.add("--");
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param group the group parameter
+   * @param owner the owner parameter
+   * @param limits the limits parameter
+   * @param resources the resources parameter
+   */
   private void applyCpuLimits(
       Group group,
       @Nullable UserPrincipal owner,
@@ -1145,6 +1499,11 @@ class ShardWorkerContext implements WorkerContext {
     resources.add(cpu);
   }
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   * @param resources the resources parameter
+   * @return the ioresource result
+   */
   private void applyMemLimits(
       Group group,
       @Nullable UserPrincipal owner,
@@ -1167,6 +1526,10 @@ class ShardWorkerContext implements WorkerContext {
   private IOResource combineResources(ArrayList<IOResource> resources) {
     return new IOResource() {
       @Override
+      /**
+       * Updates reference counts for cache entry lifecycle
+       * @return the boolean result
+       */
       public void close() {
         for (IOResource resource : resources) {
           try {

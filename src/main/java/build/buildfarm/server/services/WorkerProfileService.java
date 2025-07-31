@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param instance the instance parameter
+ * @return the public result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,23 +34,41 @@ import io.grpc.stub.StreamObserver;
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
   private final Instance instance;
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public WorkerProfileService(Instance instance) {
     this.instance = instance;
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param profile the profile parameter
+   */
   public void getWorkerProfile(
       WorkerProfileRequest request, StreamObserver<WorkerProfileMessage> responseObserver) {
     addCallback(
         instance.getWorkerProfile(request.getWorkerName()),
         new FutureCallback<>() {
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param t the t parameter
+           */
           public void onSuccess(WorkerProfileMessage profile) {
             responseObserver.onNext(profile);
             responseObserver.onCompleted();
           }
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+           * @param request the request parameter
+           * @param responseObserver the responseObserver parameter
+           */
           public void onFailure(Throwable t) {
             responseObserver.onError(t);
           }
@@ -54,6 +77,10 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param response the response parameter
+   */
   public void batchWorkerProfiles(
       BatchWorkerProfilesRequest request,
       StreamObserver<BatchWorkerProfilesResponse> responseObserver) {
@@ -61,6 +88,10 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
         instance.batchWorkerProfiles(request.getWorkerNamesList()),
         new FutureCallback<>() {
           @Override
+          /**
+           * Performs specialized operation based on method logic
+           * @param t the t parameter
+           */
           public void onSuccess(BatchWorkerProfilesResponse response) {
             responseObserver.onNext(response);
             responseObserver.onCompleted();

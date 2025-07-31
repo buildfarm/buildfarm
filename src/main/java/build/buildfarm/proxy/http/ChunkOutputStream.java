@@ -1,3 +1,6 @@
+/**
+ * Performs specialized operation based on method logic
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,11 +30,18 @@ abstract class ChunkOutputStream extends OutputStream {
   abstract void onChunk(byte[] b, int len);
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   */
   public void close() {
     flush();
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination
+   * @param b the b parameter
+   */
   public void flush() {
     if (buflen > 0) {
       onChunk(buffer, buflen);
@@ -40,11 +50,21 @@ abstract class ChunkOutputStream extends OutputStream {
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination
+   * @param b the b parameter
+   * @param off the off parameter
+   * @param len the len parameter
+   */
   public void write(byte[] b) {
     write(b, 0, b.length);
   }
 
   @Override
+  /**
+   * Persists data to storage or external destination
+   * @param b the b parameter
+   */
   public void write(byte[] b, int off, int len) {
     while (buflen + len >= buffer.length) {
       int copylen = buffer.length - buflen;

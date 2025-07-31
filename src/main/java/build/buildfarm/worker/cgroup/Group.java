@@ -1,3 +1,45 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param name the name parameter
+ * @param parent the parent parameter
+ * @return the private result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param CGroupVersion.CGROUPS_V2 the CGroupVersion.CGROUPS_V2 parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @return the boolean result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage Includes input validation and error handling for robustness.
+ * @return the set<integer> result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param controllerName the controllerName parameter
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param CGroupVersion.CGROUPS_V1 the CGroupVersion.CGROUPS_V1 parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param CGroupVersion.NONE the CGroupVersion.NONE parameter
+ * @return the else result
+ */
+/**
+ * Creates and initializes a new instance Implements complex logic with 7 conditional branches and 1 iterative operations. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+ * @param controllerName the controllerName parameter
+ */
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param CGroupVersion.CGROUPS_V2 the CGroupVersion.CGROUPS_V2 parameter
+ * @return the else result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -244,6 +286,11 @@ public final class Group {
    *
    * @param processIds Process IDs to send a signal to
    */
+  /**
+   * Retrieves a blob from the Content Addressable Storage Processes 2 input sources and produces 2 outputs. Performs side effects including logging and state modifications.
+   * @param path the path parameter
+   * @return the set<integer> result
+   */
   private void killAllProcesses(Iterable<Integer> processIds) {
     Streams.stream(processIds)
         .forEach(processId -> posix.kill(processId, Signal.SIGKILL.intValue()));
@@ -270,6 +317,11 @@ public final class Group {
     return getPids(getPath());
   }
 
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param cgroupPath the cgroupPath parameter
+   * @param pids the pids parameter
+   */
   private static Set<Integer> getPids(Path path) {
     Path procs = path.resolve("cgroup.procs");
     try {
@@ -298,6 +350,11 @@ public final class Group {
     adoptPids(getPath(), pids);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param cgroupPath the cgroupPath parameter
+   * @param controllerNames the controllerNames parameter
+   */
   static void adoptPids(Path cgroupPath, Iterable<Integer> pids) {
     Path path = cgroupPath.resolve("cgroup.procs");
     verify(Files.exists(path), "cgroup.procs doesn't exist");
@@ -477,6 +534,10 @@ public final class Group {
   }
 
   /** Shutdown hook. If there were cgroups things done earlier, un-do them now. */
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param cgroupPath the cgroupPath parameter
+   */
   public static void onShutdown() {
     if (VERSION == CGroupVersion.CGROUPS_V2) {
       try {

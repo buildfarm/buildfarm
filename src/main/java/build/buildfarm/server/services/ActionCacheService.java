@@ -1,3 +1,9 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param instance the instance parameter
+ * @param isWritable the isWritable parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,12 +63,21 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   private final Instance instance;
   private final boolean isWritable;
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Performs side effects including logging and state modifications.
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public ActionCacheService(Instance instance, boolean isWritable) {
     this.instance = instance;
     this.isWritable = isWritable;
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param actionResult the actionResult parameter
+   */
   public void getActionResult(
       GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
     Digest actionDigest =
@@ -88,6 +103,10 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
               (ServerCallStreamObserver<ActionResult>) responseObserver;
 
           @Override
+          /**
+           * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+           * @param t the t parameter
+           */
           public void onSuccess(@Nullable ActionResult actionResult) {
             try {
               if (actionResult == null) {
@@ -105,6 +124,11 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
           @SuppressWarnings("NullableProblems")
           @Override
+          /**
+           * Updates internal state or external resources
+           * @param request the request parameter
+           * @param responseObserver the responseObserver parameter
+           */
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (call.isCancelled()) {

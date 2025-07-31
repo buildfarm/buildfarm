@@ -23,6 +23,10 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
+/**
+ * Retrieves a blob from the Content Addressable Storage Performs side effects including logging and state modifications.
+ * @return the cgroupversion result
+ */
 public class CGroupVersionProvider implements Supplier<CGroupVersion> {
 
   @Override

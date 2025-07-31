@@ -1,3 +1,42 @@
+/**
+ * Stores a blob in the Content Addressable Storage
+ * @param onPut the onPut parameter
+ * @return the public result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage Provides thread-safe access through synchronization mechanisms.
+ * @param executionContext the executionContext parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param currentSlot the currentSlot parameter
+ * @return the else result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param time the time parameter
+ * @return the compute the bucket index the timestamp would belong to
+    private int result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @return the operationstagedurations result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param metadata the metadata parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param metadata the metadata parameter
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param other the other parameter
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,6 +65,10 @@ import java.util.Arrays;
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
 
+  /**
+   * Removes data or cleans up resources Implements complex logic with 4 conditional branches and 2 iterative operations.
+   * @param now the now parameter
+   */
   private final AverageTimeCostOfLastPeriod[] averagesWithinDifferentPeriods;
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
@@ -112,6 +155,12 @@ public class PutOperationStage extends PipelineStage.NullStage {
     }
 
     // Compute the bucket index the Timestamp would belong to
+    /**
+     * Performs specialized operation based on method logic
+     * @param a the a parameter
+     * @param b the b parameter
+     * @return the duration result
+     */
     private int getCurrentSlot(Timestamp time) {
       long millisPeriod = Durations.toMillis(period);
       return (int) (Timestamps.toMillis(time) % millisPeriod / (millisPeriod / buckets.length));
@@ -148,6 +197,11 @@ public class PutOperationStage extends PipelineStage.NullStage {
     }
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param weight the weight parameter
+   * @return the operationstagedurations result
+   */
   private static Duration betweenIfAfter(Timestamp a, Timestamp b) {
     // ensure a < b
     if (Timestamps.compare(a, b) < 0) {

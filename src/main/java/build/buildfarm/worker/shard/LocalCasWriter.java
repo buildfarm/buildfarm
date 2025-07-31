@@ -1,3 +1,13 @@
+/**
+ * Persists data to storage or external destination
+ * @param execFileSystem the execFileSystem parameter
+ * @return the public result
+ */
+/**
+ * Persists data to storage or external destination
+ * @param digest the digest parameter
+ * @param file the file parameter
+ */
 // Copyright 2022 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,8 +43,18 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 class LocalCasWriter implements CasWriter {
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param digest the digest parameter
+   * @return the write result
+   */
   private ExecFileSystem execFileSystem;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param digest the digest parameter
+   * @param content the content parameter
+   */
   public LocalCasWriter(ExecFileSystem execFileSystem) {
     this.execFileSystem = execFileSystem;
   }
@@ -50,6 +70,11 @@ class LocalCasWriter implements CasWriter {
     insertStream(digest, content::newInput);
   }
 
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+   * @param digest the digest parameter
+   * @param suppliedStream the suppliedStream parameter
+   */
   private Write getLocalWrite(Digest digest) throws IOException {
     return execFileSystem
         .getStorage()

@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param DigestFunction.Value.UNKNOWN the DigestFunction.Value.UNKNOWN parameter
+ * @return the similar result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -249,6 +254,11 @@ public class DigestUtil {
     return new DigestUtil(hashFn);
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param action the action parameter
+   * @return the actionkey result
+   */
   public Digest build(String hexHash, long size) {
     if (!hashFn.isValidHexDigest(hexHash)) {
       throw new NumberFormatException(
@@ -266,6 +276,10 @@ public class DigestUtil {
     return compute(message.toByteString());
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @return the digest result
+   */
   public ActionKey computeActionKey(Action action) {
     return new ActionKey(compute(action));
   }
@@ -273,14 +287,31 @@ public class DigestUtil {
   /**
    * Assumes that the given Digest is a valid digest of an Action, and creates an ActionKey wrapper.
    */
+  /**
+   * Constructs digest from hash string and size information
+   * @param hexHash the hexHash parameter
+   * @param size the size parameter
+   * @param digestFunction the digestFunction parameter
+   * @return the digest result
+   */
   public static ActionKey asActionKey(Digest digest) {
     return new ActionKey(digest);
   }
 
+  /**
+   * Stores a blob in the Content Addressable Storage
+   * @param out the out parameter
+   * @return the hashingoutputstream result
+   */
   public Digest empty() {
     return empty.get(getDigestFunction());
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param digestFunction the digestFunction parameter
+   * @return the string result
+   */
   public static Digest buildDigest(String hexHash, long size, DigestFunction.Value digestFunction) {
     return Digest.newBuilder()
         .setHash(hexHash)
@@ -293,6 +324,11 @@ public class DigestUtil {
     return new HashingOutputStream(hashFn.getHash(), out);
   }
 
+  /**
+   * Formats digest as human-readable string for logging
+   * @param digest the digest parameter
+   * @return the string result
+   */
   public static String optionalDigestFunction(DigestFunction.Value digestFunction) {
     if (OMITTED_DIGEST_FUNCTIONS.contains(digestFunction)
         || digestFunction == DigestFunction.Value.UNKNOWN) {
@@ -307,6 +343,11 @@ public class DigestUtil {
         optionalDigestFunction(digest.getDigestFunction()), digest.getHash(), digest.getSize());
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param digest the digest parameter
+   * @return the digest result
+   */
   public static build.bazel.remote.execution.v2.Digest toDigest(Digest digest) {
     return build.bazel.remote.execution.v2.Digest.newBuilder()
         .setHash(digest.getHash())
@@ -314,6 +355,11 @@ public class DigestUtil {
         .build();
   }
 
+  /**
+   * Transforms data between different representations
+   * @param digest the digest parameter
+   * @return the digest result
+   */
   public Digest toDigest(build.bazel.remote.execution.v2.Digest digest) {
     return Digest.newBuilder()
         .setHash(digest.getHash())
@@ -322,6 +368,17 @@ public class DigestUtil {
         .build();
   }
 
+  /**
+   * Converts between different digest representations
+   * @param digest the digest parameter
+   * @param digestFunction the digestFunction parameter
+   * @return the digest result
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param digest the digest parameter
+   * @return the digestutil result
+   */
   public static Digest parseDigest(String digest) {
     String[] components = digest.split("/");
     int length = components.length;

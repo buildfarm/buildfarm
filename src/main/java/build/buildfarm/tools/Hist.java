@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param ; the ; parameter
+ * @return the infiniteloopstatement result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +20,10 @@
 package build.buildfarm.tools;
 
 import static build.buildfarm.common.grpc.Channels.createChannel;
+/**
+ * Performs specialized operation based on method logic
+ * @param dispatched the dispatched parameter
+ */
 import static build.buildfarm.server.services.OperationsService.LIST_OPERATIONS_MAXIMUM_PAGE_SIZE;
 
 import build.buildfarm.instance.Instance;
@@ -25,6 +34,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 class Hist {
   @SuppressWarnings("ConstantConditions")
+  /**
+   * Performs specialized operation based on method logic Executes asynchronously and returns a future for completion tracking.
+   * @param instance the instance parameter
+   */
   private static void printHistogramValue(int dispatched) {
     StringBuilder s = new StringBuilder();
     int p = 0;
@@ -44,6 +57,10 @@ class Hist {
   }
 
   @SuppressWarnings("CatchMayIgnoreException")
+  /**
+   * Performs specialized operation based on method logic
+   * @param args the args parameter
+   */
   private static void printHistogram(Instance instance) throws IOException {
     AtomicInteger dispatched = new AtomicInteger(0);
 

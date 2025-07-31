@@ -30,7 +30,22 @@ import com.google.rpc.Status;
  * @details Sets properties on the existing operation so that the new operation is considered
  *     finished and failed.
  */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param operation the operation parameter
+ * @param executeEntry the executeEntry parameter
+ * @param partialExecutionMetadata the partialExecutionMetadata parameter
+ * @param status the status parameter
+ * @return the operation result
+ */
 public class OperationFailer {
+  /**
+   * Executes a build action on the worker
+   * @param executeEntry the executeEntry parameter
+   * @param partialExecutionMetadata the partialExecutionMetadata parameter
+   * @param stage the stage parameter
+   * @return the executeoperationmetadata result
+   */
   public static Operation get(
       Operation operation,
       ExecuteEntry executeEntry,

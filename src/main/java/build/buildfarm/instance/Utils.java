@@ -1,3 +1,19 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
+/**
+ * Stores a blob in the Content Addressable Storage Executes asynchronously and returns a future for completion tracking.
+ * @param instance the instance parameter
+ * @param compressor the compressor parameter
+ * @param digest the digest parameter
+ * @param data the data parameter
+ * @param writeDeadlineAfter the writeDeadlineAfter parameter
+ * @param writeDeadlineAfterUnits the writeDeadlineAfterUnits parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the async with onready for feedbackoutputstream
+  public static listenablefuture<digest> result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +31,25 @@
 package build.buildfarm.instance;
 
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+/**
+ * Retrieves a blob from the Content Addressable Storage Processes 1 input sources and produces 2 outputs.
+ * @param instance the instance parameter
+ * @param compressor the compressor parameter
+ * @param blobDigest the blobDigest parameter
+ * @param offset the offset parameter
+ * @param deadlineAfter the deadlineAfter parameter
+ * @param deadlineAfterUnits the deadlineAfterUnits parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the bytestring result
+ */
+/**
+ * Retrieves a blob from the Content Addressable Storage
+ * @param instance the instance parameter
+ * @param compressor the compressor parameter
+ * @param blobDigest the blobDigest parameter
+ * @param requestMetadata the requestMetadata parameter
+ * @return the bytestring result
+ */
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Compressor;
@@ -50,6 +85,12 @@ public final class Utils {
         instance, compressor, blobDigest, /* offset= */ 0, 60, TimeUnit.SECONDS, requestMetadata);
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param digestSize the digestSize parameter
+   * @param contentSize the contentSize parameter
+   * @return the status result
+   */
   public static ByteString getBlob(
       Instance instance,
       Compressor.Value compressor,
@@ -77,6 +118,10 @@ public final class Utils {
   }
 
   // TODO make this *actually* async with onReady for FeedbackOutputStream
+  /**
+   * Performs specialized operation based on method logic
+   * @param committedSize the committedSize parameter
+   */
   public static ListenableFuture<Digest> putBlobFuture(
       Instance instance,
       Compressor.Value compressor,
@@ -96,12 +141,27 @@ public final class Utils {
           write.getFuture(),
           new FutureCallback<Long>() {
             @Override
+            /**
+             * Performs specialized operation based on method logic
+             * @param t the t parameter
+             */
             public void onSuccess(Long committedSize) {
               future.set(digest);
             }
 
             @SuppressWarnings("NullableProblems")
             @Override
+            /**
+             * Stores a blob in the Content Addressable Storage Executes asynchronously and returns a future for completion tracking. Includes input validation and error handling for robustness.
+             * @param instance the instance parameter
+             * @param compressor the compressor parameter
+             * @param digest the digest parameter
+             * @param blob the blob parameter
+             * @param writeDeadlineAfter the writeDeadlineAfter parameter
+             * @param writeDeadlineAfterUnits the writeDeadlineAfterUnits parameter
+             * @param requestMetadata the requestMetadata parameter
+             * @return the digest result
+             */
             public void onFailure(Throwable t) {
               future.setException(t);
             }

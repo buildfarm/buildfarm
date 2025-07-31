@@ -14,6 +14,10 @@
 
 package build.buildfarm.tools;
 
+/**
+ * Performs specialized operation based on method logic
+ * @param args the args parameter
+ */
 import static build.buildfarm.common.grpc.Channels.createChannel;
 
 import build.buildfarm.instance.Instance;

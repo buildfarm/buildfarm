@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param instance the instance parameter
+ * @return the public result
+ */
 // Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,6 +34,11 @@ public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
 
   private final Instance instance;
 
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public CapabilitiesService(Instance instance) {
     this.instance = instance;
   }

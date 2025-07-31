@@ -1,3 +1,12 @@
+/**
+ * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+ * @param null the null parameter
+ * @return the return if found result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @return the advance timeout if blocking on queue and not at max each queue cycle result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -88,12 +97,23 @@ public class ExecutionQueue {
    * @details Used in a round-robin fashion to ensure an even distribution of dequeues across
    *     matched queues.
    */
+  /**
+   * Creates and initializes a new instance Performs side effects including logging and state modifications.
+   * @param jedis the jedis parameter
+   * @param queue the queue parameter
+   * @param visitor the visitor parameter
+   * @return the visitor<balancedqueueentry> result
+   */
   private int currentDequeueIndex = 0;
 
   /**
    * @brief Constructor.
    * @details Construct the operation queue with various provisioned redis queues.
    * @param queues Provisioned queues.
+   */
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param balancedQueueEntry the balancedQueueEntry parameter
    */
   public ExecutionQueue(List<ProvisionedRedisQueue> queues) {
     this.queues = queues;
@@ -135,6 +155,11 @@ public class ExecutionQueue {
    * @param jedis Jedis cluster client.
    * @param visitor A visitor for each visited element in the queue.
    */
+  /**
+   * Removes data or cleans up resources
+   * @param pipeline the pipeline parameter
+   * @param entry the entry parameter
+   */
   public void visitDequeue(UnifiedJedis jedis, Visitor<ExecutionQueueEntry> visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
       BalancedRedisQueue queue = provisionedQueue.queue();
@@ -163,6 +188,11 @@ public class ExecutionQueue {
    * @details Enacts a visitor over each element in the queue.
    * @param jedis Jedis cluster client.
    * @param visitor A visitor for each visited element in the queue.
+   */
+  /**
+   * Performs specialized operation based on method logic
+   * @param pipeline the pipeline parameter
+   * @return the supplier<long> result
    */
   public void visit(UnifiedJedis jedis, Visitor<ExecutionQueueEntry> visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
@@ -227,6 +257,14 @@ public class ExecutionQueue {
    * @param provisions Provisions used to select an eligible queue.
    * @return The name of the queue.
    * @note Suggested return identifier: name.
+   */
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 12 conditional branches and 3 iterative operations. Performs side effects including logging and state modifications. Includes input validation and error handling for robustness.
+   * @param jedis the jedis parameter
+   * @param queues the queues parameter
+   * @param resourceSet the resourceSet parameter
+   * @param service the service parameter
+   * @return the executionqueueentry result
    */
   public String getName(List<Platform.Property> provisions) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);

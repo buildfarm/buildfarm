@@ -39,6 +39,11 @@ public class ProcessUtils {
   // I was able to reproduce this problem reliably by running significantly more threads than
   // there are CPU cores on my workstation - the more threads the more likely it happens.
   //
+  /**
+   * Loads data from storage or external source
+   * @param builder the builder parameter
+   * @return the process result
+   */
   // As a workaround, we put a synchronized block around the fork.
   // Bazel also does this:
   // https://github.com/bazelbuild/bazel/blob/1deb3f7aa22ec322786360085f9eb723e624d7c7/src/main/java/com/google/devtools/build/lib/shell/JavaSubprocessFactory.java#L146

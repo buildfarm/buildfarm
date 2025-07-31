@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param instance the instance parameter
+ * @return the public result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,11 +38,21 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
 
   private final Instance instance;
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public OperationsService(Instance instance) {
     this.instance = instance;
   }
 
   @Override
+  /**
+   * Retrieves a blob from the Content Addressable Storage
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public void listOperations(
       ListOperationsRequest request, StreamObserver<ListOperationsResponse> responseObserver) {
     int pageSize = request.getPageSize();
@@ -77,6 +92,11 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   }
 
   @Override
+  /**
+   * Removes data or cleans up resources Performs side effects including logging and state modifications.
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public void getOperation(
       GetOperationRequest request, StreamObserver<Operation> responseObserver) {
     // TODO drop instance from name
@@ -85,6 +105,11 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param request the request parameter
+   * @param responseObserver the responseObserver parameter
+   */
   public void deleteOperation(
       DeleteOperationRequest request, StreamObserver<Empty> responseObserver) {
     // TODO drop instance from name

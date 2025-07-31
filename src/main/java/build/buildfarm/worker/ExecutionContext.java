@@ -1,3 +1,33 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param executeResponse the executeResponse parameter
+ * @param operation the operation parameter
+ * @param metadata the metadata parameter
+ * @param poller the poller parameter
+ * @param execDir the execDir parameter
+ * @param action the action parameter
+ * @param command the command parameter
+ * @param tree the tree parameter
+ * @param queueEntry the queueEntry parameter
+ * @param claim the claim parameter
+ * @param workerExecutedMetadata the workerExecutedMetadata parameter
+ * @return the private result
+ */
+/**
+ * Constructs digest from hash string and size information
+ * @param executeResponse the executeResponse parameter
+ * @param operation the operation parameter
+ * @param metadata the metadata parameter
+ * @param poller the poller parameter
+ * @param execDir the execDir parameter
+ * @param action the action parameter
+ * @param command the command parameter
+ * @param tree the tree parameter
+ * @param queueEntry the queueEntry parameter
+ * @param claim the claim parameter
+ * @param workerExecutedMetadata the workerExecutedMetadata parameter
+ * @return the private result
+ */
 // Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -64,6 +94,11 @@ public final class ExecutionContext {
     this.workerExecutedMetadata = workerExecutedMetadata;
   }
 
+  /**
+   * Performs specialized operation based on method logic
+   * @param operation the operation parameter
+   * @return the builder result
+   */
   public static final class Builder {
     private ExecuteResponse.Builder executeResponse;
     private Operation operation;
@@ -102,51 +137,99 @@ public final class ExecutionContext {
       this.workerExecutedMetadata = workerExecutedMetadata;
     }
 
+    /**
+     * Carries request context and tracing information
+     * @param metadata the metadata parameter
+     * @return the builder result
+     */
     public Builder setOperation(Operation operation) {
       this.operation = operation;
       return this;
     }
 
+    /**
+     * Polls for available operations from the backplane
+     * @param poller the poller parameter
+     * @return the builder result
+     */
     public Builder setMetadata(QueuedOperationMetadata.Builder metadata) {
       this.metadata = metadata;
       return this;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param execDir the execDir parameter
+     * @return the builder result
+     */
     public Builder setPoller(Poller poller) {
       this.poller = poller;
       return this;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param action the action parameter
+     * @return the builder result
+     */
     public Builder setExecDir(Path execDir) {
       this.execDir = execDir;
       return this;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param command the command parameter
+     * @return the builder result
+     */
     public Builder setAction(Action action) {
       this.action = action;
       return this;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param tree the tree parameter
+     * @return the builder result
+     */
     public Builder setCommand(Command command) {
       this.command = command;
       return this;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param queueEntry the queueEntry parameter
+     * @return the builder result
+     */
     public Builder setTree(Tree tree) {
       this.tree = tree;
       return this;
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @param claim the claim parameter
+     * @return the builder result
+     */
     public Builder setQueueEntry(QueueEntry queueEntry) {
       this.queueEntry = queueEntry;
       return this;
     }
 
+    /**
+     * Constructs digest from hash string and size information
+     * @return the executioncontext result
+     */
     public Builder setClaim(Claim claim) {
       this.claim = claim;
       return this;
     }
 
+    /**
+     * Constructs digest from hash string and size information
+     * @return the builder result
+     */
     public ExecutionContext build() {
       return new ExecutionContext(
           executeResponse,
@@ -163,6 +246,10 @@ public final class ExecutionContext {
     }
   }
 
+  /**
+   * Constructs digest from hash string and size information
+   * @return the builder result
+   */
   public static Builder newBuilder() {
     return new Builder(
         /* executeResponse= */ ExecuteResponse.newBuilder(),

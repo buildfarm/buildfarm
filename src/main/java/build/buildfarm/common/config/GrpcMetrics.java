@@ -7,6 +7,11 @@ import me.dinowernli.grpc.prometheus.Configuration;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 
 @Data
+/**
+ * Processes the operation according to configured logic
+ * @param serverBuilder the serverBuilder parameter
+ * @param grpcMetrics the grpcMetrics parameter
+ */
 public class GrpcMetrics {
   private boolean enabled = false;
   private boolean provideLatencyHistograms = false;

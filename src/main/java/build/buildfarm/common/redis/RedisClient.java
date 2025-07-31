@@ -1,3 +1,44 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param jedis the jedis parameter
+ * @return the t result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param jedis the jedis parameter
+ * @return the t result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param message the message parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param cause the cause parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param message the message parameter
+ * @param cause the cause parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param jedis the jedis parameter
+ * @return the public result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param SocketTimeoutException the SocketTimeoutException parameter
+ * @return the else result
+ */
+/**
+ * Performs specialized operation based on method logic
+ * @param IOException the IOException parameter
+ * @return the else result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,10 +87,17 @@ public class RedisClient implements Closeable {
       super(message);
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     */
     public JedisMisconfigurationException(final Throwable cause) {
       super(cause);
     }
 
+    /**
+     * Performs specialized operation based on method logic
+     * @return the boolean result
+     */
     public JedisMisconfigurationException(final String message, final Throwable cause) {
       super(message, cause);
     }
@@ -57,6 +105,9 @@ public class RedisClient implements Closeable {
 
   private final UnifiedJedis jedis;
 
+  /**
+   * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+   */
   private boolean closed = false;
 
   public RedisClient(UnifiedJedis jedis) {
@@ -64,10 +115,19 @@ public class RedisClient implements Closeable {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic
+   * @param withJedis the withJedis parameter
+   */
   public synchronized void close() {
     closed = true;
   }
 
+  /**
+   * Performs specialized operation based on method logic Provides thread-safe access through synchronization mechanisms. Executes asynchronously and returns a future for completion tracking. Processes 1 input sources and produces 4 outputs. Includes input validation and error handling for robustness.
+   * @param withJedis the withJedis parameter
+   * @return the t result
+   */
   public synchronized boolean isClosed() {
     return closed;
   }
@@ -87,6 +147,11 @@ public class RedisClient implements Closeable {
             });
   }
 
+  /**
+   * Performs specialized operation based on method logic Implements complex logic with 6 conditional branches and 1 iterative operations. Includes input validation and error handling for robustness.
+   * @param withJedis the withJedis parameter
+   * @return the t result
+   */
   public <T> T blockingCall(JedisInterruptibleContext<T> withJedis)
       throws IOException, InterruptedException {
     AtomicReference<InterruptedException> interruption = new AtomicReference<>(null);

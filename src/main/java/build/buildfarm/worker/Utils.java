@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the private result
+ */
 // Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +26,13 @@ import java.nio.file.FileStore;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 
+/**
+ * Performs specialized operation based on method logic Includes input validation and error handling for robustness.
+ * @param path the path parameter
+ * @param followSymlinks the followSymlinks parameter
+ * @param fileStore the fileStore parameter
+ * @return the filestatus result
+ */
 public final class Utils {
   private Utils() {}
 

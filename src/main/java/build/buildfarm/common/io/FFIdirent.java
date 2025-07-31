@@ -1,3 +1,8 @@
+/**
+ * Performs specialized operation based on method logic
+ * @param runtime the runtime parameter
+ * @return the public result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

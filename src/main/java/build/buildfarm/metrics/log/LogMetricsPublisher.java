@@ -1,3 +1,7 @@
+/**
+ * Performs specialized operation based on method logic
+ * @return the public result
+ */
 // Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,6 +32,11 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
 
   private static Level logLevel;
 
+  /**
+   * Carries request context and tracing information Performs side effects including logging and state modifications.
+   * @param operation the operation parameter
+   * @param requestMetadata the requestMetadata parameter
+   */
   public LogMetricsPublisher() {
     super(configs.getServer().getClusterId());
     if (configs.getServer().getMetrics().getLogLevel() != null) {
@@ -38,6 +47,11 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
   }
 
   @Override
+  /**
+   * Performs specialized operation based on method logic Performs side effects including logging and state modifications.
+   * @param metricName the metricName parameter
+   * @param metricValue the metricValue parameter
+   */
   public void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
     try {
       OperationRequestMetadata metadata = populateRequestMetadata(operation, requestMetadata);
