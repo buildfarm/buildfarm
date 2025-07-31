@@ -21,6 +21,7 @@ import static build.buildfarm.common.io.Utils.formatIOError;
 import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
@@ -82,6 +83,9 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
@@ -163,6 +167,7 @@ public final class Worker extends LoggingMain {
   private LoadingCache<String, StubInstance> workerStubs;
   private AtomicBoolean released = new AtomicBoolean(true);
   private AtomicBoolean shutdownInitiated = new AtomicBoolean(false);
+  private boolean startWritable = true;
 
   /**
    * The method will prepare the worker for graceful shutdown when the worker is ready. Note on
@@ -232,50 +237,15 @@ public final class Worker extends LoggingMain {
 
   private Server createServer(
       ServerBuilder<?> serverBuilder,
-      @Nullable CASFileCache storage,
       Instance instance,
-      Pipeline pipeline,
-      ShardWorkerContext context) {
+      WorkerProfileService workerProfileService) {
     serverBuilder.addService(healthStatusManager.getHealthService());
     serverBuilder.addService(new ContentAddressableStorageService(instance));
     serverBuilder.addService(new ByteStreamService(instance));
     serverBuilder.addService(new ShutDownWorkerGracefully(this));
     serverBuilder.addService(ProtoReflectionServiceV1.newInstance());
+    serverBuilder.addService(workerProfileService);
 
-    // We will build a worker's server based on it's capabilities.
-    // A worker that is capable of execution will construct an execution pipeline.
-    // It will use various execution phases for it's profile service.
-    // On the other hand, a worker that is only capable of CAS storage does not need a pipeline.
-    if (configs.getWorker().getCapabilities().isExecution()) {
-      // all claims should be released upon pipeline completion, but it is safe to ensure that
-      // they are whether empty or not, so do so.
-      PutOperationStage completeStage =
-          new ReleaseClaimStage(operation -> context.deactivate(operation.getName()));
-      PipelineStage errorStage = completeStage; /* new ErrorStage(); */
-      SuperscalarPipelineStage reportResultStage =
-          new ReportResultStage(context, completeStage, errorStage);
-      SuperscalarPipelineStage executeActionStage =
-          new ExecuteActionStage(context, reportResultStage, errorStage);
-      PipelineStage releaseClaimAndRequeueStage = new ReleaseClaimStage(context::requeue);
-      SuperscalarPipelineStage inputFetchStage =
-          new InputFetchStage(context, executeActionStage, releaseClaimAndRequeueStage);
-      PipelineStage matchStage =
-          new MatchStage(context, inputFetchStage, releaseClaimAndRequeueStage);
-
-      pipeline.add(matchStage, 4);
-      pipeline.add(inputFetchStage, 3);
-      pipeline.add(executeActionStage, 2);
-      pipeline.add(reportResultStage, 1);
-
-      serverBuilder.addService(
-          new WorkerProfileService(
-              storage,
-              matchStage,
-              inputFetchStage,
-              executeActionStage,
-              reportResultStage,
-              completeStage));
-    }
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
     serverBuilder.intercept(new ServerHeadersInterceptor(meta -> {}));
     if (configs.getServer().getMaxInboundMessageSizeBytes() != 0) {
@@ -786,18 +756,64 @@ public final class Worker extends LoggingMain {
             writer);
 
     pipeline = new Pipeline();
-    server = createServer(serverBuilder, (CASFileCache) storage, instance, pipeline, context);
+    SuperscalarPipelineStage inputFetchStage = null;
+    SuperscalarPipelineStage executeActionStage = null;
+    SuperscalarPipelineStage reportResultStage = null;
+    PutOperationStage completeStage = null;
+    if (configs.getWorker().getCapabilities().isExecution()) {
+      // all claims should be released upon pipeline completion, but it is safe to ensure that
+      // they are whether empty or not, so do so.
+      completeStage = new ReleaseClaimStage(operation -> context.deactivate(operation.getName()));
+      PipelineStage errorStage = completeStage; /* new ErrorStage(); */
+      reportResultStage = new ReportResultStage(context, completeStage, errorStage);
+      executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);
+      // FIXME this implies and requires that context::requeue performs the context::deactivate
+      // function
+      PipelineStage releaseClaimAndRequeueStage = new ReleaseClaimStage(context::requeue);
+      inputFetchStage =
+          new InputFetchStage(context, executeActionStage, releaseClaimAndRequeueStage);
+      matchStage = new MatchStage(context, inputFetchStage, releaseClaimAndRequeueStage);
+
+      pipeline.add(matchStage, 4);
+      pipeline.add(inputFetchStage, 3);
+      pipeline.add(executeActionStage, 2);
+      pipeline.add(reportResultStage, 1);
+    }
+
+    WorkerProfileService workerProfileService =
+        new WorkerProfileService(
+            (CASFileCache) storage,
+            matchStage,
+            inputFetchStage,
+            executeActionStage,
+            reportResultStage,
+            completeStage);
+    server = createServer(serverBuilder, instance, workerProfileService);
 
     removeWorker(configs.getWorker().getPublicName());
 
     boolean skipLoad = configs.getWorker().getStorages().getFirst().isSkipLoad();
-    execFileSystem.start(
-        (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()), skipLoad);
+    ListenableFuture<Void> writable =
+        execFileSystem.start(
+            (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()),
+            skipLoad,
+            startWritable);
 
     server.start();
-    healthStatusManager.setStatus(
-        HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
+    Futures.addCallback(
+        writable,
+        new FutureCallback<>() {
+          @Override
+          public void onSuccess(Void result) {
+            healthStatusManager.setStatus(
+                HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
+            PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
+          }
+
+          @Override
+          public void onFailure(Throwable t) {}
+        },
+        directExecutor());
     startFailsafeRegistration();
 
     pipeline.start();

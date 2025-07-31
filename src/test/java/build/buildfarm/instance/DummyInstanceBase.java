@@ -115,6 +115,11 @@ class DummyInstanceBase extends InstanceBase {
   }
 
   @Override
+  public boolean isReadOnly() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public Write getBlobWrite(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest digest,
