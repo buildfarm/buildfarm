@@ -142,6 +142,11 @@ class ShardWorkerContext implements WorkerContext {
   private final LocalResourceSet resourceSet;
   private final boolean errorOperationOutputSizeExceeded;
   private final boolean provideOwnedClaim;
+  private boolean inGracefulShutdown = false;
+  private boolean pauseMatch = false;
+  private boolean pauseInputFetch = false;
+  private boolean pauseExecute = false;
+  private boolean pauseReportResult = false;
 
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, String name, int executeStageWidth) {
@@ -216,6 +221,37 @@ class ShardWorkerContext implements WorkerContext {
             /*options.experimentalRemoteRetryJitter=*/ 0.1,
             /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
         Retrier.REDIS_IS_RETRIABLE);
+  }
+
+  @Override
+  public boolean inGracefulShutdown() {
+    return inGracefulShutdown;
+  }
+
+  @Override
+  public boolean isMatching() {
+    return !inGracefulShutdown() && !pauseMatch;
+  }
+
+  // later stages must drain with graceful shutdown
+  @Override
+  public boolean isInputFetching() {
+    return inGracefulShutdown() || !pauseInputFetch;
+  }
+
+  @Override
+  public boolean isExecuting() {
+    return inGracefulShutdown() || !pauseExecute;
+  }
+
+  @Override
+  public boolean isReportingResults() {
+    return inGracefulShutdown() || !pauseReportResult;
+  }
+
+  @Override
+  public void prepareForGracefulShutdown() {
+    inGracefulShutdown = true;
   }
 
   @Override
@@ -444,7 +480,7 @@ class ShardWorkerContext implements WorkerContext {
             throw new RuntimeException(t);
           }
         };
-    while (!dedupMatchListener.isMatched()) {
+    while (isMatching() && !dedupMatchListener.isMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {

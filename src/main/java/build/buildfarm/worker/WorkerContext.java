@@ -66,6 +66,18 @@ public interface WorkerContext {
       Deadline deadline,
       Executor executor);
 
+  boolean inGracefulShutdown();
+
+  boolean isMatching();
+
+  boolean isInputFetching();
+
+  boolean isExecuting();
+
+  boolean isReportingResults();
+
+  void prepareForGracefulShutdown();
+
   void match(MatchListener listener) throws InterruptedException;
 
   List<ExecutionPolicy> getExecutionPolicies(String name);

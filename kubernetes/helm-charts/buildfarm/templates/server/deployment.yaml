@@ -50,14 +50,18 @@ spec:
               name: "server-comm"
             - containerPort: 9090
               name: "metrics"
+          {{- with .Values.server.livenessProbe}}
           livenessProbe:
-            grpc:
-              port: 8980
-            initialDelaySeconds: 10
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.server.readinessProbe }}
           readinessProbe:
-            grpc:
-              port: 8980
-            initialDelaySeconds: 10
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.server.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.server.resources | nindent 12 }}
           volumeMounts:
