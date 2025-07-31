@@ -67,7 +67,7 @@ public final class ByteStreamHelper {
         new StreamObserver<ReadResponse>() {
           long requestOffset = offset;
           long currentOffset = offset;
-          Backoff backoff = backoffSupplier.get();
+          Backoff backoff = backoffSupplier.get(30, TimeUnit.SECONDS);
 
           @Override
           public void onNext(ReadResponse response) {
@@ -95,7 +95,7 @@ public final class ByteStreamHelper {
             long nextDelayMillis = backoff.nextDelayMillis();
             if (status.getCode() == Status.Code.DEADLINE_EXCEEDED
                 && currentOffset != requestOffset) {
-              backoff = backoffSupplier.get();
+              backoff = backoffSupplier.get(30, TimeUnit.SECONDS);
               retryRequest();
             } else if (retryService == null || nextDelayMillis < 0 || !isRetriable.test(status)) {
               streamReadyFuture.setException(t);
@@ -108,7 +108,7 @@ public final class ByteStreamHelper {
                 schedulingResult.addListener(
                     () -> {
                       try {
-                        schedulingResult.get();
+                        schedulingResult.get(30, TimeUnit.SECONDS);
                       } catch (ExecutionException e) {
                         inputStream.setException(e.getCause());
                       } catch (InterruptedException e) {
@@ -135,7 +135,7 @@ public final class ByteStreamHelper {
     // the interface is technically blocking (not aio) and is
     // perfectly reasonable to be used as a wait point
     try {
-      return streamReadyFuture.get();
+      return streamReadyFuture.get(30, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       try {
         inputStream.close();

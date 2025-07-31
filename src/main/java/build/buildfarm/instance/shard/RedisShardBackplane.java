@@ -92,6 +92,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -806,7 +807,7 @@ public class RedisShardBackplane implements Backplane {
 
   private synchronized Set<String> getExecuteWorkers() throws IOException {
     try {
-      return recentExecuteWorkers.get();
+      return recentExecuteWorkers.get(30, TimeUnit.SECONDS);
     } catch (RuntimeException e) {
       // unwrap checked exception mask
       log.log(Level.WARNING, "getExecuteWorkers failed", e);

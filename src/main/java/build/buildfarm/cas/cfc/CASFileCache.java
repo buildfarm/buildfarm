@@ -395,7 +395,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       @Nullable build.bazel.remote.execution.v2.Digest.Builder result,
       Consumer<String> onContains) {
     String key = getKey(digest, isExecutable);
-    Entry entry = storage.get(key);
+    Entry entry;
+    synchronized (storage) {
+      entry = storage.get(key);
+    }
     if (entry != null && (digest.getSize() < 0 || digest.getSize() == entry.size)) {
       if (result != null) {
         result.mergeFrom(DigestUtil.toDigest(digest)).setSizeBytes(entry.size);
@@ -508,7 +511,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     boolean isExecutable = false;
     do {
       String key = getKey(digest, isExecutable);
-      Entry e = storage.get(key);
+      Entry e;
+      synchronized (storage) {
+        e = storage.get(key);
+      }
       if (e != null) {
         InputStream input;
         try {
@@ -763,12 +769,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throw new EntryLimitException(digest.getSize(), maxEntrySizeInBytes);
     }
     try {
-      return writes.get(
+      BlobWriteKey key =
           BlobWriteKey.newBuilder()
               .setDigest(digest)
               .setIdentifier(uuid.toString())
               .setCompressor(compressor)
-              .build());
+              .build();
+      synchronized (writes) {
+        return writes.get(key);
+      }
     } catch (ExecutionException e) {
       String compression = "";
       if (compressor == Compressor.Value.ZSTD) {
@@ -784,7 +793,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   SettableFuture<Long> getFuture(Digest digest) {
     try {
-      return writesInProgress.get(digest);
+      synchronized (writesInProgress) {
+        return writesInProgress.get(digest);
+      }
     } catch (ExecutionException e) {
       Throwables.throwIfUnchecked(e.getCause());
       throw new UncheckedExecutionException(e.getCause());

@@ -200,7 +200,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private boolean checkComplete() throws IOException {
     try {
       if (writeFuture.isDone()) {
-        writeFuture.get();
+        writeFuture.get(30, TimeUnit.SECONDS);
         return true;
       }
     } catch (ExecutionException e) {
@@ -338,7 +338,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     try {
       if (checkComplete()) {
         try {
-          return writeFuture.get();
+          return writeFuture.get(30, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
           // impossible, future must be done
           throw new RuntimeException(e);

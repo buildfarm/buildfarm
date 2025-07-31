@@ -780,7 +780,7 @@ public class ServerInstance extends NodeInstance {
                   ImmutableList.of(DigestUtil.toDigest(digest)),
                   digest.getDigestFunction(),
                   requestMetadata)
-              .get();
+              .get(30, TimeUnit.SECONDS);
     } catch (ExecutionException e) {
       throwIfUnchecked(e.getCause());
       throw new RuntimeException(e.getCause());
@@ -1512,7 +1512,7 @@ public class ServerInstance extends NodeInstance {
                       return null;
                     },
                     directExecutor())
-                .get();
+                .get(30, TimeUnit.SECONDS);
           } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             throwIfUnchecked(cause);
