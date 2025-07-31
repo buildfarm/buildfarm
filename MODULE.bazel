@@ -62,6 +62,7 @@ register_toolchains(
 
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
+    name = "buildfarm_maven",
     artifacts = [
         # keep sorted
         "com.amazonaws:aws-java-sdk-core",  # Version is specified via the BOM below
@@ -154,7 +155,7 @@ maven.install(
         "io.grpc:grpc-bom:1.62.2",
         "io.netty:netty-bom:4.1.108.Final",
     ],
-    fail_if_repin_required = True,  # TO RE-PIN: REPIN=1 bazel run @unpinned_maven//:pin
+    fail_if_repin_required = True,  # TO RE-PIN: REPIN=1 bazel run @buildfarm_maven//:pin
     generate_compat_repositories = True,
     lock_file = "//:maven_install.json",
     repositories = [
@@ -167,6 +168,7 @@ maven.install(
 # Test only maven dependencies
 [
     maven.artifact(
+        name = "buildfarm_maven",
         testonly = True,
         artifact = artifact,
         group = group,
@@ -182,8 +184,8 @@ maven.install(
 
 use_repo(
     maven,
-    "maven",
-    "unpinned_maven",
+    "buildfarm_maven",
+    "unpinned_buildfarm_maven",
 )
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
