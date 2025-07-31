@@ -29,6 +29,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -226,7 +227,7 @@ public class BalancedRedisQueue {
   private <T> T getBlockingReply(Future<T> reply, Runnable onInterrupted)
       throws InterruptedException {
     try {
-      return reply.get();
+      return reply.get(30, TimeUnit.SECONDS);
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       Throwables.throwIfUnchecked(cause);
@@ -247,7 +248,7 @@ public class BalancedRedisQueue {
       throws InterruptedException {
     // consider duration / queues.size() timeouts
     Duration queueTimeout = timeout.dividedBy(queues.size());
-    int startIndex = currentPopQueue;
+    int startIndex = getCurrentPopQueueIndex();
     int currentIndex = roundRobinPopIndex();
     do {
       String queueName = queues.get(currentIndex);
@@ -290,7 +291,7 @@ public class BalancedRedisQueue {
     // call.
     // If none of the queues are able to dequeue.  We can move onto a different strategy.
     // (a strategy in which the system appears to be under less load)
-    int startQueue = currentPopQueue;
+    int startQueue = getCurrentPopQueueIndex();
     // end this phase if we have done a full round-robin
     boolean blocking = false;
     // try each of the internal queues with exponential backoff
@@ -316,7 +317,7 @@ public class BalancedRedisQueue {
         throw new InterruptedException();
       }
 
-      if (currentPopQueue == startQueue) {
+      if (getCurrentPopQueueIndex() == startQueue) {
         // advance timeout if blocking on queue and not at max each queue cycle
         if (blocking) {
           currentTimeout = currentTimeout.multipliedBy(2);
@@ -346,7 +347,7 @@ public class BalancedRedisQueue {
   // BalancedQueue -> BalancedRedisQueue
   // make into decorated pattern
   public @Nullable BalancedQueueEntry pollAny(UnifiedJedis unified) throws InterruptedException {
-    int startIndex = currentPopQueue;
+    int startIndex = getCurrentPopQueueIndex();
     int currentIndex = roundRobinPopIndex();
     do {
       String queueName = queues.get(currentIndex);
@@ -367,7 +368,7 @@ public class BalancedRedisQueue {
    * @return The queue that the balanced queue intends to pop from next.
    * @note Suggested return identifier: currentPopQueue.
    */
-  public String getCurrentPopQueue() {
+  public synchronized String getCurrentPopQueue() {
     return queues.get(currentPopQueue);
   }
 
@@ -377,7 +378,7 @@ public class BalancedRedisQueue {
    * @return The index of the queue that the balanced queue intends to pop from next.
    * @note Suggested return identifier: currentPopQueueIndex.
    */
-  public int getCurrentPopQueueIndex() {
+  public synchronized int getCurrentPopQueueIndex() {
     return currentPopQueue;
   }
 
