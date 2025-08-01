@@ -57,6 +57,7 @@ import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.v1test.WorkerType;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.annotations.VisibleForTesting;
@@ -109,13 +110,27 @@ public class RedisShardBackplane implements Backplane {
 
   private static final int workerSetMaxAge = 3; // seconds
 
-  static final JsonFormat.Printer operationPrinter =
+  static final JsonFormat.Printer executionPrinter =
       JsonFormat.printer()
           .usingTypeRegistry(
               JsonFormat.TypeRegistry.newBuilder()
                   .add(ExecuteOperationMetadata.getDescriptor())
                   .add(QueuedOperationMetadata.getDescriptor())
                   .add(PreconditionFailure.getDescriptor())
+                  .build());
+
+  static final JsonFormat.Printer actionResultPrinter =
+      JsonFormat.printer()
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+                  .add(WorkerExecutedMetadata.getDescriptor())
+                  .build());
+
+  static final JsonFormat.Parser actionResultParser =
+      JsonFormat.parser()
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+                  .add(WorkerExecutedMetadata.getDescriptor())
                   .build());
 
   private final String source; // used in operation change publication
@@ -369,7 +384,7 @@ public class RedisShardBackplane implements Backplane {
 
   static String printOperationChange(OperationChange operationChange)
       throws InvalidProtocolBufferException {
-    return operationPrinter.print(operationChange);
+    return executionPrinter.print(operationChange);
   }
 
   void publish(
@@ -885,10 +900,10 @@ public class RedisShardBackplane implements Backplane {
     return returnWorkers;
   }
 
-  private static ActionResult parseActionResult(String json) {
+  public static ActionResult parseActionResult(String json) {
     try {
       ActionResult.Builder builder = ActionResult.newBuilder();
-      JsonFormat.parser().merge(json, builder);
+      actionResultParser.merge(json, builder);
       return builder.build();
     } catch (InvalidProtocolBufferException e) {
       return null;
@@ -898,7 +913,11 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
-    String json = client.call(jedis -> state.actionCache.get(jedis, actionKey.toString()));
+    String json =
+        client.call(
+            jedis ->
+                state.actionCache.getex(
+                    jedis, actionKey.toString(), configs.getBackplane().getActionCacheExpire()));
     if (json == null) {
       return null;
     }
@@ -923,7 +942,7 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
-    String json = JsonFormat.printer().print(actionResult);
+    String json = actionResultPrinter.print(actionResult);
     client.run(
         jedis ->
             state.actionCache.insert(
@@ -1026,7 +1045,7 @@ public class RedisShardBackplane implements Backplane {
 
     String json;
     try {
-      json = operationPrinter.print(operation);
+      json = executionPrinter.print(operation);
     } catch (InvalidProtocolBufferException e) {
       log.log(Level.SEVERE, "error printing operation " + operation.getName(), e);
       return false;
@@ -1069,7 +1088,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void queue(QueueEntry queueEntry, Operation operation) throws IOException {
     String executionName = operation.getName();
-    String operationJson = operationPrinter.print(operation);
+    String operationJson = executionPrinter.print(operation);
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     Operation publishOperation = onPublish.apply(operation);
     int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
@@ -1303,7 +1322,7 @@ public class RedisShardBackplane implements Backplane {
       throws IOException {
     String toolInvocationId = executeEntry.getRequestMetadata().getToolInvocationId();
     String executionName = execution.getName();
-    String operationJson = operationPrinter.print(execution);
+    String operationJson = executionPrinter.print(execution);
     String executeEntryJson = JsonFormat.printer().print(executeEntry);
     Operation publishExecution = onPublish.apply(execution);
     int priority = executeEntry.getExecutionPolicy().getPriority();

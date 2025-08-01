@@ -1,0 +1,124 @@
+{{- if .Values.execWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-exec-worker
+  labels:
+    name: {{ include "buildfarm.fullname" . }}-exec-worker
+    {{- include "buildfarm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: exec-worker
+  annotations:
+    {{- toYaml .Values.execWorker.annotations | nindent 4 }}
+spec:
+  {{- if .Values.execWorker.autoscaling.enabled }}
+  replicas: {{ .Values.execWorker.autoscaling.minReplicas }}
+  {{- else }}
+  replicas: {{ .Values.execWorker.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      name: {{ include "buildfarm.fullname" . }}-exec-worker
+      {{- include "buildfarm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/worker-config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        name: {{ include "buildfarm.fullname" . }}-exec-worker
+        {{- include "buildfarm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: exec-worker
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "buildfarm.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.execWorker.securityContext | nindent 8 }}
+      containers:
+        - name: buildfarm-worker
+          image: "{{ .Values.execWorker.image.repository }}:{{ .Values.execWorker.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.execWorker.image.pullPolicy }}
+          args:
+            - --public_name=$(POD_IP):8982
+          env:
+            - name: CONFIG_PATH
+              value: /config/config.yml
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+HeapDumpOnOutOfMemoryError -Djava.util.logging.config.file=/exec-worker-log-props/logging.properties
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            {{- if .Values.execWorker.extraEnv }}
+            {{- toYaml .Values.execWorker.extraEnv | nindent 12 }}
+            {{- end }}
+          ports:
+            - containerPort: 8982
+              name: "worker-comm"
+            - containerPort: 9090
+              name: "metrics"
+          {{- with .Values.execWorker.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.execWorker.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.execWorker.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.execWorker.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /config
+              name: config
+              readOnly: true
+            - mountPath: /exec-worker-log-props
+              name: exec-worker-log-props
+              readOnly: true
+            {{- with .Values.execWorker.extraVolumeMounts }}
+            {{- tpl (toYaml .) $ | nindent 12 -}}
+            {{- end }}
+      {{- with .Values.execWorker.runtimeClassName }}
+      runtimeClassName: {{ tpl . $ }}
+      {{- end }}
+
+      {{- with .Values.execWorker.nodeSelector }}
+      nodeSelector:
+        {{- tpl (toYaml .) $ | nindent 8 -}}
+      {{- end }}
+
+      {{- with .Values.execWorker.affinity }}
+      affinity:
+        {{- tpl (toYaml .) $ | nindent 8 -}}
+      {{- end }}
+
+      {{- with .Values.execWorker.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.execWorker.tolerations }}
+      tolerations:
+        {{- tpl (toYaml .) $ | nindent 8 -}}
+      {{- end }}
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: {{ include "buildfarm.fullname" . }}-exec-config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: {{ include "buildfarm.fullname" . }}-exec-worker-log-props
+          name: exec-worker-log-props
+        {{- with .Values.execWorker.extraVolumes }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
+        {{- end }}
+{{- end }}

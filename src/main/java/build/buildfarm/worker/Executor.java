@@ -84,6 +84,7 @@ class Executor {
   private final java.util.concurrent.Executor pollerExecutor;
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
+  private boolean polling = false;
 
   Executor(
       WorkerContext workerContext,
@@ -175,10 +176,13 @@ class Executor {
       policies = Iterables.concat(policies, workerContext.getExecutionPolicies("pool-" + pool));
     }
 
+    polling = true;
     try {
       return executePolled(limits, policies, timeout, stopwatch);
     } finally {
-      executionContext.poller.pause();
+      if (polling) {
+        executionContext.poller.pause();
+      }
     }
   }
 
@@ -297,12 +301,6 @@ class Executor {
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
-    for (ExecutionPolicy policy : policies) {
-      if (policy.getExecutionWrapper() != null) {
-        arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
-      }
-    }
-
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
@@ -311,6 +309,14 @@ class Executor {
             arguments,
             executionContext.command,
             workingDirectory)) {
+
+      // Apply custom execution policies AFTER built-in wrappers
+      for (ExecutionPolicy policy : policies) {
+        if (policy.getExecutionWrapper() != null) {
+          arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
+        }
+      }
+
       // Windows requires that relative command programs are absolutized
       Iterator<String> argumentItr = command.getArgumentsList().iterator();
       boolean absolutizeExe =
@@ -410,6 +416,7 @@ class Executor {
         }
       }
     }
+    polling = false;
     return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
   }
 

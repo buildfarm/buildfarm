@@ -83,6 +83,7 @@ public class InputFetchStageTest {
             .build();
 
     WorkerContext workerContext = mock(WorkerContext.class);
+    when(workerContext.isInputFetching()).thenReturn(true);
     when(workerContext.getInputFetchStageWidth()).thenReturn(1);
     when(workerContext.getInputFetchDeadline()).thenReturn(60);
     // inspire empty argument list in Command resulting in null
@@ -123,6 +124,7 @@ public class InputFetchStageTest {
             any(Runnable.class),
             any(Deadline.class),
             any(Executor.class));
+    verify(workerContext, times(2)).isInputFetching();
     verifyNoMoreInteractions(workerContext);
     ExecutionContext executionContext = error.getExecutionContexts().getFirst();
     assertThat(executionContext).isEqualTo(badContext);

@@ -54,6 +54,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.DequeueMatchEvaluator;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecutionPolicies;
@@ -141,6 +142,11 @@ class ShardWorkerContext implements WorkerContext {
   private final LocalResourceSet resourceSet;
   private final boolean errorOperationOutputSizeExceeded;
   private final boolean provideOwnedClaim;
+  private boolean inGracefulShutdown = false;
+  private boolean pauseMatch = false;
+  private boolean pauseInputFetch = false;
+  private boolean pauseExecute = false;
+  private boolean pauseReportResult = false;
 
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, String name, int executeStageWidth) {
@@ -215,6 +221,37 @@ class ShardWorkerContext implements WorkerContext {
             /*options.experimentalRemoteRetryJitter=*/ 0.1,
             /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
         Retrier.REDIS_IS_RETRIABLE);
+  }
+
+  @Override
+  public boolean inGracefulShutdown() {
+    return inGracefulShutdown;
+  }
+
+  @Override
+  public boolean isMatching() {
+    return !inGracefulShutdown() && !pauseMatch;
+  }
+
+  // later stages must drain with graceful shutdown
+  @Override
+  public boolean isInputFetching() {
+    return inGracefulShutdown() || !pauseInputFetch;
+  }
+
+  @Override
+  public boolean isExecuting() {
+    return inGracefulShutdown() || !pauseExecute;
+  }
+
+  @Override
+  public boolean isReportingResults() {
+    return inGracefulShutdown() || !pauseReportResult;
+  }
+
+  @Override
+  public void prepareForGracefulShutdown() {
+    inGracefulShutdown = true;
   }
 
   @Override
@@ -443,7 +480,7 @@ class ShardWorkerContext implements WorkerContext {
             throw new RuntimeException(t);
           }
         };
-    while (!dedupMatchListener.isMatched()) {
+    while (isMatching() && !dedupMatchListener.isMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
@@ -758,10 +795,17 @@ class ShardWorkerContext implements WorkerContext {
       DigestFunction.Value digestFunction,
       Action action,
       Command command,
-      @Nullable UserPrincipal owner)
+      @Nullable UserPrincipal owner,
+      WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
     return execFileSystem.createExecDir(
-        operationName, directoriesIndex, digestFunction, action, command, owner);
+        operationName,
+        directoriesIndex,
+        digestFunction,
+        action,
+        command,
+        owner,
+        workerExecutedMetadata);
   }
 
   // might want to split for removeDirectory and decrement references to avoid removing for streamed
@@ -820,10 +864,7 @@ class ShardWorkerContext implements WorkerContext {
 
   void createOperationExecutionLimits() {
     try {
-      int availableProcessors = SystemProcessors.get();
-      Preconditions.checkState(availableProcessors >= executeStageWidth);
-      executionsGroup.getCpu().setMaxCpu(executeStageWidth);
-      if (executeStageWidth < availableProcessors) {
+      if (executeStageWidth < SystemProcessors.get()) {
         /* only divide up our cfs quota if we need to limit below the available processors for executions */
         executionsGroup.getCpu().setMaxCpu(executeStageWidth);
       }

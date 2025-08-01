@@ -16,51 +16,28 @@ package build.buildfarm.tools;
 
 import static build.buildfarm.common.grpc.Channels.createChannel;
 
-import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.config.ShardWorkerOptions;
-import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.shard.JedisClusterFactory;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
-import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.WorkerProfileMessage;
-import com.google.common.collect.Sets;
-import com.google.devtools.common.options.OptionsParser;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
-import com.google.protobuf.util.JsonFormat;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 import javax.naming.ConfigurationException;
-import redis.clients.jedis.UnifiedJedis;
 
 class WorkerProfile {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
-  /**
-   * Transform worker string from "ip-10-135-31-210.ec2:8981" to "10.135.31.210".
-   *
-   * @param worker
-   * @return
-   */
-  @SuppressWarnings("JavaDoc")
-  private static String workerStringTransformation(String worker) {
-    return worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".")
-        + ':'
-        + worker.split(":")[1];
-  }
+  private static Instance instance;
 
   private static void analyzeMessage(String worker, WorkerProfileMessage response) {
     System.out.println("\nWorkerProfile:");
     System.out.println(worker);
     String strIntFormat = "%-50s : %d";
+
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
     System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
@@ -82,6 +59,10 @@ class WorkerProfile {
         (strIntFormat) + "%n",
         "Total Evicted Entries size in Bytes",
         response.getCasEvictedEntrySize());
+    System.out.printf(
+        ("%-50s : %2.1f%%") + "%n",
+        "Total size in Bytes",
+        (100.0f * response.getCasSize() / response.getCasMaxSize()));
 
     List<StageInformation> stages = response.getStagesList();
     for (StageInformation stage : stages) {
@@ -95,88 +76,35 @@ class WorkerProfile {
   }
 
   @SuppressWarnings("ConstantConditions")
-  private static Set<String> getWorkers(String[] args) throws ConfigurationException, IOException {
-    OptionsParser parser = OptionsParser.newOptionsParser(ShardWorkerOptions.class);
-    parser.parseAndExitUponError(args);
-    List<String> residue = parser.getResidue();
-    if (residue.isEmpty()) {
-      throw new IllegalArgumentException("Missing Config_PATH");
-    }
-    try {
-      configs.loadConfigs(Path.of(residue.get(3)));
-    } catch (IOException e) {
-      System.out.println("Could not parse yml configuration file." + e);
-    }
-    RedisClient client = new RedisClient(JedisClusterFactory.create("worker-profile").get());
-    return client.call(jedis -> fetchWorkers(jedis, System.currentTimeMillis()));
-  }
-
-  private static Set<String> fetchWorkers(UnifiedJedis jedis, long now) {
-    Set<String> workers = Sets.newConcurrentHashSet();
-    for (Map.Entry<String, String> entry :
-        jedis.hgetAll(configs.getBackplane().getWorkersHashName() + "_storage").entrySet()) {
-      String json = entry.getValue();
-      try {
-        if (json != null) {
-          ShardWorker.Builder builder = ShardWorker.newBuilder();
-          JsonFormat.parser().merge(json, builder);
-          ShardWorker worker = builder.build();
-          if (worker.getExpireAt() > now) {
-            workers.add(worker.getEndpoint());
-          }
-        }
-      } catch (InvalidProtocolBufferException e) {
-        e.printStackTrace();
-      }
-    }
-    return workers;
+  private static Set<String> getWorkers() throws ConfigurationException, IOException {
+    return instance.backplaneStatus().getActiveExecuteWorkersList().stream()
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   @SuppressWarnings("BusyWait")
-  private static void workerProfile(String[] args) throws IOException {
+  private static void workerProfile() throws IOException, ExecutionException, InterruptedException {
     Set<String> workers = null;
-    WorkerProfileMessage currentWorkerMessage;
-    HashMap<String, Instance> workersToChannels = new HashMap<>();
-    String type = args[1];
 
     //noinspection InfiniteLoopStatement
     while (true) {
       // update worker list
       if (workers == null) {
         try {
-          workers = getWorkers(args);
+          workers = getWorkers();
         } catch (ConfigurationException e) {
           e.printStackTrace();
         }
       }
       if (workers == null || workers.isEmpty()) {
         System.out.println(
-            "cannot find any workers, check the redis url and make sure there are workers in the"
-                + " cluster");
+            "cannot find any workers, make sure there are workers in the" + " cluster");
       } else {
-        // remove the unregistered workers
-        for (String existingWorker : workersToChannels.keySet()) {
-          if (!workers.contains(existingWorker)) {
-            workersToChannels.remove(existingWorker);
-          }
-        }
-
+        BatchWorkerProfilesResponse responses = instance.batchWorkerProfiles(workers).get();
         // add new registered workers and profile
-        for (String worker : workers) {
-          if (!workersToChannels.containsKey(worker)) {
-            workersToChannels.put(
-                worker,
-                new StubInstance(
-                    type,
-                    "bf-workerprofile",
-                    createChannel(workerStringTransformation(worker)),
-                    Durations.fromMinutes(1)));
-          }
+        for (BatchWorkerProfilesResponse.Response worker : responses.getResponsesList()) {
           try {
-            currentWorkerMessage = workersToChannels.get(worker).getWorkerProfile();
-            System.out.println(worker);
-            analyzeMessage(worker, currentWorkerMessage);
-          } catch (StatusRuntimeException e) {
+            analyzeMessage(worker.getWorkerName(), worker.getProfile());
+          } catch (Exception e) {
             e.printStackTrace();
             System.out.println("==============TIMEOUT");
           }
@@ -193,9 +121,11 @@ class WorkerProfile {
     }
   }
 
-  // how to run the binary: bf-workerprofile WorkerProfile shard SHA256
-  // examples/config.yml
+  // how to run the binary: bf-workerprofile <instance> <uri>
   public static void main(String[] args) throws Exception {
-    workerProfile(args);
+    instance =
+        new StubInstance(
+            args[0], "bf-workerprofile", createChannel(args[1]), Durations.fromMinutes(1));
+    workerProfile();
   }
 }

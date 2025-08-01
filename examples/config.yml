@@ -63,6 +63,7 @@ backplane:
   jedisPoolMaxIdle: 8
   jedisPoolMinIdle: 0
   jedisTimeBetweenEvictionRunsMillis: 30000
+  connectionValidatedOnBorrow: false
   workersHashName: Workers
   workerChannel: WorkerChannel
   actionCachePrefix: ActionCache
@@ -134,7 +135,7 @@ worker:
   linkExecFileSystem: true
   linkInputDirectories: true
   linkedInputDirectories:
-  - (?!external/)[^/]+
+  - ^(?!external$).*$
   execOwner:
   defaultMaxCores: 0
   limitGlobalExecution: false
