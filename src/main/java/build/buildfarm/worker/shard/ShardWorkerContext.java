@@ -30,6 +30,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.Claim;
 import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestPath;
@@ -421,6 +422,19 @@ class ShardWorkerContext implements WorkerContext {
     return queueEntry;
   }
 
+  /** wait until matching should occur, false return indicates that we are shutting down */
+  private boolean waitToMatch() throws InterruptedException {
+    ContentAddressableStorage storage = execFileSystem.getStorage();
+    boolean isMatching = isMatching();
+    synchronized (storage) {
+      while (isMatching && storage.isReadOnly()) {
+        storage.waitForWritable(java.time.Duration.ofSeconds(1));
+        isMatching = isMatching();
+      }
+    }
+    return isMatching;
+  }
+
   @Override
   public void match(MatchListener listener) throws InterruptedException {
     RetryingMatchListener dedupMatchListener =
@@ -480,7 +494,7 @@ class ShardWorkerContext implements WorkerContext {
             throw new RuntimeException(t);
           }
         };
-    while (isMatching() && !dedupMatchListener.isMatched()) {
+    while (waitToMatch() && !dedupMatchListener.isMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
