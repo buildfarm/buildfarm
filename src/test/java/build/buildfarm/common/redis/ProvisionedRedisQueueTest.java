@@ -74,9 +74,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
-    expected_explanation += "matched: {}\n";
-    expected_explanation += "unmatched: {}\n";
-    expected_explanation += "still required: {}\n";
+    expected_explanationBuilder.append("matched: {}\n");
+    expected_explanationBuilder.append("unmatched: {}\n");
+    expected_explanationBuilder.append("still required: {}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -97,9 +97,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
-    expected_explanation += "matched: {}\n";
-    expected_explanation += "unmatched: {}\n";
-    expected_explanation += "still required: {}\n";
+    expected_explanationBuilder.append("matched: {}\n");
+    expected_explanationBuilder.append("unmatched: {}\n");
+    expected_explanationBuilder.append("still required: {}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -121,9 +121,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
-    expected_explanation += "matched: {key=[value]}\n";
-    expected_explanation += "unmatched: {}\n";
-    expected_explanation += "still required: {}\n";
+    expected_explanationBuilder.append("matched: {key=[value]}\n");
+    expected_explanationBuilder.append("unmatched: {}\n");
+    expected_explanationBuilder.append("still required: {}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -145,9 +145,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
-    expected_explanation += "matched: {key=[value]}\n";
-    expected_explanation += "unmatched: {}\n";
-    expected_explanation += "still required: {}\n";
+    expected_explanationBuilder.append("matched: {key=[value]}\n");
+    expected_explanationBuilder.append("unmatched: {}\n");
+    expected_explanationBuilder.append("still required: {}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -169,9 +169,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are not eligible for the foo queue.\n";
-    expected_explanation += "matched: {}\n";
-    expected_explanation += "unmatched: {key=[value]}\n";
-    expected_explanation += "still required: {}\n";
+    expected_explanationBuilder.append("matched: {}\n");
+    expected_explanationBuilder.append("unmatched: {key=[value]}\n");
+    expected_explanationBuilder.append("still required: {}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isFalse();
   }
@@ -193,9 +193,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
-    expected_explanation += "matched: {}\n";
-    expected_explanation += "unmatched: {key=[value]}\n";
-    expected_explanation += "still required: {}\n";
+    expected_explanationBuilder.append("matched: {}\n");
+    expected_explanationBuilder.append("unmatched: {key=[value]}\n");
+    expected_explanationBuilder.append("still required: {}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -218,9 +218,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are not eligible for the foo queue.\n";
-    expected_explanation += "matched: {}\n";
-    expected_explanation += "unmatched: {}\n";
-    expected_explanation += "still required: {key=[value]}\n";
+    expected_explanationBuilder.append("matched: {}\n");
+    expected_explanationBuilder.append("unmatched: {}\n");
+    expected_explanationBuilder.append("still required: {key=[value]}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isFalse();
   }
@@ -243,9 +243,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are not eligible for the foo queue.\n";
-    expected_explanation += "matched: {}\n";
-    expected_explanation += "unmatched: {}\n";
-    expected_explanation += "still required: {key=[value]}\n";
+    expected_explanationBuilder.append("matched: {}\n");
+    expected_explanationBuilder.append("unmatched: {}\n");
+    expected_explanationBuilder.append("still required: {key=[value]}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isFalse();
   }
@@ -267,7 +267,7 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
-    expected_explanation += "The queue is fully wildcard.\n";
+    expected_explanationBuilder.append("The queue is fully wildcard.\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -289,7 +289,7 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
-    expected_explanation += "The queue is fully wildcard.\n";
+    expected_explanationBuilder.append("The queue is fully wildcard.\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -317,9 +317,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are not eligible for the cpu queue.\n";
-    expected_explanation += "matched: {min-cores=[1], max-cores=[1]}\n";
-    expected_explanation += "unmatched: {env-vars=[{'OMP_NUM_THREAD': '1'}]}\n";
-    expected_explanation += "still required: {}\n";
+    expected_explanationBuilder.append("matched: {min-cores=[1], max-cores=[1]}\n");
+    expected_explanationBuilder.append("unmatched: {env-vars=[{'OMP_NUM_THREAD': '1'}]}\n");
+    expected_explanationBuilder.append("still required: {}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isFalse();
   }
@@ -346,9 +346,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the cpu queue.\n";
-    expected_explanation += "matched: {min-cores=[1], max-cores=[1]}\n";
-    expected_explanation += "unmatched: {env-vars=[{'OMP_NUM_THREAD': '1'}]}\n";
-    expected_explanation += "still required: {}\n";
+    expected_explanationBuilder.append("matched: {min-cores=[1], max-cores=[1]}\n");
+    expected_explanationBuilder.append("unmatched: {env-vars=[{'OMP_NUM_THREAD': '1'}]}\n");
+    expected_explanationBuilder.append("still required: {}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -370,7 +370,7 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
-    expected_explanation += "The queue was specifically chosen.\n";
+    expected_explanationBuilder.append("The queue was specifically chosen.\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -392,9 +392,9 @@ public class ProvisionedRedisQueueTest {
 
     // ASSERT
     String expected_explanation = "The properties are not eligible for the foo queue.\n";
-    expected_explanation += "matched: {}\n";
-    expected_explanation += "unmatched: {choose-queue=[wrong]}\n";
-    expected_explanation += "still required: {}\n";
+    expected_explanationBuilder.append("matched: {}\n");
+    expected_explanationBuilder.append("unmatched: {choose-queue=[wrong]}\n");
+    expected_explanationBuilder.append("still required: {}\n");
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isFalse();
   }
