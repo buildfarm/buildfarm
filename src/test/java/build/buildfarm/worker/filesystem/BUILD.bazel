@@ -1,0 +1,32 @@
+load("@rules_java//java:java_test.bzl", "java_test")
+
+config_setting(
+    name = "fuse",
+    values = {"define": "fuse=true"},
+)
+
+java_test(
+    name = "tests",
+    size = "small",
+    srcs = glob(
+        ["*.java"],
+        exclude = ["FuseCASTest.java"],
+    ) + select({
+        ":fuse": ["FuseCASTest.java"],
+        "//conditions:default": [],
+    }),
+    data = ["//examples:example_configs"],
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        "//src/main/java/build/buildfarm/worker/filesystem",
+        "//src/test/java/build/buildfarm:test_runner",
+        "@buildfarm_maven//:com_github_jnr_jnr_constants",
+        "@buildfarm_maven//:com_github_jnr_jnr_ffi",
+        "@buildfarm_maven//:com_github_serceman_jnr_fuse",
+        "@buildfarm_maven//:com_google_guava_guava",
+        "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:com_google_truth_truth",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+    ],
+)

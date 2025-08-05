@@ -35,19 +35,21 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import persistent.bazel.client.PersistentWorker;
+import persistent.bazel.client.WorkerIndex;
 import persistent.bazel.client.WorkerKey;
 
 @RunWith(JUnit4.class)
 public class ProtoCoordinatorTest {
-  private WorkerKey makeWorkerKey(
-      WorkFilesContext ctx, WorkerInputs workerFiles, Path workRootsDir) {
-    return Keymaker.make(
-        ctx.opRoot,
+  private WorkerKey makeWorkerKey(WorkerInputs workerFiles, Path workRootsDir) {
+    return Keymaker.makeKey(
+        Keymaker.makeBasicKey(
+            ImmutableList.of("workerExecCmd"),
+            ImmutableList.of("workerInitArgs"),
+            ImmutableMap.of(),
+            "executionName"),
+        null,
+        ImmutableList.of(),
         workRootsDir,
-        ImmutableList.of("workerExecCmd"),
-        ImmutableList.of("workerInitArgs"),
-        ImmutableMap.of(),
-        "executionName",
         workerFiles);
   }
 
@@ -69,7 +71,8 @@ public class ProtoCoordinatorTest {
 
   @Test
   public void testProtoCoordinator() throws Exception {
-    ProtoCoordinator pc = ProtoCoordinator.ofCommonsPool(4);
+    WorkerIndex workerIndex = new WorkerIndex();
+    ProtoCoordinator pc = ProtoCoordinator.ofCommonsPool(workerIndex, 4);
 
     Path fsRoot = jimFsRoot();
     Path opRoot = fsRoot.resolve("opRoot");
@@ -99,14 +102,14 @@ public class ProtoCoordinatorTest {
       Files.createFile(file);
     }
 
-    WorkerKey key = makeWorkerKey(ctx, workerFiles, fsRoot.resolve("workRootsDir"));
+    WorkerKey key = makeWorkerKey(workerFiles, fsRoot.resolve("workRootsDir"));
 
     Path workRoot = key.getExecRoot();
     Path toolsRoot = workRoot.resolve(PersistentWorker.TOOL_INPUT_SUBDIR);
 
     // Assert: all Tools are copied into "/workRootsDir/*/tool_inputs"
     assertThat(toolsRoot.toString()).startsWith(workRoot.toString());
-    pc.copyToolInputsIntoWorkerToolRoot(key, workerFiles);
+    pc.copyToolInputsIntoWorkerToolRoot(key, workerFiles, key.getOwner());
 
     assertThat(Files.exists(workRoot)).isTrue();
     assertThat(Files.exists(toolsRoot)).isTrue();

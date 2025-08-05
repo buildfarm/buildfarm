@@ -13,6 +13,8 @@ java_test(
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/worker",
+        "//src/main/java/build/buildfarm/worker/filesystem",
+        "//src/main/java/build/buildfarm/worker/persistent",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/java/build/buildfarm/worker/shard",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",

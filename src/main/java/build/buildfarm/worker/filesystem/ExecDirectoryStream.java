@@ -1,4 +1,4 @@
-package build.buildfarm.worker;
+package build.buildfarm.worker.filesystem;
 
 import static com.google.common.collect.Iterators.concat;
 import static com.google.common.collect.Iterators.transform;
@@ -7,10 +7,10 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.SymlinkNode;
-import build.buildfarm.worker.ExecFileSystem.ExecDirectoryAttributes;
-import build.buildfarm.worker.ExecFileSystem.ExecFileAttributes;
-import build.buildfarm.worker.ExecFileSystem.ExecSymlinkAttributes;
-import build.buildfarm.worker.ExecTreeWalker.Entry;
+import build.buildfarm.worker.filesystem.ExecFileSystem.ExecDirectoryAttributes;
+import build.buildfarm.worker.filesystem.ExecFileSystem.ExecFileAttributes;
+import build.buildfarm.worker.filesystem.ExecFileSystem.ExecSymlinkAttributes;
+import build.buildfarm.worker.filesystem.ExecTreeWalker.Entry;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Path;
 import java.util.Iterator;

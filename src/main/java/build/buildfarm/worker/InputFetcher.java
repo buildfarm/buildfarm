@@ -33,6 +33,7 @@ import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.worker.filesystem.ExecDirException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
@@ -249,7 +250,7 @@ public class InputFetcher implements Runnable {
               executionContext.queueEntry.getExecuteEntry().getActionDigest().getDigestFunction(),
               queuedOperation.getAction(),
               queuedOperation.getCommand(),
-              executionContext.claim.owner(),
+              executionContext.claim.getOwner(),
               executionContext.workerExecutedMetadata);
     } catch (IOException e) {
       Status.Builder status = Status.newBuilder().setMessage("Error creating exec dir");

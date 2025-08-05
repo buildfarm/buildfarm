@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.filesystem;
 
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import com.google.common.base.Preconditions;

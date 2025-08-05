@@ -20,6 +20,14 @@ import java.util.Map.Entry;
 import javax.annotation.Nullable;
 
 public interface Claim {
+  interface Lease {
+    int getAmount();
+
+    Stage getStage();
+
+    void release();
+  }
+
   enum Stage {
     EXECUTE_ACTION_STAGE,
     REPORT_RESULT_STAGE,
@@ -29,8 +37,12 @@ public interface Claim {
 
   void release();
 
-  @Nullable
-  UserPrincipal owner();
+  void replace(String resourceName, Lease lease);
 
-  Iterable<Entry<String, List<Object>>> getPools();
+  @Nullable
+  UserPrincipal getOwner();
+
+  void setOwner(@Nullable UserPrincipal owner);
+
+  Iterable<Entry<String, List<?>>> getPools();
 }

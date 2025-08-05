@@ -17,10 +17,17 @@ package build.buildfarm.worker.persistent;
 import static java.lang.String.join;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.Claim;
+import build.buildfarm.common.config.ExecutionPolicy;
+import build.buildfarm.worker.executionwrappers.ExecutionWrapperUtils;
+import build.buildfarm.worker.filesystem.ExecFileSystem;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.devtools.build.lib.worker.WorkerProtocol.Input;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
@@ -30,11 +37,16 @@ import com.google.rpc.Code;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
+import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import persistent.bazel.client.BasicWorkerKey;
+import persistent.bazel.client.WorkerIndex;
 import persistent.bazel.client.WorkerKey;
 
 /**
@@ -46,8 +58,10 @@ import persistent.bazel.client.WorkerKey;
  */
 @Log
 public class PersistentExecutor {
+  public static final WorkerIndex workerIndex = new WorkerIndex();
+
   private static final ProtoCoordinator coordinator =
-      ProtoCoordinator.ofCommonsPool(getMaxWorkersPerKey());
+      ProtoCoordinator.ofCommonsPool(workerIndex, getMaxWorkersPerKey());
 
   // TODO load from config (i.e. {worker_root}/persistent)
   public static final Path defaultWorkRootsDir = Path.of("/tmp/worker/persistent/");
@@ -96,6 +110,7 @@ public class PersistentExecutor {
    * @param timeout
    * @param workRootsDir
    * @param resultBuilder
+   * @param claim
    * @return
    */
   public static Code runOnPersistentWorker(
@@ -106,7 +121,12 @@ public class PersistentExecutor {
       ResourceLimits limits,
       Duration timeout,
       Path workRootsDir,
-      ActionResult.Builder resultBuilder)
+      ActionResult.Builder resultBuilder,
+      ExecFileSystem execFileSystem,
+      @Nullable PersistentWorkerAwareExecOwnerPool execOwnerPool,
+      Claim claim,
+      Iterable<ExecutionPolicy> executionPolicies,
+      Iterable<Platform.Property> platformProperties)
       throws IOException {
     // Pull out persistent worker start command from the overall action request
 
@@ -147,17 +167,45 @@ public class PersistentExecutor {
           "Binary wasn't a tool input nor an absolute path: " + binary);
     }
 
-    WorkerKey key =
-        Keymaker.make(
-            context.opRoot,
-            workRootsDir,
-            workerExecCmd,
-            workerInitArgs,
-            env,
-            executionName,
-            workerFiles);
+    BasicWorkerKey basicKey =
+        Keymaker.makeBasicKey(workerExecCmd, workerInitArgs, env, executionName);
 
-    coordinator.copyToolInputsIntoWorkerToolRoot(key, workerFiles);
+    /*
+     * As with any other action, an exec owner is reserved for an action executed by a persistent worker. However,
+     * because the exec owner is part of the worker key, we need to be careful about which exec owner we use. If we use
+     * any random exec owner, we could end up creating a new persistent worker when one already exists with practically
+     * the same worker key (except for the exec owner).
+     *
+     * To prevent runaway persistent worker creation, we attempt to swap the already-reserved exec owner for a more
+     * strategic one. We do this in `PersistentExecutor` instead of in `MatchStage` (where the claim is acquired)
+     * because we don't have enough information in `MatchStage` to know if a persistent worker will be used and
+     * construct a `BasicWorkerKey`, and therefore which exec owner to lease.
+     */
+    if (execOwnerPool != null) {
+      Optional<PersistentWorkerAwareExecOwnerPool.Lease> newExecOwnerLease =
+          execOwnerPool.tryAcquireForPersistentWorker(basicKey);
+
+      if (newExecOwnerLease.isPresent()) {
+        PersistentWorkerAwareExecOwnerPool.Lease lease = newExecOwnerLease.get();
+
+        claim.replace(LocalResourceSet.EXEC_OWNER_RESOURCE_NAME, lease);
+
+        String newExecOwnerName = Iterables.getOnlyElement(lease.ownerNames);
+        UserPrincipal newExecOwner = execFileSystem.getOwner(newExecOwnerName);
+
+        claim.setOwner(newExecOwner);
+      }
+    }
+
+    // Evaluate execution wrappers after exec owner swapping to ensure correct context
+    ImmutableList<String> wrapperArguments =
+        ExecutionWrapperUtils.evaluateExecutionWrappers(
+            executionPolicies, claim, platformProperties);
+
+    WorkerKey key =
+        Keymaker.makeKey(basicKey, claim.getOwner(), wrapperArguments, workRootsDir, workerFiles);
+
+    coordinator.copyToolInputsIntoWorkerToolRoot(key, workerFiles, key.getOwner());
 
     // Make request
 

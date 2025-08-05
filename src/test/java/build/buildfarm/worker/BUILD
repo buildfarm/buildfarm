@@ -1,20 +1,9 @@
 load("@rules_java//java:java_test.bzl", "java_test")
 
-config_setting(
-    name = "fuse",
-    values = {"define": "fuse=true"},
-)
-
 java_test(
     name = "tests",
     size = "small",
-    srcs = glob(
-        ["*.java"],
-        exclude = ["FuseCASTest.java"],
-    ) + select({
-        ":fuse": ["FuseCASTest.java"],
-        "//conditions:default": [],
-    }),
+    srcs = glob(["*.java"]),
     data = ["//examples:example_configs"],
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     test_class = "build.buildfarm.AllTests",
@@ -24,6 +13,7 @@ java_test(
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/worker",
+        "//src/main/java/build/buildfarm/worker/filesystem",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
