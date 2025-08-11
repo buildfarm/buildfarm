@@ -1,5 +1,5 @@
-load("@protobuf//bazel:java_proto_library.bzl", "java_proto_library")
-load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@com_google_protobuf//bazel:java_proto_library.bzl", "java_proto_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_java//java:java_library.bzl", "java_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -9,11 +9,11 @@ proto_library(
     srcs = ["resource.proto"],
     deps = [
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_proto",
+        "@com_google_protobuf//:duration_proto",
+        "@com_google_protobuf//:timestamp_proto",
         "@googleapis//google/api:annotations_proto",
         "@googleapis//google/longrunning:operations_proto",
         "@googleapis//google/rpc:status_proto",
-        "@protobuf//:duration_proto",
-        "@protobuf//:timestamp_proto",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_proto",
     ],
 )
