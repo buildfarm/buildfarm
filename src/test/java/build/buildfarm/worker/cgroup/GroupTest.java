@@ -33,7 +33,6 @@ import org.junit.runners.JUnit4;
 /** Tests for {@link Group#getSelfCgroup} method. */
 @RunWith(JUnit4.class)
 public class GroupTest {
-
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private Path procSelfCgroupPath;

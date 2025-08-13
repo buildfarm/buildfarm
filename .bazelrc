@@ -34,5 +34,10 @@ build:linux --sandbox_add_mount_pair=/tmp
 build:macos --sandbox_add_mount_pair=/var/tmp
 build:windows --sandbox_add_mount_pair=C:\Temp
 
+# Protobuf will be dropping support for MSVC + Bazel in 34.0.
+# To continue using it until then, use the flag --define=protobuf_allow_msvc=true.
+# For feedback or discussion, see github.com/protocolbuffers/protobuf/issues/20085.
+build:windows --define=protobuf_allow_msvc=true
+
 # Planned to be default in Bazel 9; see https://github.com/bazelbuild/bazel/issues/22080
 common --incompatible_disable_native_repo_rules
