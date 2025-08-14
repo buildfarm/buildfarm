@@ -43,6 +43,13 @@ fi
 # - the cgroup Path. This is the only part we care about.
 cgroupNameRelativePath="$(cut -d':' -f3- < /proc/self/cgroup)"
 
+# Debug output (can be disabled by setting CGEXEC_DEBUG=0)
+if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+    echo "Debug: cgroupNameRelativePath=$cgroupNameRelativePath" >&2
+    echo "Debug: controllers=$controllers" >&2
+    echo "Debug: cgroupName=$cgroupName" >&2
+fi
+
 # This diverges from `cgexec` where we place ourselves in a group relative to parent.
 # Example:
 # cgroupName = `executions/operations/29aec796-ad19-4e6b-a83b-b8b9f55d0abb`
@@ -56,8 +63,60 @@ cgroupNameRelativePath="$(cut -d':' -f3- < /proc/self/cgroup)"
 #   │     └─29aec796-ad19-4e6b-a83b-b8b9f55d0abb
 #   │        └─123458 ${@}
 baseCgroup=$(dirname "${cgroupNameRelativePath}")
+
+# More debug output
+if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+    echo "Debug: baseCgroup=$baseCgroup" >&2
+    echo "Debug: target_cgroup=/sys/fs/cgroup${baseCgroup}/$cgroupName" >&2
+fi
 # Bouncing my own PID $$ into /sys/fs/cgroup${baseCgroup}/$cgroupName"
-echo $$ > "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs"
+target_cgroup="/sys/fs/cgroup${baseCgroup}/$cgroupName"
+
+# Check if the cgroup directory exists
+if [ ! -d "$target_cgroup" ]; then
+    echo "Error: Cgroup directory does not exist: $target_cgroup" >&2
+    echo "Available cgroups in ${baseCgroup}:" >&2
+    ls -la "/sys/fs/cgroup${baseCgroup}/" 2>/dev/null || echo "Base cgroup directory not accessible: /sys/fs/cgroup${baseCgroup}/" >&2
+    
+    # Attempt to create the cgroup directory if parent exists
+    parent_cgroup="/sys/fs/cgroup${baseCgroup}"
+    if [ -d "$parent_cgroup" ] && [ -w "$parent_cgroup" ]; then
+        echo "Attempting to create cgroup directory: $target_cgroup" >&2
+        if mkdir -p "$target_cgroup" 2>/dev/null; then
+            echo "Successfully created cgroup directory: $target_cgroup" >&2
+        else
+            echo "Failed to create cgroup directory: $target_cgroup" >&2
+            exit 1
+        fi
+    else
+        exit 1
+    fi
+fi
+
+# Check if cgroup.procs file exists and is writable
+if [ ! -f "$target_cgroup/cgroup.procs" ]; then
+    echo "Error: cgroup.procs file does not exist: $target_cgroup/cgroup.procs" >&2
+    exit 1
+fi
+
+if [ ! -w "$target_cgroup/cgroup.procs" ]; then
+    echo "Error: No write permission to: $target_cgroup/cgroup.procs" >&2
+    echo "Current user: $(id)" >&2
+    echo "File permissions: $(ls -la "$target_cgroup/cgroup.procs" 2>/dev/null || echo "File not accessible")" >&2
+    exit 1
+fi
+
+# Attempt to write PID to cgroup.procs with error handling
+if ! echo $$ > "$target_cgroup/cgroup.procs" 2>/dev/null; then
+    echo "Error: Failed to write PID $$ to $target_cgroup/cgroup.procs" >&2
+    echo "This may be due to:"
+    echo "  - Insufficient permissions (try running with appropriate privileges)"
+    echo "  - Cgroup is frozen or in an invalid state"
+    echo "  - Process already belongs to an incompatible cgroup"
+    echo "Current process cgroup: $cgroupNameRelativePath" >&2
+    echo "Target cgroup: $target_cgroup" >&2
+    exit 1
+fi
 
 # Exec the rest of the arguments as-is
 exec "$@"
