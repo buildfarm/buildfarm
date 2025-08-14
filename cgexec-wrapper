@@ -211,5 +211,25 @@ if [ "$write_success" = "false" ]; then
     exit 1
 fi
 
-# Exec the rest of the arguments as-is
-exec "$@"
+# If successful with any method, execute the command
+if [ "$write_success" = "true" ]; then
+    if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+        echo "Successfully moved to target cgroup, executing command: $*" >&2
+    fi
+    
+    # In container environments, we may need to handle setgroups restrictions
+    # Check if we're in a container environment
+    if [ -f /.dockerenv ] || [ -n "${KUBERNETES_SERVICE_HOST}" ] || echo "$cgroupNameRelativePath" | grep -q "kubepods\|docker\|containerd"; then
+        # Set environment variable to indicate we're in a restricted environment
+        export CGEXEC_CONTAINER_MODE=1
+        
+        # Some commands may need to know about setgroups restrictions
+        if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+            echo "Container environment detected - setting CGEXEC_CONTAINER_MODE=1" >&2
+            echo "Note: setgroups operations may be restricted in this environment" >&2
+        fi
+    fi
+    
+    # Execute the command
+    exec "$@"
+fi
