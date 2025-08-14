@@ -27,6 +27,14 @@ main(int argc, char *argv[])
 {
   int argi = 1;
   char *username = "nobody";
+  
+  // Check if we're in a container environment (used for multiple system calls)
+  int in_container = 0;
+  if (access("/.dockerenv", F_OK) == 0 || 
+      getenv("KUBERNETES_SERVICE_HOST") != NULL ||
+      getenv("CGEXEC_CONTAINER_MODE") != NULL) {
+    in_container = 1;
+  }
 
   if (argc <= 1) {
     fprintf(stderr, "usage: as-nobody [-u <user>] <command>\n");
@@ -49,20 +57,12 @@ main(int argc, char *argv[])
   }
   if (setgroups(0, NULL) < 0) {
     // In container environments (Docker, Kubernetes), setgroups may be restricted
-    // Check if we're in a container environment and make this non-fatal
-    int in_container = 0;
-    
-    // Check for common container environment indicators
-    if (access("/.dockerenv", F_OK) == 0 || 
-        getenv("KUBERNETES_SERVICE_HOST") != NULL ||
-        getenv("CGEXEC_CONTAINER_MODE") != NULL) {
-      in_container = 1;
-    }
-    
-    if (in_container && errno == EPERM) {
+    if (in_container && (errno == EPERM || errno == ENOENT || errno == ENOSYS)) {
       // In container environments, setgroups restrictions are common and expected
-      // Log a warning but continue execution
-      fprintf(stderr, "Warning: setgroups not permitted in container environment, continuing...\n");
+      // EPERM: Operation not permitted (common in containers)
+      // ENOENT: No such file or directory (some container setups)
+      // ENOSYS: Function not implemented (minimal containers)
+      fprintf(stderr, "Warning: setgroups not available in container environment (%s), continuing...\n", strerror(errno));
     } else {
       // In non-container environments or for other errors, fail as before
       perror("setgroups");
@@ -70,12 +70,20 @@ main(int argc, char *argv[])
     }
   }
   if (setregid(pw->pw_gid, pw->pw_gid) < 0) {
-    perror("setregid");
-    return EXIT_FAILURE;
+    if (in_container && (errno == EINVAL || errno == EPERM || errno == ENOSYS)) {
+      fprintf(stderr, "Warning: setregid not available in container environment (%s), continuing...\n", strerror(errno));
+    } else {
+      perror("setregid");
+      return EXIT_FAILURE;
+    }
   }
   if (setreuid(pw->pw_uid, pw->pw_uid) < 0) {
-    perror("setreuid");
-    return EXIT_FAILURE;
+    if (in_container && (errno == EINVAL || errno == EPERM || errno == ENOSYS)) {
+      fprintf(stderr, "Warning: setreuid not available in container environment (%s), continuing...\n", strerror(errno));
+    } else {
+      perror("setreuid");
+      return EXIT_FAILURE;
+    }
   }
   execvp(argv[argi], argv + argi);
   perror("execvp");
