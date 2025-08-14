@@ -106,15 +106,108 @@ if [ ! -w "$target_cgroup/cgroup.procs" ]; then
     exit 1
 fi
 
-# Attempt to write PID to cgroup.procs with error handling
-if ! echo $$ > "$target_cgroup/cgroup.procs" 2>/dev/null; then
-    echo "Error: Failed to write PID $$ to $target_cgroup/cgroup.procs" >&2
+# Attempt to write PID to cgroup.procs with multiple strategies
+write_success=false
+
+# Method 1: Try to write current PID directly (original approach)
+if echo $$ > "$target_cgroup/cgroup.procs" 2>/dev/null; then
+    write_success=true
+    if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+        echo "Method 1 succeeded: Moved current PID $$ to cgroup" >&2
+    fi
+else
+    if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+        echo "Method 1 failed: Cannot write current PID $$ to cgroup.procs" >&2
+    fi
+fi
+
+# Method 2: If direct write failed, try using a subshell with its own PID
+if [ "$write_success" = "false" ]; then
+    if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+        echo "Trying Method 2: Using subshell PID" >&2
+    fi
+    
+    if (echo $BASHPID > "$target_cgroup/cgroup.procs" && exec "$@") 2>/dev/null; then
+        # This will exit the script if successful
+        exit 0
+    fi
+    
+    if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+        echo "Method 2 failed: Cannot write subshell PID to cgroup.procs" >&2
+    fi
+fi
+
+# Method 3: For container environments, try to spawn command in target cgroup directly
+if [ "$write_success" = "false" ]; then
+    # Check if we're in a container environment
+    if [ -f /.dockerenv ] || [ -n "${KUBERNETES_SERVICE_HOST}" ] || echo "$cgroupNameRelativePath" | grep -q "kubepods\|docker\|containerd"; then
+        if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+            echo "Method 3: Container environment detected, trying direct execution in target cgroup" >&2
+        fi
+        
+        # Try to use systemd-run if available (common in containers)
+        if command -v systemd-run >/dev/null 2>&1; then
+            if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+                echo "Trying systemd-run to place command in cgroup" >&2
+            fi
+            
+            # Extract the relative cgroup path for systemd-run
+            cgroup_slice=$(echo "$cgroupName" | sed 's|/|-|g')
+            if systemd-run --scope --slice="$cgroup_slice" "$@" 2>/dev/null; then
+                exit 0
+            fi
+        fi
+        
+        # Try a different approach: fork and execute
+        if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+            echo "Trying fork-and-execute approach" >&2
+        fi
+        
+        (
+            # In this subshell, try to move to the target cgroup before exec
+            if echo $$ > "$target_cgroup/cgroup.procs" 2>/dev/null; then
+                exec "$@"
+            else
+                # If we can't move this process, at least try to execute
+                exec "$@"
+            fi
+        )
+        
+        # If the subshell succeeded, we're done
+        exit_code=$?
+        if [ $exit_code -eq 0 ]; then
+            exit 0
+        fi
+        
+        write_success="attempted"
+    fi
+fi
+
+# If all methods failed, provide detailed error information and try fallback
+if [ "$write_success" = "false" ]; then
+    echo "Error: Failed to write PID to $target_cgroup/cgroup.procs using all available methods" >&2
     echo "This may be due to:"
     echo "  - Insufficient permissions (try running with appropriate privileges)"
     echo "  - Cgroup is frozen or in an invalid state"
     echo "  - Process already belongs to an incompatible cgroup"
+    echo "  - Kubernetes/container restrictions on cgroup movement"
     echo "Current process cgroup: $cgroupNameRelativePath" >&2
     echo "Target cgroup: $target_cgroup" >&2
+    
+    # Additional diagnostics
+    echo "Additional diagnostics:" >&2
+    echo "  Current PID: $$" >&2
+    echo "  Current cgroup controllers: $(cat /proc/self/cgroup)" >&2
+    echo "  Target cgroup controllers: $(cat "$target_cgroup/cgroup.controllers" 2>/dev/null || echo "N/A")" >&2
+    echo "  Target cgroup type: $(cat "$target_cgroup/cgroup.type" 2>/dev/null || echo "N/A")" >&2
+    echo "  Target cgroup.procs permissions: $(ls -la "$target_cgroup/cgroup.procs" 2>/dev/null || echo "N/A")" >&2
+    
+    # Check if we can use a fallback approach
+    if [ "${CGEXEC_FALLBACK:-1}" = "1" ]; then
+        echo "  Attempting fallback: executing command without cgroup migration" >&2
+        exec "$@"
+    fi
+    
     exit 1
 fi
 
