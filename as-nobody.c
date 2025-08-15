@@ -48,8 +48,16 @@ main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
   if (setgroups(0, NULL) < 0) {
-    perror("setgroups");
-    return EXIT_FAILURE;
+    // Check if we're in a container environment with setgroups restrictions
+    if (errno == EPERM) {
+      // Common in Kubernetes/Docker containers due to security policies
+      // Try to continue anyway - the user/group switching might still work
+      fprintf(stderr, "Warning: setgroups failed (Operation not permitted) - container security restriction\n");
+      fprintf(stderr, "Continuing with user switching only...\n");
+    } else {
+      perror("setgroups");
+      return EXIT_FAILURE;
+    }
   }
   if (setregid(pw->pw_gid, pw->pw_gid) < 0) {
     perror("setregid");

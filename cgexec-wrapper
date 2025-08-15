@@ -8,9 +8,67 @@ set -e
 # Required arguments:
 # -g <controllers>:<CgroupName>
 
+# Function to check container security constraints
+check_container_security() {
+    if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+        echo "=== Container Security Diagnostics ===" >&2
+        
+        # Check current process context
+        echo "Current process context:" >&2
+        echo "  Real UID: $(id -u)" >&2
+        echo "  Effective UID: $(id -u)" >&2
+        echo "  Real GID: $(id -g)" >&2
+        echo "  Effective GID: $(id -g)" >&2
+        echo "  Groups: $(id -G)" >&2
+        
+        # Check container environment
+        echo "Container environment detection:" >&2
+        if [ -f /.dockerenv ]; then
+            echo "  Docker environment detected" >&2
+        fi
+        if [ -n "${KUBERNETES_SERVICE_HOST}" ]; then
+            echo "  Kubernetes environment detected" >&2
+        fi
+        
+        # Check cgroup info
+        echo "cgroup info:" >&2
+        while IFS= read -r line; do
+            if echo "$line" | grep -q "kubepods\|docker\|containerd"; then
+                echo "  Container cgroup detected: $line" >&2
+            fi
+        done < /proc/self/cgroup
+        
+        # Check user namespace
+        echo "User namespace check:" >&2
+        if [ -f /proc/self/uid_map ]; then
+            echo "  UID mapping:" >&2
+            while IFS= read -r line; do
+                echo "    $line" >&2
+            done < /proc/self/uid_map
+        fi
+        
+        if [ -f /proc/self/gid_map ]; then
+            echo "  GID mapping:" >&2
+            while IFS= read -r line; do
+                echo "    $line" >&2
+            done < /proc/self/gid_map
+        fi
+        
+        if [ -f /proc/self/setgroups ]; then
+            echo "  setgroups policy: $(cat /proc/self/setgroups)" >&2
+        else
+            echo "  setgroups policy file not found" >&2
+        fi
+        
+        echo "========================================" >&2
+    fi
+}
+
 # Function to display usage information
 usage() {
     echo "Usage: $0 -g <value>" >&2
+    echo "Environment variables:" >&2
+    echo "  CGEXEC_DEBUG=1    Enable detailed diagnostics" >&2
     exit 1
 }
 
@@ -36,6 +94,9 @@ if [ -z "$controllers" ] || [ -z "$cgroupName" ]; then
     usage
 fi
 
+# Run container security diagnostics if debug mode is enabled
+check_container_security
+
 # Get my own Cgroup from /proc/self/cgroup.
 # There are three fields here, separated by ':':
 # - the group ID. This is always 0 for cgroups v2.
@@ -56,8 +117,84 @@ cgroupNameRelativePath="$(cut -d':' -f3- < /proc/self/cgroup)"
 #   │     └─29aec796-ad19-4e6b-a83b-b8b9f55d0abb
 #   │        └─123458 ${@}
 baseCgroup=$(dirname "${cgroupNameRelativePath}")
+
+# Debug output if enabled
+if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+    echo "Debug: cgroupNameRelativePath=$cgroupNameRelativePath" >&2
+    echo "Debug: controllers=$controllers" >&2
+    echo "Debug: cgroupName=$cgroupName" >&2
+    echo "Debug: baseCgroup=$baseCgroup" >&2
+    echo "Debug: target_cgroup=/sys/fs/cgroup${baseCgroup}/$cgroupName" >&2
+fi
+
 # Bouncing my own PID $$ into /sys/fs/cgroup${baseCgroup}/$cgroupName"
-echo $$ > "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs"
+target_cgroup="/sys/fs/cgroup${baseCgroup}/$cgroupName"
+
+# Check if the cgroup directory exists
+if [ ! -d "$target_cgroup" ]; then
+    echo "Error: Cgroup directory does not exist: $target_cgroup" >&2
+    if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+        echo "Available cgroups in ${baseCgroup}:" >&2
+        ls -la "/sys/fs/cgroup${baseCgroup}/" 2>/dev/null || echo "Base cgroup directory not accessible: /sys/fs/cgroup${baseCgroup}/" >&2
+    fi
+    exit 1
+fi
+
+# Attempt to write PID to cgroup.procs with enhanced error handling
+if ! echo $$ > "$target_cgroup/cgroup.procs" 2>/dev/null; then
+    echo "Error: Failed to write PID $$ to $target_cgroup/cgroup.procs" >&2
+    
+    # Provide detailed diagnostics
+    echo "This may be due to:" >&2
+    echo "  - Insufficient permissions (check container security context)" >&2
+    echo "  - Cgroup is frozen or in an invalid state" >&2
+    echo "  - Process already belongs to an incompatible cgroup" >&2
+    echo "  - Kubernetes/container restrictions on cgroup movement" >&2
+    
+    if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+        echo "Extended diagnostics:" >&2
+        echo "  Current process cgroup: $cgroupNameRelativePath" >&2
+        echo "  Target cgroup: $target_cgroup" >&2
+        echo "  Current cgroup controllers: $(cat /proc/self/cgroup)" >&2
+        echo "  Target cgroup controllers: $(cat "$target_cgroup/cgroup.controllers" 2>/dev/null || echo "N/A")" >&2
+        echo "  Target cgroup type: $(cat "$target_cgroup/cgroup.type" 2>/dev/null || echo "N/A")" >&2
+        echo "  Target cgroup.procs permissions: $(ls -la "$target_cgroup/cgroup.procs" 2>/dev/null || echo "N/A")" >&2
+        
+        # Check if setgroups restrictions might affect child processes
+        if [ -f /proc/self/setgroups ]; then
+            setgroups_policy=$(cat /proc/self/setgroups)
+            echo "  setgroups policy: $setgroups_policy" >&2
+            if [ "$setgroups_policy" = "deny" ]; then
+                echo "  WARNING: setgroups is denied - child processes may fail to drop privileges" >&2
+            fi
+        fi
+    fi
+    
+    exit 1
+else
+    if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+        echo "Successfully moved PID $$ to cgroup: $target_cgroup" >&2
+    fi
+fi
+
+# Check for potential issues with child processes before exec
+if [ "${CGEXEC_DEBUG:-1}" = "1" ]; then
+    echo "Pre-exec diagnostics:" >&2
+    
+    # Check if setgroups is available for child processes
+    if [ -f /proc/self/setgroups ]; then
+        setgroups_policy=$(cat /proc/self/setgroups)
+        if [ "$setgroups_policy" = "deny" ]; then
+            echo "  WARNING: setgroups is denied in this container" >&2
+            echo "  Child processes using 'as-nobody' may fail with 'Operation not permitted'" >&2
+            echo "  Consider using a container with CAP_SETGID or user namespace mapping" >&2
+        else
+            echo "  setgroups policy: $setgroups_policy (should work)" >&2
+        fi
+    fi
+    
+    echo "Executing command: $@" >&2
+fi
 
 # Exec the rest of the arguments as-is
 exec "$@"
