@@ -459,6 +459,7 @@ worker:
 | Configuration    | Accepted and _Default_ Values                              | Description                                                         |
 |------------------|------------------------------------------------------------|---------------------------------------------------------------------|
 | name             | String                                                     | Execution policy name                                               |
+| prioritized      | Boolean, _false_                                           | If true, policy will run before built-in policies                   |
 | executionWrapper | Execution wrapper, containing a path and list of arguments | Execution wrapper, its path and a list of arguments for the wrapper |
 
 Example:
@@ -467,6 +468,7 @@ Example:
 worker:
   executionPolicies:
     - name: as-nobody
+      prioritized: true
       executionWrapper:
         path: /app/build_buildfarm/as-nobody
         arguments:

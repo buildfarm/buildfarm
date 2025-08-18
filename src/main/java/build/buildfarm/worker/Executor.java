@@ -301,6 +301,13 @@ class Executor {
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
+    // Apply custom PRIORITIZED execution policies BEFORE built-in wrappers
+    for (ExecutionPolicy policy : policies) {
+      if (policy.isPrioritized() && policy.getExecutionWrapper() != null) {
+        arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
+      }
+    }
+
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
@@ -309,9 +316,10 @@ class Executor {
             arguments,
             executionContext.command,
             workingDirectory)) {
-      // Apply custom execution policies AFTER built-in wrappers
+
+      // Apply all other custom execution policies AFTER built-in wrappers
       for (ExecutionPolicy policy : policies) {
-        if (policy.getExecutionWrapper() != null) {
+        if (!policy.isPrioritized() && policy.getExecutionWrapper() != null) {
           arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
         }
       }
