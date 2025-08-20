@@ -56,8 +56,25 @@ cgroupNameRelativePath="$(cut -d':' -f3- < /proc/self/cgroup)"
 #   │     └─29aec796-ad19-4e6b-a83b-b8b9f55d0abb
 #   │        └─123458 ${@}
 baseCgroup=$(dirname "${cgroupNameRelativePath}")
-# Bouncing my own PID $$ into /sys/fs/cgroup${baseCgroup}/$cgroupName"
-echo $$ > "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs"
+
+# Check if the target cgroup directory exists
+if [[ ! -d "/sys/fs/cgroup${baseCgroup}/$cgroupName" ]]; then
+    echo "ERROR: Target cgroup directory does not exist: /sys/fs/cgroup${baseCgroup}/$cgroupName" >&2
+    exit 1
+fi
+
+# Check if we can write to cgroup.procs
+if [[ ! -w "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs" ]]; then
+    echo "ERROR: Cannot write to cgroup.procs file: /sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs" >&2
+    exit 1
+fi
+
+# Move the process to the cgroup
+if ! echo $$ > "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs" 2>/dev/null; then
+    # This happens if the cgroup is not writable or the process is already in the cgroup
+    echo "ERROR: Failed to move process to cgroup, is the cgroup directory in additionalWritePaths?" >&2
+    exit 1
+fi
 
 # Exec the rest of the arguments as-is
 exec "$@"

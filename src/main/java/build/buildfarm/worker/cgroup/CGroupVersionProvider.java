@@ -32,7 +32,9 @@ public class CGroupVersionProvider implements Supplier<CGroupVersion> {
       if (path.toFile().exists() && path.toFile().isDirectory()) {
         FileStore fileStore = Files.getFileStore(path);
         String fsType = fileStore.type();
-        if (fsType.equals("cgroup2")) {
+        log.log(Level.INFO, "Detected filesystem type for /sys/fs/cgroup: " + fsType);
+        if (fsType.equals("cgroup2") || fsType.equals("cgroup2fs")) {
+          log.log(Level.INFO, "Detected cgroups v2 support");
           return CGroupVersion.CGROUPS_V2;
         } else {
           /* fsType=cgroup or fsType=tmpfs */
