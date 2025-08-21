@@ -570,6 +570,12 @@ class Executor {
     try {
       process = ProcessUtils.threadSafeStart(processBuilder);
       process.getOutputStream().close();
+
+      // Move the process to the appropriate cgroup if needed
+      // This replaces cgexec-wrapper and works with both sandbox and non-sandbox scenarios
+      if (limits.cgroups && (limits.cpu.limit || limits.mem.limit)) {
+        workerContext.moveProcessToCgroup(operationName, process.pid(), limits);
+      }
     } catch (IOException e) {
       log.log(Level.SEVERE, format("error starting process for %s", operationName), e);
       // again, should we do something else here??
