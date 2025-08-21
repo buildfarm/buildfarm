@@ -61,7 +61,6 @@ import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
-import build.buildfarm.worker.cgroup.CGroupVersion;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
@@ -981,13 +980,6 @@ class ShardWorkerContext implements WorkerContext {
     return resource;
   }
 
-  private String getCgroups() {
-    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
-      return configs.getExecutionWrappers().getCgroups2();
-    }
-    return configs.getExecutionWrappers().getCgroups1();
-  }
-
   IOResource limitSpecifiedExecution(
       ResourceLimits limits,
       String operationName,
@@ -1017,17 +1009,46 @@ class ShardWorkerContext implements WorkerContext {
         usedGroups.add(group.getMem().getControllerName());
       }
 
-      // Decide the CLI for running under cgroups
-      if (!usedGroups.isEmpty()) {
-        arguments.add(
-            getCgroups(), "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
-      }
+      // Note: cgexec command generation removed - cgroup moves now handled
+      // directly by Java parent process to work with both sandbox and non-sandbox scenarios
     }
 
     // The executor expects a single IOResource.
     // However, we may have multiple IOResources due to using multiple cgroup groups.
     // We construct a single IOResource to account for this.
     return combineResources(resources);
+  }
+
+  /**
+   * Move a child process to the appropriate cgroup for resource limiting. This replaces the
+   * cgexec-wrapper approach and works with both sandbox and non-sandbox scenarios.
+   */
+  public void moveProcessToCgroup(String operationName, long pid, ResourceLimits limits) {
+    if (!limits.cgroups || (!limits.cpu.limit && !limits.mem.limit)) {
+      return; // No cgroup restrictions to apply
+    }
+
+    try {
+      String operationId = getOperationId(operationName);
+      final Group group = operationsGroup.getChild(operationId);
+
+      // Create list of PIDs to move
+      java.util.List<Integer> pids = java.util.List.of((int) pid);
+
+      // Use the new public method that handles both cgroups v1 and v2
+      group.moveProcessesToCgroup(pids);
+
+      log.log(
+          java.util.logging.Level.FINE,
+          "Successfully moved process {0} to cgroup for operation {1}",
+          new Object[] {pid, operationName});
+    } catch (Exception e) {
+      log.log(
+          java.util.logging.Level.WARNING,
+          "Failed to move process {0} to cgroup for operation {1}: {2}",
+          new Object[] {pid, operationName, e.getMessage()});
+      // Don't re-throw - cgroup move failure shouldn't prevent action execution
+    }
   }
 
   private LinuxSandboxOptions decideLinuxSandboxOptions(
