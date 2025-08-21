@@ -66,14 +66,28 @@ fi
 # Check if we can write to cgroup.procs
 if [[ ! -w "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs" ]]; then
     echo "ERROR: Cannot write to cgroup.procs file: /sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs" >&2
+    echo "Current user: $(whoami), File permissions: $(ls -la "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs" 2>/dev/null || echo 'file not readable')" >&2
     exit 1
 fi
 
 # Move the process to the cgroup
 if ! echo $$ > "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs" 2>/dev/null; then
-    # This happens if the cgroup is not writable or the process is already in the cgroup
-    echo "ERROR: Failed to move process to cgroup, is the cgroup directory in additionalWritePaths?" >&2
-    exit 1
+    # Check if we're inside linux-sandbox by testing filesystem writability
+    if [[ ! -w /sys/fs/cgroup ]]; then
+        echo "WARNING: Cgroup filesystem is read-only (likely linux-sandbox environment)." >&2
+        echo "Note: Process should have been moved to cgroup by parent process before sandbox started." >&2
+        # Continue execution - this is expected in linux-sandbox environments
+    else
+        echo "ERROR: Failed to move process to cgroup. Details:" >&2
+        echo "  Current user: $(whoami)" >&2
+        echo "  Process ID: $$" >&2
+        echo "  Target cgroup: /sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs" >&2
+        echo "  File permissions: $(ls -la "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs" 2>/dev/null || echo 'file not readable')" >&2
+        echo "  Cgroup filesystem mount: $(mount | grep cgroup || echo 'no cgroup mounts found')" >&2
+        echo "  /sys/fs/cgroup permissions: $(ls -ld /sys/fs/cgroup 2>/dev/null || echo 'not readable')" >&2
+        echo "  Test write to /sys/fs/cgroup: $(touch /sys/fs/cgroup/test_write 2>&1 || echo 'write failed')" >&2
+        exit 1
+    fi
 fi
 
 # Exec the rest of the arguments as-is

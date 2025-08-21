@@ -388,7 +388,6 @@ worker:
     alwaysUseAsNobody: false
     alwaysUseCgroups: true
     alwaysUseTmpFs: true
-    additionalWritePaths: ["/sys/fs"]
     tmpFsPaths: ["/tmp", "/dev/shm"]
     selectForBlockNetwork: true
     selectForTmpFs: true
@@ -410,7 +409,6 @@ worker:
     alwaysUseAsNobody: false
     alwaysUseCgroups: true
     alwaysUseTmpFs: true
-    additionalWritePaths: ["/sys/fs"]
     tmpFsPaths: ["/tmp", "/dev/shm"]
     selectForBlockNetwork: true
     selectForTmpFs: true
