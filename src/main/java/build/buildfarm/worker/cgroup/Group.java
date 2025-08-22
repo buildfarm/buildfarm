@@ -319,7 +319,31 @@ public final class Group {
 
   static void adoptPids(Path cgroupPath, Iterable<Integer> pids) {
     Path path = cgroupPath.resolve("cgroup.procs");
-    verify(Files.exists(path), "cgroup.procs doesn't exist");
+
+    // Create the cgroup directory if it doesn't exist (especially important for v1)
+    if (!Files.exists(cgroupPath)) {
+      try {
+        Files.createDirectories(cgroupPath);
+        log.log(Level.FINE, "Created cgroup directory: " + cgroupPath);
+      } catch (IOException e) {
+        log.log(Level.WARNING, "Failed to create cgroup directory: " + cgroupPath, e);
+        return;
+      }
+    }
+
+    // For v1, the cgroup.procs file might not exist, so we need to handle this gracefully
+    if (!Files.exists(path)) {
+      // For v1, try the legacy tasks file as fallback
+      Path tasksFile = cgroupPath.resolve("tasks");
+      if (Files.exists(tasksFile)) {
+        path = tasksFile;
+        log.log(Level.FINE, "Using legacy tasks file for cgroup: " + cgroupPath);
+      } else {
+        log.log(Level.WARNING, "Neither cgroup.procs nor tasks file exists at: " + cgroupPath);
+        return;
+      }
+    }
+
     // Only one process can be migrated on a single write(2) call.
     for (Integer pid : pids) {
       try {
