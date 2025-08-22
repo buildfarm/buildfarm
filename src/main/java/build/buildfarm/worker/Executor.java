@@ -572,7 +572,7 @@ class Executor {
       process.getOutputStream().close();
 
       // Move the process to the appropriate cgroup if needed
-      // This replaces cgexec-wrapper and works with both sandbox and non-sandbox scenarios
+      // This Java-based approach works with both sandbox and non-sandbox scenarios
       if (limits.cgroups && (limits.cpu.limit || limits.mem.limit)) {
         workerContext.moveProcessToCgroup(operationName, process.pid(), limits);
       }
