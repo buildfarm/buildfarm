@@ -126,68 +126,92 @@ public class CgroupVersionHandler {
   private boolean handleV1ProcessMove(long processId, String cgroupHierarchyPath)
       throws IOException {
     // In v1, we need to handle each controller separately
-    String[] availableControllers = {"cpu", "memory", "cpuset", "blkio"};
+    // cpu and memory are essential, cpuset and blkio are optional
+    String[] essentialControllers = {"cpu", "memory"};
+    String[] optionalControllers = {"cpuset", "blkio"};
     boolean overallSuccess = true;
 
-    for (String controller : availableControllers) {
-      Path controllerPath = cgroupMountPoint.resolve(controller);
-      if (!Files.exists(controllerPath)) {
-        continue; // Skip unavailable controllers
-      }
-
-      Path targetCgroupPath = controllerPath.resolve(cgroupHierarchyPath);
-
-      // Create the cgroup directory if needed - this is critical for v1
-      if (!Files.exists(targetCgroupPath)) {
-        try {
-          Files.createDirectories(targetCgroupPath);
-          logger.fine("Created cgroup directory: " + targetCgroupPath);
-        } catch (IOException e) {
-          logger.log(Level.WARNING, "Failed to create cgroup directory: " + targetCgroupPath, e);
-          overallSuccess = false;
-          continue;
-        }
-      }
-
-      // Try cgroup.procs first, then fall back to tasks for older systems
-      Path processControlFile = targetCgroupPath.resolve("cgroup.procs");
-      if (!Files.exists(processControlFile)) {
-        processControlFile = targetCgroupPath.resolve("tasks");
-      }
-
-      if (!Files.exists(processControlFile)) {
-        logger.warning("No process control file found at: " + targetCgroupPath);
+    // Handle essential controllers first
+    for (String controller : essentialControllers) {
+      if (!moveProcessToController(processId, cgroupHierarchyPath, controller, true)) {
         overallSuccess = false;
-        continue;
-      }
-
-      // Check if process still exists before attempting move
-      Path procPath = Paths.get("/proc/" + processId);
-      if (!Files.exists(procPath)) {
-        logger.fine("Process " + processId + " no longer exists, skipping move to " + controller);
-        continue; // Not an error if process already exited
-      }
-
-      try (Writer out = new OutputStreamWriter(Files.newOutputStream(processControlFile))) {
-        out.write(processId + "\n");
-        logger.fine(
-            "Moved process " + processId + " to " + controller + " cgroup: " + cgroupHierarchyPath);
-      } catch (IOException e) {
-        if (e.getMessage() != null && e.getMessage().contains("No such process")) {
-          logger.fine("Process " + processId + " exited during move to " + controller + " cgroup");
-        } else {
-          logger.log(
-              Level.WARNING,
-              String.format(
-                  "Failed to move process %d to %s cgroup %s",
-                  processId, controller, cgroupHierarchyPath),
-              e);
-          overallSuccess = false;
-        }
       }
     }
 
+    // Handle optional controllers - failures are logged but don't affect overall success
+    for (String controller : optionalControllers) {
+      moveProcessToController(processId, cgroupHierarchyPath, controller, false);
+    }
+
     return overallSuccess;
+  }
+
+  private boolean moveProcessToController(
+      long processId, String cgroupHierarchyPath, String controller, boolean essential) {
+    Path controllerPath = cgroupMountPoint.resolve(controller);
+    if (!Files.exists(controllerPath)) {
+      if (essential) {
+        logger.warning("Essential controller " + controller + " not available");
+      }
+      return !essential; // Missing essential controllers are failures
+    }
+
+    Path targetCgroupPath = controllerPath.resolve(cgroupHierarchyPath);
+
+    // Create the cgroup directory if needed - this is critical for v1
+    if (!Files.exists(targetCgroupPath)) {
+      try {
+        Files.createDirectories(targetCgroupPath);
+        logger.fine("Created cgroup directory: " + targetCgroupPath);
+      } catch (IOException e) {
+        Level logLevel = essential ? Level.WARNING : Level.FINE;
+        logger.log(logLevel, "Failed to create cgroup directory: " + targetCgroupPath, e);
+        return !essential;
+      }
+    }
+
+    // Try cgroup.procs first, then fall back to tasks for older systems
+    Path processControlFile = targetCgroupPath.resolve("cgroup.procs");
+    if (!Files.exists(processControlFile)) {
+      processControlFile = targetCgroupPath.resolve("tasks");
+    }
+
+    if (!Files.exists(processControlFile)) {
+      Level logLevel = essential ? Level.WARNING : Level.FINE;
+      logger.log(logLevel, "No process control file found at: " + targetCgroupPath);
+      return !essential;
+    }
+
+    // Check if process still exists before attempting move
+    Path procPath = Paths.get("/proc/" + processId);
+    if (!Files.exists(procPath)) {
+      logger.fine("Process " + processId + " no longer exists, skipping move to " + controller);
+      return true; // Not an error if process already exited
+    }
+
+    try (Writer out = new OutputStreamWriter(Files.newOutputStream(processControlFile))) {
+      out.write(processId + "\n");
+      logger.fine(
+          "Moved process " + processId + " to " + controller + " cgroup: " + cgroupHierarchyPath);
+      return true;
+    } catch (IOException e) {
+      if (e.getMessage() != null && e.getMessage().contains("No such process")) {
+        logger.fine("Process " + processId + " exited during move to " + controller + " cgroup");
+        return true;
+      } else {
+        Level logLevel = essential ? Level.WARNING : Level.FINE;
+        String message =
+            essential
+                ? String.format(
+                    "Failed to move process %d to essential %s cgroup %s",
+                    processId, controller, cgroupHierarchyPath)
+                : String.format(
+                    "Failed to move process %d to optional %s cgroup %s (this is not critical)",
+                    processId, controller, cgroupHierarchyPath);
+        logger.log(logLevel, message, e);
+        return !essential;
+      }
+    }
   }
 
   public CgroupVersion getVersion() {
