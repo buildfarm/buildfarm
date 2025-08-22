@@ -141,6 +141,7 @@ class ShardWorkerContext implements WorkerContext {
   private final LocalResourceSet resourceSet;
   private final boolean errorOperationOutputSizeExceeded;
   private final boolean provideOwnedClaim;
+  private final CgroupVersionHandler cgroupHandler;
   private boolean inGracefulShutdown = false;
   private boolean pauseMatch = false;
   private boolean pauseInputFetch = false;
@@ -207,6 +208,7 @@ class ShardWorkerContext implements WorkerContext {
     this.errorOperationOutputSizeExceeded = errorOperationOutputSizeExceeded;
     this.resourceSet = resourceSet;
     this.writer = writer;
+    this.cgroupHandler = new CgroupVersionHandler();
 
     provideOwnedClaim = this.resourceSet.poolResources.containsKey(EXEC_OWNER_RESOURCE_NAME);
   }
@@ -1030,18 +1032,27 @@ class ShardWorkerContext implements WorkerContext {
 
     try {
       String operationId = getOperationId(operationName);
-      final Group group = operationsGroup.getChild(operationId);
+      String cgroupPath = "shard/executions/" + operationId;
 
-      // Create list of PIDs to move
-      java.util.List<Integer> pids = java.util.List.of((int) pid);
+      // First try the new cgroup handler that properly supports both v1 and v2
+      boolean success = cgroupHandler.moveProcessToCgroup(pid, cgroupPath);
 
-      // Use the new public method that handles both cgroups v1 and v2
-      group.moveProcessesToCgroup(pids);
+      if (success) {
+        log.log(
+            java.util.logging.Level.FINE,
+            "Successfully moved process {0} to cgroup for operation {1} using {2}",
+            new Object[] {pid, operationName, cgroupHandler.getVersion()});
+      } else {
+        // Fallback to the existing Group method
+        final Group group = operationsGroup.getChild(operationId);
+        java.util.List<Integer> pids = java.util.List.of((int) pid);
+        group.moveProcessesToCgroup(pids);
 
-      log.log(
-          java.util.logging.Level.FINE,
-          "Successfully moved process {0} to cgroup for operation {1}",
-          new Object[] {pid, operationName});
+        log.log(
+            java.util.logging.Level.FINE,
+            "Successfully moved process {0} to cgroup for operation {1} using fallback method",
+            new Object[] {pid, operationName});
+      }
     } catch (Exception e) {
       log.log(
           java.util.logging.Level.WARNING,
