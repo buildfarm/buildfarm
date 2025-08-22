@@ -299,8 +299,7 @@ public final class Group {
   }
 
   /**
-   * Public method to move processes to this cgroup. Supports both cgroups v1 and v2. This replaces
-   * the cgexec-wrapper functionality.
+   * Public method to move processes to this cgroup. Supports both cgroups v1 and v2.
    *
    * @param pids The process IDs to move to this cgroup
    */

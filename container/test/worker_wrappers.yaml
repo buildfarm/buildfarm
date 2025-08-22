@@ -1,12 +1,6 @@
 schemaVersion: 2.0.0
 # These align with the default paths in //src/main/java/build/buildfarm/common/config/ExecutionWrappers.java
 fileExistenceTests:
-- name: cgroups cexec
-    # This is installed by the OS package manager.
-  path: /usr/bin/cgexec
-  shouldExist: true
-  permissions: -rwxr-xr-x
-
 - name: unshare
     # This is installed by the OS package manager.
   path: /usr/bin/unshare

@@ -156,8 +156,8 @@ public interface WorkerContext {
 
   /**
    * Move a process to an appropriate cgroup for resource limits. This is called from the parent
-   * process to move a child process to a cgroup. Replaces the cgexec-wrapper approach for better
-   * sandbox compatibility.
+   * process to move a child process to a cgroup. This Java-based approach provides better sandbox
+   * compatibility.
    *
    * @param operationName The operation name for the cgroup
    * @param pid The process ID to move to the cgroup

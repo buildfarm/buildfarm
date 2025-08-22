@@ -1009,8 +1009,8 @@ class ShardWorkerContext implements WorkerContext {
         usedGroups.add(group.getMem().getControllerName());
       }
 
-      // Note: cgexec command generation removed - cgroup moves now handled
-      // directly by Java parent process to work with both sandbox and non-sandbox scenarios
+      // Note: Cgroup moves now handled directly by Java parent process to work
+      // with both sandbox and non-sandbox scenarios
     }
 
     // The executor expects a single IOResource.
@@ -1020,8 +1020,8 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   /**
-   * Move a child process to the appropriate cgroup for resource limiting. This replaces the
-   * cgexec-wrapper approach and works with both sandbox and non-sandbox scenarios.
+   * Move a child process to the appropriate cgroup for resource limiting. This Java-based approach
+   * works with both sandbox and non-sandbox scenarios.
    */
   public void moveProcessToCgroup(String operationName, long pid, ResourceLimits limits) {
     if (!limits.cgroups || (!limits.cpu.limit && !limits.mem.limit)) {
