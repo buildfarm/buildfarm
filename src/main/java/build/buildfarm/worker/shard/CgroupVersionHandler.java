@@ -131,17 +131,36 @@ public class CgroupVersionHandler {
     String[] essentialControllers = {"cpu", "memory"};
     String[] optionalControllers = {"cpuset", "blkio"};
     boolean overallSuccess = true;
+    boolean systemLimitsDetected = false;
+
+    // Pre-check: Test if we can create at least one essential controller directory
+    // This helps us fail fast instead of partially creating directories
+    if (!canCreateCgroupDirectories(cgroupHierarchyPath, essentialControllers)) {
+      logger.warning(
+          "Cannot create cgroup directories due to system limits, skipping process move for: "
+              + cgroupHierarchyPath);
+      return false;
+    }
 
     // Handle essential controllers first
     for (String controller : essentialControllers) {
       if (!moveProcessToController(processId, cgroupHierarchyPath, controller, true)) {
         overallSuccess = false;
+        // If we fail due to system limits, don't try optional controllers
+        if (isSystemLimitFailure(controller, cgroupHierarchyPath)) {
+          systemLimitsDetected = true;
+          break;
+        }
       }
     }
 
-    // Handle optional controllers - failures are logged but don't affect overall success
-    for (String controller : optionalControllers) {
-      moveProcessToController(processId, cgroupHierarchyPath, controller, false);
+    // Only try optional controllers if we haven't hit system limits
+    if (!systemLimitsDetected) {
+      for (String controller : optionalControllers) {
+        moveProcessToController(processId, cgroupHierarchyPath, controller, false);
+      }
+    } else {
+      logger.info("Skipping optional controllers due to system resource limits");
     }
 
     return overallSuccess;
@@ -236,6 +255,85 @@ public class CgroupVersionHandler {
         return !essential;
       }
     }
+  }
+
+  /**
+   * Checks if the failure to create a cgroup is due to system resource limits. This helps us avoid
+   * trying additional controllers when the system is out of resources.
+   */
+  private boolean isSystemLimitFailure(String controller, String cgroupHierarchyPath) {
+    try {
+      Path controllerPath = cgroupMountPoint.resolve(controller);
+      if (!Files.exists(controllerPath)) {
+        return false; // Controller doesn't exist, not a system limit issue
+      }
+
+      Path targetCgroupPath = controllerPath.resolve(cgroupHierarchyPath);
+      if (Files.exists(targetCgroupPath)) {
+        return false; // Directory exists, so no creation failure
+      }
+
+      // Try to create the directory to test for system limits
+      try {
+        Files.createDirectories(targetCgroupPath);
+        // If creation succeeded, clean up and return false
+        try {
+          Files.delete(targetCgroupPath);
+        } catch (IOException cleanupError) {
+          // Ignore cleanup errors
+        }
+        return false;
+      } catch (IOException e) {
+        // Check if this is a system limit error
+        return e.getMessage() != null && e.getMessage().contains("No space left on device");
+      }
+    } catch (Exception e) {
+      // If we can't determine, assume it's not a system limit issue
+      return false;
+    }
+  }
+
+  /**
+   * Pre-checks if we can create cgroup directories for the given controllers. This helps us fail
+   * fast when system resources are low, rather than partially creating directories.
+   */
+  private boolean canCreateCgroupDirectories(String cgroupHierarchyPath, String[] controllers) {
+    for (String controller : controllers) {
+      Path controllerPath = cgroupMountPoint.resolve(controller);
+      if (!Files.exists(controllerPath)) {
+        continue; // Skip non-existent controllers
+      }
+
+      Path targetCgroupPath = controllerPath.resolve(cgroupHierarchyPath);
+      if (Files.exists(targetCgroupPath)) {
+        continue; // Directory already exists, that's fine
+      }
+
+      // Test directory creation
+      try {
+        Files.createDirectories(targetCgroupPath);
+        // Clean up the test directory
+        try {
+          Files.delete(targetCgroupPath);
+        } catch (IOException cleanupError) {
+          // Log but don't fail on cleanup errors
+          logger.fine("Failed to cleanup test cgroup directory: " + targetCgroupPath);
+        }
+      } catch (IOException e) {
+        if (e.getMessage() != null && e.getMessage().contains("No space left on device")) {
+          logger.info(
+              "System resource limits detected during pre-check for controller " + controller);
+          return false;
+        }
+        // Other errors don't necessarily mean system limits
+        logger.fine(
+            "Non-critical error during cgroup pre-check for controller "
+                + controller
+                + ": "
+                + e.getMessage());
+      }
+    }
+    return true;
   }
 
   public CgroupVersion getVersion() {

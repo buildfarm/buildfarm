@@ -61,6 +61,7 @@ import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.cgroup.CGroupVersion;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
@@ -97,6 +98,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
@@ -1056,7 +1058,8 @@ class ShardWorkerContext implements WorkerContext {
 
     try {
       String operationId = getOperationId(operationName);
-      String cgroupPath = "shard/executions/" + operationId;
+      // Use the same hierarchy path as the Group fallback: executions/operations/{operationId}
+      String cgroupPath = "executions/operations/" + operationId;
 
       // First try the new cgroup handler that properly supports both v1 and v2
       boolean success = cgroupHandler.moveProcessToCgroup(pid, cgroupPath);
@@ -1081,12 +1084,22 @@ class ShardWorkerContext implements WorkerContext {
           // Both methods failed - likely system resource limits
           if (fallbackException.getMessage() != null
               && fallbackException.getMessage().contains("No space left on device")) {
-            log.log(
-                java.util.logging.Level.INFO,
-                "Cannot move process {0} to cgroup due to system resource limits. "
-                    + "Execution will continue without cgroup resource limiting for operation {1}. "
-                    + "Consider increasing kernel cgroup limits or cleaning up unused cgroups.",
-                new Object[] {pid, operationName});
+            // Attempt to clean up potentially stale cgroups before completely giving up
+            boolean cleanupAttempted = attemptStaleCgroupCleanup(operationId);
+            if (cleanupAttempted) {
+              log.log(
+                  java.util.logging.Level.INFO,
+                  "Attempted cleanup of stale cgroups due to system resource limits. "
+                      + "Process {0} will run without cgroup limits for operation {1}.",
+                  new Object[] {pid, operationName});
+            } else {
+              log.log(
+                  java.util.logging.Level.INFO,
+                  "Cannot move process {0} to cgroup due to system resource limits. Execution will"
+                      + " continue without cgroup resource limiting for operation {1}. Consider"
+                      + " increasing kernel cgroup limits or cleaning up unused cgroups.",
+                  new Object[] {pid, operationName});
+            }
           } else {
             log.log(
                 java.util.logging.Level.WARNING,
@@ -1261,5 +1274,106 @@ class ShardWorkerContext implements WorkerContext {
         return false;
       }
     };
+  }
+
+  /**
+   * Attempts to clean up potentially stale cgroups when hitting system resource limits. This is a
+   * best-effort operation that tries to free up cgroup resources.
+   *
+   * @param currentOperationId The current operation ID to avoid cleaning up
+   * @return true if cleanup was attempted, false otherwise
+   */
+  private boolean attemptStaleCgroupCleanup(String currentOperationId) {
+    try {
+      // Check if cgroup cleanup is enabled and we haven't exceeded cleanup attempts
+      if (!configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
+        return false;
+      }
+
+      log.log(
+          java.util.logging.Level.INFO,
+          "Attempting to clean up stale cgroups due to system resource limits...");
+
+      // Get the operations directory path by constructing it from the root path
+      // Since we can't access getPath() directly, we'll construct the path manually
+      Path rootCgroupPath = java.nio.file.Paths.get("/sys/fs/cgroup");
+      Path operationsPath;
+
+      if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
+        // For v1, operations are under cpu controller
+        operationsPath = rootCgroupPath.resolve("cpu").resolve("executions").resolve("operations");
+      } else {
+        // For v2, operations are under the unified hierarchy
+        operationsPath = rootCgroupPath.resolve("executions").resolve("operations");
+      }
+
+      if (!Files.exists(operationsPath)) {
+        return false;
+      }
+
+      int cleanedCount;
+      try (Stream<Path> operations = Files.list(operationsPath)) {
+        cleanedCount =
+            operations
+                .filter(Files::isDirectory)
+                .filter(path -> !path.getFileName().toString().equals(currentOperationId))
+                .mapToInt(this::cleanupSingleCgroup)
+                .sum();
+      }
+
+      if (cleanedCount > 0) {
+        log.log(
+            java.util.logging.Level.INFO,
+            "Cleaned up {0} potentially stale cgroup directories",
+            cleanedCount);
+        return true;
+      }
+
+      return false;
+    } catch (Exception e) {
+      log.log(java.util.logging.Level.WARNING, "Failed to attempt stale cgroup cleanup", e);
+      return false;
+    }
+  }
+
+  /**
+   * Attempts to clean up a single cgroup directory if it appears to be stale.
+   *
+   * @param cgroupPath Path to the cgroup directory
+   * @return 1 if cleaned up, 0 otherwise
+   */
+  private int cleanupSingleCgroup(Path cgroupPath) {
+    try {
+      // Check if the cgroup has any processes
+      Path procsFile = cgroupPath.resolve("cgroup.procs");
+      if (!Files.exists(procsFile)) {
+        // Try tasks file for v1
+        procsFile = cgroupPath.resolve("tasks");
+      }
+
+      if (Files.exists(procsFile)) {
+        List<String> pids = Files.readAllLines(procsFile);
+        // Remove empty lines and whitespace
+        pids =
+            pids.stream()
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
+
+        if (pids.isEmpty()) {
+          // Cgroup is empty, safe to delete
+          Files.delete(cgroupPath);
+          log.log(java.util.logging.Level.FINE, "Cleaned up empty cgroup directory: " + cgroupPath);
+          return 1;
+        }
+      }
+
+      return 0;
+    } catch (Exception e) {
+      log.log(
+          java.util.logging.Level.FINE,
+          "Could not clean up cgroup directory: " + cgroupPath + ", " + e.getMessage());
+      return 0;
+    }
   }
 }
