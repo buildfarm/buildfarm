@@ -885,11 +885,35 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public void destroyExecutionLimits() {
     if (configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
+      // Improved error handling - try to clean up both cgroups even if one fails
+      IOException operationsException = null;
+      IOException executionsException = null;
+
       try {
         operationsGroup.getCpu().close();
+      } catch (IOException e) {
+        operationsException = e;
+        log.log(Level.WARNING, "Failed to close operations cgroup CPU controller", e);
+      }
+
+      try {
         executionsGroup.getCpu().close();
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        executionsException = e;
+        log.log(Level.WARNING, "Failed to close executions cgroup CPU controller", e);
+      }
+
+      // If both failed, throw the first exception but log both
+      if (operationsException != null && executionsException != null) {
+        log.log(
+            Level.SEVERE,
+            "Failed to close both operations and executions cgroup controllers",
+            executionsException);
+        throw new RuntimeException("Failed to destroy execution limits", operationsException);
+      } else if (operationsException != null) {
+        throw new RuntimeException("Failed to destroy operations cgroup", operationsException);
+      } else if (executionsException != null) {
+        throw new RuntimeException("Failed to destroy executions cgroup", executionsException);
       }
     }
   }
@@ -1043,15 +1067,33 @@ class ShardWorkerContext implements WorkerContext {
             "Successfully moved process {0} to cgroup for operation {1} using {2}",
             new Object[] {pid, operationName, cgroupHandler.getVersion()});
       } else {
-        // Fallback to the existing Group method
-        final Group group = operationsGroup.getChild(operationId);
-        java.util.List<Integer> pids = java.util.List.of((int) pid);
-        group.moveProcessesToCgroup(pids);
+        // Try fallback to the existing Group method, but be prepared for same system limits
+        try {
+          final Group group = operationsGroup.getChild(operationId);
+          java.util.List<Integer> pids = java.util.List.of((int) pid);
+          group.moveProcessesToCgroup(pids);
 
-        log.log(
-            java.util.logging.Level.FINE,
-            "Successfully moved process {0} to cgroup for operation {1} using fallback method",
-            new Object[] {pid, operationName});
+          log.log(
+              java.util.logging.Level.FINE,
+              "Successfully moved process {0} to cgroup for operation {1} using fallback method",
+              new Object[] {pid, operationName});
+        } catch (Exception fallbackException) {
+          // Both methods failed - likely system resource limits
+          if (fallbackException.getMessage() != null
+              && fallbackException.getMessage().contains("No space left on device")) {
+            log.log(
+                java.util.logging.Level.INFO,
+                "Cannot move process {0} to cgroup due to system resource limits. "
+                    + "Execution will continue without cgroup resource limiting for operation {1}. "
+                    + "Consider increasing kernel cgroup limits or cleaning up unused cgroups.",
+                new Object[] {pid, operationName});
+          } else {
+            log.log(
+                java.util.logging.Level.WARNING,
+                "Failed to move process {0} to cgroup for operation {1} using fallback method: {2}",
+                new Object[] {pid, operationName, fallbackException.getMessage()});
+          }
+        }
       }
     } catch (Exception e) {
       log.log(
