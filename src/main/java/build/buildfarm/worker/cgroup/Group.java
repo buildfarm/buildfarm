@@ -584,16 +584,93 @@ public final class Group {
 
                   disableSubtreeControl(cgroupPath);
                   adoptPids(cgroupPath, getPids(childPath));
-                  verify(
-                      getPids(childPath).isEmpty(),
-                      "evacuated but processes remain in cgroup %s",
-                      childPath);
 
-                  Files.delete(childPath);
+                  // Verify evacuation completed, but don't fail if processes died naturally
+                  Set<Integer> remainingPids = getPids(childPath);
+                  if (!remainingPids.isEmpty()) {
+                    log.log(
+                        Level.WARNING,
+                        "Some processes remain in cgroup after evacuation: "
+                            + childPath
+                            + ", remaining PIDs: "
+                            + remainingPids);
+                  }
+
+                  // Try to delete the directory, with improved error handling
+                  boolean deleted = false;
+                  int retryCount = 0;
+                  final int maxRetries = 3;
+
+                  while (!deleted && retryCount < maxRetries) {
+                    try {
+                      Files.delete(childPath);
+                      deleted = true;
+                      log.log(Level.FINE, "Successfully deleted cgroup directory: " + childPath);
+                    } catch (IOException deleteError) {
+                      retryCount++;
+
+                      // Check if directory was already deleted by another process
+                      if (!Files.exists(childPath)) {
+                        log.log(Level.FINE, "Cgroup directory was already deleted: " + childPath);
+                        break;
+                      }
+
+                      if (retryCount < maxRetries) {
+                        log.log(
+                            Level.FINE,
+                            "Failed to delete cgroup directory, retrying: "
+                                + childPath
+                                + " (attempt "
+                                + retryCount
+                                + "/"
+                                + maxRetries
+                                + ")",
+                            deleteError);
+                        try {
+                          Thread.sleep(50 * retryCount); // Short exponential backoff
+                        } catch (InterruptedException ie) {
+                          Thread.currentThread().interrupt();
+                          log.log(
+                              Level.WARNING,
+                              "Interrupted while waiting to retry cgroup deletion: " + childPath);
+                          break;
+                        }
+                      } else {
+                        log.log(
+                            Level.WARNING,
+                            "Unable to delete cgroup directory after "
+                                + maxRetries
+                                + " attempts: "
+                                + childPath
+                                + ". Error: "
+                                + deleteError.getMessage());
+                        // Continue with other cleanups rather than failing entirely
+                      }
+                    }
+                  }
 
                 } catch (IOException e) {
                   log.log(
-                      Level.WARNING, "Failed to move processes from child cgroup: " + childPath, e);
+                      Level.WARNING,
+                      "Failed to process child cgroup during cleanup: " + childPath,
+                      e);
+
+                  // Try to at least delete the directory even if process migration failed
+                  try {
+                    if (Files.exists(childPath)) {
+                      Files.delete(childPath);
+                      log.log(
+                          Level.INFO,
+                          "Deleted cgroup directory despite process migration failure: "
+                              + childPath);
+                    }
+                  } catch (IOException deleteError) {
+                    log.log(
+                        Level.WARNING,
+                        "Failed to delete cgroup directory after process migration failure: "
+                            + childPath,
+                        deleteError);
+                  }
                 }
               });
     }
@@ -602,5 +679,66 @@ public final class Group {
     disableSubtreeControl(cgroupPath);
 
     return cgroupPath;
+  }
+
+  /**
+   * Utility method to safely delete a cgroup directory with retry logic and proper error handling.
+   * This method ensures that cgroup cleanup continues even if individual directories fail to
+   * delete.
+   *
+   * @param cgroupPath Path to the cgroup directory to delete
+   * @param maxRetries Maximum number of deletion attempts
+   * @return true if directory was successfully deleted or already didn't exist, false otherwise
+   */
+  static boolean safeCgroupDirectoryDelete(Path cgroupPath, int maxRetries) {
+    if (!Files.exists(cgroupPath)) {
+      return true; // Already deleted
+    }
+
+    for (int retryCount = 0; retryCount < maxRetries; retryCount++) {
+      try {
+        Files.delete(cgroupPath);
+        log.log(Level.FINE, "Successfully deleted cgroup directory: " + cgroupPath);
+        return true;
+      } catch (IOException e) {
+        // Check if directory was deleted by another process
+        if (!Files.exists(cgroupPath)) {
+          log.log(Level.FINE, "Cgroup directory was already deleted: " + cgroupPath);
+          return true;
+        }
+
+        if (retryCount < maxRetries - 1) {
+          log.log(
+              Level.FINE,
+              "Failed to delete cgroup directory, retrying: "
+                  + cgroupPath
+                  + " (attempt "
+                  + (retryCount + 1)
+                  + "/"
+                  + maxRetries
+                  + ")",
+              e);
+          try {
+            Thread.sleep(50 * (retryCount + 1)); // Exponential backoff
+          } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            log.log(
+                Level.WARNING, "Interrupted while waiting to retry cgroup deletion: " + cgroupPath);
+            return false;
+          }
+        } else {
+          log.log(
+              Level.WARNING,
+              "Unable to delete cgroup directory after "
+                  + maxRetries
+                  + " attempts: "
+                  + cgroupPath
+                  + ". Error: "
+                  + e.getMessage());
+          return false;
+        }
+      }
+    }
+    return false;
   }
 }

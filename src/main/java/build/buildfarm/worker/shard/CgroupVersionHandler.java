@@ -37,6 +37,7 @@ public class CgroupVersionHandler {
 
   private final CgroupVersion version;
   private final Path cgroupMountPoint;
+  private static volatile boolean systemLimitsWarningShown = false;
 
   public CgroupVersionHandler() {
     this.cgroupMountPoint = Paths.get("/sys/fs/cgroup");
@@ -164,9 +165,32 @@ public class CgroupVersionHandler {
         Files.createDirectories(targetCgroupPath);
         logger.fine("Created cgroup directory: " + targetCgroupPath);
       } catch (IOException e) {
-        Level logLevel = essential ? Level.WARNING : Level.FINE;
-        logger.log(logLevel, "Failed to create cgroup directory: " + targetCgroupPath, e);
-        return !essential;
+        // Special handling for "No space left on device" which usually means cgroup limits
+        if (e.getMessage() != null && e.getMessage().contains("No space left on device")) {
+          // Only show the detailed system limits warning once to avoid log spam
+          if (!systemLimitsWarningShown && essential) {
+            systemLimitsWarningShown = true;
+            logger.warning(
+                "System has reached cgroup resource limits. Cannot create new cgroup directories. "
+                    + "This may affect resource limiting capabilities. "
+                    + "Consider increasing kernel.keys.maxkeys, cleaning up unused cgroups, "
+                    + "or restarting the system to reset cgroup limits.");
+          }
+
+          String message =
+              String.format(
+                  "Cannot create %s cgroup directory for %s controller due to system limits: %s",
+                  essential ? "essential" : "optional", controller, targetCgroupPath);
+          Level logLevel = essential ? Level.INFO : Level.FINE;
+          logger.log(logLevel, message);
+
+          return !essential;
+        } else {
+          // Other IO errors
+          Level logLevel = essential ? Level.WARNING : Level.FINE;
+          logger.log(logLevel, "Failed to create cgroup directory: " + targetCgroupPath, e);
+          return !essential;
+        }
       }
     }
 

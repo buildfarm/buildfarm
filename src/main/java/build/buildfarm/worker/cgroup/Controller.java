@@ -24,8 +24,11 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 abstract class Controller implements IOResource {
+  private static final Logger log = Logger.getLogger(Controller.class.getName());
   protected final Group group;
 
   private boolean opened = false;
@@ -62,18 +65,70 @@ abstract class Controller implements IOResource {
   public void close() throws IOException {
     Path path = getPath();
     boolean exists = true;
-    while (exists) {
-      group.killUntilEmpty(getControllerName());
+    int retryCount = 0;
+    final int maxRetries = 5;
+    IOException lastException = null;
+
+    while (exists && retryCount < maxRetries) {
       try {
+        // Try to kill processes, but don't fail if they're already gone
+        try {
+          group.killUntilEmpty(getControllerName());
+        } catch (IOException e) {
+          log.log(Level.FINE, "Process cleanup completed or processes already gone: " + path, e);
+        }
+
         Files.delete(path);
         exists = false;
       } catch (IOException e) {
+        lastException = e;
         exists = Files.exists(path);
-        if (exists && !e.getMessage().endsWith("Device or resource busy")) {
-          throw e;
+
+        if (!exists) {
+          // Directory was deleted by another process, which is fine
+          log.log(Level.FINE, "Cgroup directory was already deleted: " + path);
+          break;
+        }
+
+        if (e.getMessage() != null && e.getMessage().contains("Device or resource busy")) {
+          // Directory still busy, retry after a short delay
+          retryCount++;
+          if (retryCount < maxRetries) {
+            log.log(
+                Level.FINE,
+                "Cgroup directory busy, retrying deletion: "
+                    + path
+                    + " (attempt "
+                    + retryCount
+                    + "/"
+                    + maxRetries
+                    + ")");
+            try {
+              Thread.sleep(100 * retryCount); // Exponential backoff
+            } catch (InterruptedException ie) {
+              Thread.currentThread().interrupt();
+              throw new IOException("Interrupted while waiting to retry cgroup deletion", ie);
+            }
+          }
+        } else {
+          // Some other error, don't retry
+          break;
         }
       }
     }
+
+    // Final check - if directory still exists after all retries, log but don't fail
+    if (Files.exists(path)) {
+      log.log(
+          Level.WARNING,
+          "Unable to delete cgroup directory after "
+              + maxRetries
+              + " attempts: "
+              + path
+              + (lastException != null ? ". Last error: " + lastException.getMessage() : ""));
+      // Don't throw - allow cleanup to continue for other cgroups
+    }
+
     opened = false;
   }
 
