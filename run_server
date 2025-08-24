@@ -1,18 +1,24 @@
-#!/bin/bash
-set -e
-set -o pipefail
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 # Run Redis docker container
 docker start buildfarm-redis || docker run -d --rm --name buildfarm-redis -p 6379:6379 redis:7.2.4
-redis-cli config set stop-writes-on-bgsave-error no
+
+if command -v redis-cli &>/dev/null
+then
+    redis-cli config set stop-writes-on-bgsave-error no
+else
+    printf 'WARNING: redis-cli not on PATH; can’t unset stop-writes-on-bgsave-error\n' >&2
+fi
 
 # Determine which configuration file to use - default or user provided
-if [[ -z "$1" ]]
+if [[ -z ${1:-} ]]
 then
-  config=$PWD/examples/config.minimal.yml
+  config="$PWD/config/config.minimal.yml"
 else
   config=$1
 fi
 
 # Run Server
-bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $config
+bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file="$PWD/config/logging.properties" "$config"

@@ -28,6 +28,7 @@ import redis.clients.jedis.Connection;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.params.GetExParams;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.params.SetParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -167,6 +168,20 @@ public class RedisMap {
    */
   public String get(UnifiedJedis jedis, String key) {
     return jedis.get(createKeyName(key));
+  }
+
+  /**
+   * @brief Get the value of the key and update expiration.
+   * @details If the key does not exist, null is returned.
+   * @param jedis Jedis cluster client.
+   * @param key The name of the key.
+   * @return The value of the key. null if key does not exist.
+   * @note Overloaded.
+   * @note Suggested return identifier: value.
+   */
+  public String getex(UnifiedJedis jedis, String key, long timeout_s) {
+    GetExParams params = GetExParams.getExParams().ex(timeout_s);
+    return jedis.getEx(createKeyName(key), params);
   }
 
   /**

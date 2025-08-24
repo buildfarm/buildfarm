@@ -34,7 +34,9 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
+import static com.google.common.util.concurrent.Futures.whenAllComplete;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -92,6 +94,7 @@ import build.buildfarm.instance.server.Filter;
 import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
@@ -102,6 +105,7 @@ import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -513,6 +517,29 @@ public class ServerInstance extends NodeInstance {
                   if (executeEntry == null) {
                     log.log(Level.SEVERE, "OperationQueuer: Got null from deprequeue...");
                     return immediateFuture(null);
+                  }
+                  if (executeEntry
+                      .getRequestMetadata()
+                      .getActionMnemonic()
+                      .equals("buildfarm:halt-on-deprequeue")) {
+                    return listeningDecorator(operationTransformService)
+                        .submit(
+                            () -> {
+                              try {
+                                backplane.putOperation(
+                                    Operation.newBuilder()
+                                        .setName(executeEntry.getOperationName())
+                                        .setDone(true)
+                                        .setMetadata(
+                                            Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+                                        .setResponse(Any.pack(ExecuteResponse.getDefaultInstance()))
+                                        .build(),
+                                    ExecutionStage.Value.COMPLETED);
+                              } catch (IOException e) {
+                                throw Status.fromThrowable(e).asRuntimeException();
+                              }
+                              return null;
+                            });
                   }
                   // half the watcher expiry, need to expose this from backplane
                   Poller poller = new Poller(Durations.fromSeconds(5));
@@ -2219,6 +2246,17 @@ public class ServerInstance extends NodeInstance {
           }
         }
         execution = stripExecution(execution);
+      } else {
+        try {
+          backplane.unmergeExecution(actionKey);
+        } catch (IOException e) {
+          log.log(
+              Level.SEVERE,
+              format(
+                  "error unmerging null execution of %s",
+                  DigestUtil.toString(actionKey.getDigest())),
+              e);
+        }
       }
       watcher.observe(execution);
     }
@@ -2251,7 +2289,7 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
-  private Operation validateMergedExecution(Operation execution, ActionKey actionKey)
+  private Operation validateMergedExecution(@Nullable Operation execution, ActionKey actionKey)
       throws IOException {
     if (execution == null) {
       return null;
@@ -2381,7 +2419,14 @@ public class ServerInstance extends NodeInstance {
             .build();
     Operation operation =
         Operation.newBuilder().setName(executionName).setMetadata(Any.pack(metadata)).build();
-    if (inDenyList(requestMetadata)) {
+    if (requestMetadata.getActionMnemonic().equals("buildfarm:halt-on-execute")) {
+      operation =
+          operation.toBuilder()
+              .setDone(true)
+              .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+              .setResponse(Any.pack(ExecuteResponse.getDefaultInstance()))
+              .build();
+    } else if (inDenyList(requestMetadata)) {
       operation =
           operation.toBuilder()
               .setDone(true)
@@ -3190,6 +3235,37 @@ public class ServerInstance extends NodeInstance {
     return super.getCacheCapabilities().toBuilder()
         .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
         .build();
+  }
+
+  @Override
+  public ListenableFuture<WorkerProfileMessage> getWorkerProfile(String name) {
+    return workerStub(name).getWorkerProfile(name);
+  }
+
+  @Override
+  public ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names) {
+    Iterable<ListenableFuture<WorkerProfileMessage>> profiles =
+        Iterables.transform(names, this::getWorkerProfile);
+    return whenAllComplete(profiles)
+        .call(
+            () -> {
+              Iterator<String> iter = names.iterator();
+              Iterator<ListenableFuture<WorkerProfileMessage>> profileIter = profiles.iterator();
+              BatchWorkerProfilesResponse.Builder response =
+                  BatchWorkerProfilesResponse.newBuilder();
+              while (iter.hasNext() && profileIter.hasNext()) {
+                ListenableFuture<WorkerProfileMessage> profileFuture = profileIter.next();
+                BatchWorkerProfilesResponse.Response.Builder builder =
+                    response.addResponsesBuilder().setWorkerName(iter.next());
+                try {
+                  builder.setProfile(profileFuture.get());
+                } catch (Exception e) {
+                  builder.setStatus(StatusProto.fromThrowable(e));
+                }
+              }
+              return response.build();
+            },
+            directExecutor());
   }
 
   public String indexCorrelatedInvocations(URI uri) throws IOException {

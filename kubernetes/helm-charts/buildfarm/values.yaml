@@ -6,8 +6,10 @@ fullnameOverride: ""
 
 imagePullSecrets: []
 
+# Configuration shared by all workers and the server.
+# see: https://github.com/buildfarm/buildfarm/blob/main/examples/config.yml
+# Workers specific configuration is in the `shardWorker` and `execWorker` sections below.
 config:
-  # see: https://github.com/buildfarm/buildfarm/blob/main/examples/config.yml
   digestFunction: SHA256
   defaultActionTimeout: 600
   maximumActionTimeout: 3600
@@ -22,19 +24,26 @@ config:
             value: "*"
           - name: "max-cores"
             value: "*"
-  server:
-    name: "shard"
-    recordBesEvents: true
-  worker:
-    port: 8982
 
 server:
+  annotations: {}
   image:
     repository: bazelbuild/buildfarm-server
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
   replicaCount: 1
+
+  livenessProbe:
+    grpc:
+      port: 8980
+    initialDelaySeconds: 10
+  readinessProbe:
+    grpc:
+      port: 8980
+    initialDelaySeconds: 10
+  startupProbe: {}
+
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
@@ -48,6 +57,7 @@ server:
     #   cpu: 100m
     #   memory: 128Mi
   service:
+    annotations: {}
     type: ClusterIP
     port: 8980
 
@@ -117,6 +127,10 @@ server:
     relabelings: []
     targetLabels: []
 
+  config:
+    name: "shard"
+    recordBesEvents: true
+
   loggingProperties:
     build.buildfarm.level: INFO
     handlers: java.util.logging.ConsoleHandler
@@ -124,12 +138,15 @@ server:
     java.util.logging.ConsoleHandler.formatter: java.util.logging.SimpleFormatter
     java.util.logging.SimpleFormatter.format: "[%4$-7s] %2$s - %5$s %6$s %n"
 
+# By default a worker handles both CAS and Exec.
 shardWorker:
   image:
     repository: bazelbuild/buildfarm-worker
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
+  annotations: {}
+  podManagementPolicy: Parallel # Or "OrderedReady"
   replicaCount: 2
   autoscaling:
     enabled: true
@@ -144,6 +161,16 @@ shardWorker:
             type: Utilization
             averageUtilization: 50
     targetCPUUtilizationPercentage: 50 # effective only in `v1`
+
+  livenessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
+  readinessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
+  startupProbe: {}
 
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
@@ -167,6 +194,7 @@ shardWorker:
     size: 50Gi
 
   service:
+    annotations: {}
     type: ClusterIP
     port: 8982
 
@@ -217,6 +245,135 @@ shardWorker:
     scrapeTimeout: 30s
     relabelings: []
     targetLabels: []
+
+  config:
+    port: 8982
+    # Specific configuration for this worker.
+    # see the `worker` section here: https://github.com/buildfarm/buildfarm/blob/main/examples/config.yml
+    capabilities:
+      # By default this worker supports both CAS and Exec.
+      # You can disable this and choose dedicated workers for CAS and Exec by setting the execWorker.enabled to true and disabling Exec in this worker.
+      execution: true
+
+  loggingProperties:
+    build.buildfarm.level: INFO
+    handlers: java.util.logging.ConsoleHandler
+    java.util.logging.ConsoleHandler.level: INFO
+    java.util.logging.ConsoleHandler.formatter: java.util.logging.SimpleFormatter
+    java.util.logging.SimpleFormatter.format: "[%4$-7s] %2$s - %5$s %6$s %n"
+
+execWorker:
+  enabled: false
+  annotations: {}
+  image:
+    repository: bazelbuild/buildfarm-worker
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: ""
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    behavior: {} # effective only in `v2*`
+    metrics: # effective only in `v2*`
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 50
+    targetCPUUtilizationPercentage: 50 # effective only in `v1`
+
+  livenessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
+  readinessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
+  startupProbe: {}
+
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  resources:
+    {}
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  storage:
+    enabled: true
+    # the storage class for pv, leave empty will using default
+    class: ""
+    size: 50Gi
+
+  service:
+    annotations: {}
+    type: ClusterIP
+    port: 8982
+
+  runtimeClassName: ""
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  ## Security Context
+  ## https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+  ##
+  securityContext: {}
+
+  ## Pod Disruption Budget configuration
+  ## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+  ##
+  pdb:
+    create: false
+    minAvailable: ""
+    maxUnavailable: ""
+
+  extraVolumes: []
+  # - name: additionalSecret
+  #   secret:
+  #   secretName: my-secret
+  #   defaultMode: 0600
+
+  extraVolumeMounts: []
+  # - name: customConfig
+  #   mountPath: /mnt/config
+  #   readOnly: true
+
+  extraEnv:
+    - name: JAVABIN
+      value: "/usr/bin/java"
+
+  serviceMonitor:
+    ## If true, a ServiceMonitor CRD is created for a prometheus operator
+    ## https://github.com/coreos/prometheus-operator
+    ##
+    enabled: false
+    path: /metrics
+    #  namespace: monitoring  (defaults to use the namespace this chart is deployed to)
+    additionalLabels: {}
+    interval: 1m
+    scheme: http
+    tlsConfig: {}
+    scrapeTimeout: 30s
+    relabelings: []
+    targetLabels: []
+
+  config:
+    port: 8982
+    capabilities:
+      # This is an Exec worker, so we disable CAS.
+      cas: false
 
   loggingProperties:
     build.buildfarm.level: INFO

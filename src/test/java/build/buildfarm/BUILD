@@ -17,7 +17,7 @@ java_library(
     ],
     visibility = ["//src/test/java/build/buildfarm:__subpackages__"],
     deps = [
-        "@maven//:com_google_guava_guava",
-        "@maven//:junit_junit",
+        "@buildfarm_maven//:com_google_guava_guava",
+        "@buildfarm_maven//:junit_junit",
     ],
 )

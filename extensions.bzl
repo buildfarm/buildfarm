@@ -9,9 +9,9 @@ def archive_dependencies(third_party):
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",
-            "sha256": "de54ed570e59445246bed5f44c16863ca83646c9cbd0ceaf4ca1e4ce9581f805",
-            "strip_prefix": "bazel-7.3.2",
-            "urls": ["https://github.com/bazelbuild/bazel/archive/refs/tags/7.3.2.tar.gz"],
+            "sha256": "03c2a5cfaeb7af45666f77bd7b56d768cb684551925ace1edd96d419f3d53260",
+            "strip_prefix": "bazel-b4216efd8c13c564e92115dae25dd6620423bac1",
+            "urls": ["https://github.com/bazelbuild/bazel/archive/b4216efd8c13c564e92115dae25dd6620423bac1.tar.gz"],
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
         },
@@ -38,9 +38,9 @@ def _buildfarm_extension_impl(_ctx):
 
     http_jar(
         name = "opentelemetry",
-        sha256 = "eccd069da36031667e5698705a6838d173d527a5affce6cc514a14da9dbf57d7",
+        sha256 = "16f8e28fa1ddcd56ed85bf633bd1d1fbc78ea7c4cc50e8c5726b2a319f5058c8",
         urls = [
-            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.28.0/opentelemetry-javaagent.jar",
+            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.14.0/opentelemetry-javaagent.jar",
         ],
     )
 

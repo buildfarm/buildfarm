@@ -5,7 +5,7 @@
 # We ensure that the system can build a set of bazel targets.
 
 # Run redis container
-docker run -d --name buildfarm-redis --network host redis:7.2.4 --bind localhost
+docker run --rm -d --name buildfarm-redis --network host redis:7.2.4 --bind localhost
 
 # Build a container for buildfarm services
 cp `which bazel` bazel
@@ -13,6 +13,7 @@ docker build -t buildfarm .
 
 #Start the servies and do a test build
 docker run \
+    --rm \
     -v /tmp:/tmp \
     --network host  \
     --env CACHE_TEST=$CACHE_TEST \
@@ -22,3 +23,8 @@ docker run \
     --env TEST_ARG2=$TEST_ARG2 \
     --env SHA1_TOOLS_REMOTE=$SHA1_TOOLS_REMOTE \
     buildfarm buildfarm/.bazelci/test_buildfarm_container.sh
+status=$?
+
+docker stop buildfarm-redis
+
+exit $status

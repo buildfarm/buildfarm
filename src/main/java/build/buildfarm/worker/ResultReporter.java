@@ -149,7 +149,8 @@ class ResultReporter implements Runnable {
             .metadata
             .getExecuteOperationMetadataBuilder()
             .getPartialExecutionMetadataBuilder()
-            .setOutputUploadStartTimestamp(Timestamps.now());
+            .setOutputUploadStartTimestamp(Timestamps.now())
+            .addAuxiliaryMetadata(Any.pack(executionContext.workerExecutedMetadata.build()));
     putOperation(executionContext);
 
     boolean blacklist = false;
