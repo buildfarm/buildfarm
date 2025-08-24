@@ -34,11 +34,11 @@ java_test(
         "@buildfarm_maven//:io_grpc_grpc_stub",
         "@buildfarm_maven//:me_dinowernli_java_grpc_prometheus",
         "@buildfarm_maven//:org_mockito_mockito_core",
+        "@com_google_protobuf//:protobuf_java",
         "@googleapis//google/bytestream:bytestream_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_proto",
         "@googleapis//google/longrunning:longrunning_java_grpc",
         "@googleapis//google/rpc:rpc_java_proto",
-        "@protobuf//:protobuf_java",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

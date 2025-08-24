@@ -15,7 +15,6 @@
 package build.buildfarm.worker.persistent;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static persistent.bazel.client.PersistentWorker.TOOL_INPUT_SUBDIR;
 
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
@@ -121,7 +120,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     synchronized (lock) {
       try {
         // Copy tool inputs as needed
-        Path workToolRoot = key.getExecRoot().resolve(PersistentWorker.TOOL_INPUT_SUBDIR);
+        Path workToolRoot = key.getToolRoot();
         for (Path opToolPath : workerFiles.opToolInputs) {
           Path workToolPath = workerFiles.relativizeInput(workToolRoot, opToolPath);
           if (!Files.exists(workToolPath)) {
@@ -147,7 +146,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
       throws IOException {
     log.log(Level.FINE, "loadToolsIntoWorkerRoot() into: " + workerExecRoot);
 
-    Path toolInputRoot = key.getExecRoot().resolve(TOOL_INPUT_SUBDIR);
+    Path toolInputRoot = key.getToolRoot();
     for (Path relPath : key.getWorkerFilesWithHashes().keySet()) {
       Path toolInputPath = toolInputRoot.resolve(relPath);
       Path execRootPath = workerExecRoot.resolve(relPath);

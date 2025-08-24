@@ -14,6 +14,8 @@
 
 package build.buildfarm.common;
 
+import static com.google.protobuf.ByteString.EMPTY;
+
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.buildfarm.common.blake3.Blake3HashFunction;
@@ -59,13 +61,12 @@ public class DigestUtil {
 
   public static final Map<DigestFunction.Value, Digest> empty =
       ImmutableMap.of(
-          DigestFunction.Value.MD5, DigestUtil.forHash("MD5").computeImpl(ByteString.empty()),
-          DigestFunction.Value.SHA1, DigestUtil.forHash("SHA1").computeImpl(ByteString.empty()),
-          DigestFunction.Value.SHA256, DigestUtil.forHash("SHA256").computeImpl(ByteString.empty()),
-          DigestFunction.Value.SHA384, DigestUtil.forHash("SHA384").computeImpl(ByteString.empty()),
-          DigestFunction.Value.SHA512, DigestUtil.forHash("SHA512").computeImpl(ByteString.empty()),
-          DigestFunction.Value.BLAKE3,
-              DigestUtil.forHash("BLAKE3").computeImpl(ByteString.empty()));
+          DigestFunction.Value.MD5, DigestUtil.forHash("MD5").computeImpl(EMPTY),
+          DigestFunction.Value.SHA1, DigestUtil.forHash("SHA1").computeImpl(EMPTY),
+          DigestFunction.Value.SHA256, DigestUtil.forHash("SHA256").computeImpl(EMPTY),
+          DigestFunction.Value.SHA384, DigestUtil.forHash("SHA384").computeImpl(EMPTY),
+          DigestFunction.Value.SHA512, DigestUtil.forHash("SHA512").computeImpl(EMPTY),
+          DigestFunction.Value.BLAKE3, DigestUtil.forHash("BLAKE3").computeImpl(EMPTY));
 
   /** Type of hash function to use for digesting blobs. */
   // The underlying HashFunctions are immutable and thread safe.
