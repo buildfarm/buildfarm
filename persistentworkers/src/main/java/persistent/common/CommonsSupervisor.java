@@ -36,18 +36,22 @@ public abstract class CommonsSupervisor<K, V extends Destructable>
   public void destroyObject(K key, PooledObject<V> p) {
     V obj = p.getObject();
 
-    StringBuilder msgBuilder = new StringBuilder();
-    msgBuilder.append("Supervisor.destroyObject() from key:\n");
-    msgBuilder.append(key);
-    msgBuilder.append("\nobj.toString():\n");
-    msgBuilder.append(obj);
-    msgBuilder.append("\nSupervisor.destroyObject() stackTrack:");
-    for (StackTraceElement e : Thread.currentThread().getStackTrace()) {
-      msgBuilder.append("\n\t");
-      msgBuilder.append(e);
-    }
+    var maybeOverriddenLogger = getLogger();
+    final var logLevel = Level.FINE;
+    if (maybeOverriddenLogger.isLoggable(logLevel)) {
+      StringBuilder msgBuilder = new StringBuilder();
+      msgBuilder.append("Supervisor.destroyObject() from key:\n");
+      msgBuilder.append(key);
+      msgBuilder.append("\nobj.toString():\n");
+      msgBuilder.append(obj);
+      msgBuilder.append("\nSupervisor.destroyObject() stackTrack:");
+      for (StackTraceElement e : Thread.currentThread().getStackTrace()) {
+        msgBuilder.append("\n\t");
+        msgBuilder.append(e);
+      }
 
-    getLogger().log(Level.FINE, msgBuilder.toString());
+      maybeOverriddenLogger.log(logLevel, msgBuilder.toString());
+    }
 
     obj.destroy();
   }
