@@ -9,8 +9,6 @@ java_library(
         "//src/main/java/build/buildfarm/backplane",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
-        "//src/main/java/build/buildfarm/common/resources",
-        "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@buildfarm_maven//:com_github_ben_manes_caffeine_caffeine",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",

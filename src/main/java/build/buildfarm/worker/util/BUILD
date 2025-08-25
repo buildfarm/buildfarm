@@ -7,9 +7,6 @@ java_library(
     deps = [
         "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
         "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/instance/stub",
-        "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_google_code_gson_gson",
         "@buildfarm_maven//:com_google_guava_guava",
