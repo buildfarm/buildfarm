@@ -225,6 +225,13 @@ public class CgroupVersionHandler {
       return !essential;
     }
 
+    // Additional null check as a safety measure
+    if (processControlFile == null) {
+      Level logLevel = essential ? Level.WARNING : Level.FINE;
+      logger.log(logLevel, "Process control file is null for: " + targetCgroupPath);
+      return !essential;
+    }
+
     // Check if process still exists before attempting move
     Path procPath = Paths.get("/proc/" + processId);
     if (!Files.exists(procPath)) {
