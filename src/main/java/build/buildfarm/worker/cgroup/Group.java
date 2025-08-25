@@ -115,24 +115,29 @@ public final class Group {
       try {
         // For cgroups v2, there's only one line, and it always starts with `0::`
         // For v1, there's other lines for cgroup subsystem managers.
-        List<String> myCgroups = Files.readAllLines(Paths.get("/proc/self/cgroup"));
+        Path procSelfCgroup = Paths.get("/proc/self/cgroup");
+        if (procSelfCgroup == null || !Files.exists(procSelfCgroup)) {
+          log.log(Level.WARNING, "/proc/self/cgroup does not exist, falling back to default");
+        } else {
+          List<String> myCgroups = Files.readAllLines(procSelfCgroup);
 
-        Optional<String> selfCgroup =
-            myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
-        if (selfCgroup.isPresent()) {
-          Path self = Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
-          if (self.endsWith(EVACUATION_CGROUP_NAME)) {
-            // but wait, there's more... we seem to have landed in an already-evacuated tree.
-            log.log(
-                Level.WARNING,
-                String.format(
-                    "Found pre-existing evacuation cgroup at %s. This indicates buildfarm did not"
-                        + " shutdown cleanly",
-                    self));
-            // Use the parent as the root.
-            return gatherAllCgroupChildProcesses(self.getParent());
+          Optional<String> selfCgroup =
+              myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
+          if (selfCgroup.isPresent()) {
+            Path self = Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
+            if (self.endsWith(EVACUATION_CGROUP_NAME)) {
+              // but wait, there's more... we seem to have landed in an already-evacuated tree.
+              log.log(
+                  Level.WARNING,
+                  String.format(
+                      "Found pre-existing evacuation cgroup at %s. This indicates buildfarm did not"
+                          + " shutdown cleanly",
+                      self));
+              // Use the parent as the root.
+              return gatherAllCgroupChildProcesses(self.getParent());
+            }
+            return self;
           }
-          return self;
         }
       } catch (IOException ioe) {
         log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
