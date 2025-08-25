@@ -2042,8 +2042,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       out.cancel();
       log.log(
           Level.WARNING,
-          format("error downloading %s", DigestUtil.toString(digest)),
-          e); // prevent burial by early end of stream during close
+          format(
+              "error downloading %s: %s",
+              DigestUtil.toString(digest),
+              e.getMessage())); // prevent burial by early end of stream during close
       throw e;
     }
     log.log(Level.FINER, format("download of %s complete", DigestUtil.toString(digest)));
