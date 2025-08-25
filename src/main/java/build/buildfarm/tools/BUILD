@@ -110,7 +110,6 @@ java_binary(
     main_class = "build.buildfarm.tools.Cat",
     visibility = ["//visibility:public"],
     deps = [
-        ":worker-profiler-printer",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/common/resources",
@@ -142,13 +141,9 @@ java_binary(
     deps = [
         ":worker-profiler-printer",
         "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/common/grpc",
-        "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/java/build/buildfarm/instance/stub",
-        "//src/main/java/build/buildfarm/worker/shard",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_github_pcj_google_options",
         "@buildfarm_maven//:com_google_guava_guava",
@@ -172,7 +167,6 @@ java_binary(
     main_class = "build.buildfarm.tools.Ac",
     visibility = ["//visibility:public"],
     deps = [
-        ":worker-profiler-printer",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance",
@@ -280,13 +274,6 @@ java_library(
     srcs = ["WorkerProfilePrinter.java"],
     visibility = ["//visibility:public"],
     deps = [
-        "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/common/config",
-        "//src/main/java/build/buildfarm/common/redis",
-        "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/instance/shard",
-        "//src/main/java/build/buildfarm/instance/stub",
-        "//src/main/java/build/buildfarm/worker/shard",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_github_pcj_google_options",
         "@buildfarm_maven//:com_google_guava_guava",
