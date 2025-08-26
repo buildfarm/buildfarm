@@ -209,7 +209,7 @@ public class DigestUtil {
   }
 
   public Digest compute(ByteString blob) {
-    if (blob.size() == 0) {
+    if (blob.isEmpty()) {
       return empty();
     }
     return computeImpl(blob);
