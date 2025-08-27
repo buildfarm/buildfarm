@@ -5,7 +5,7 @@ java_test(
     size = "small",
     srcs = glob(["*.java"]),
     data = [
-        "//config:base_properties",
+        "//examples:example_properties",
     ],
     test_class = "build.buildfarm.AllTests",
     deps = [
