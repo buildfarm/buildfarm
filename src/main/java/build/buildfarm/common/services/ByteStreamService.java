@@ -21,6 +21,7 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static io.grpc.Status.NOT_FOUND;
 import static io.grpc.Status.OUT_OF_RANGE;
+import static io.grpc.Status.UNAVAILABLE;
 import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Compressor;
@@ -468,6 +469,30 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   @Override
   public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
+    if (instance.isReadOnly()) {
+      return readOnlyWrite(responseObserver);
+    }
+    return observeWrite(responseObserver);
+  }
+
+  private StreamObserver<WriteRequest> readOnlyWrite(
+      StreamObserver<WriteResponse> responseObserver) {
+    responseObserver.onError(
+        UNAVAILABLE.withDescription("instance is in read-only mode").asException());
+    return new StreamObserver<>() {
+      @Override
+      public void onNext(WriteRequest request) {}
+
+      @Override
+      public void onError(Throwable t) {}
+
+      @Override
+      public void onCompleted() {}
+    };
+  }
+
+  private StreamObserver<WriteRequest> observeWrite(
+      StreamObserver<WriteResponse> responseObserver) {
     ServerCallStreamObserver<WriteResponse> serverCallStreamObserver =
         initializeBackPressure(responseObserver);
 
