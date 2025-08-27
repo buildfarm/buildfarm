@@ -309,7 +309,7 @@ backplane:
 | allowBringYourOwnContainer        | boolean, _false_              |                       | Enable execution in a custom Docker container                                                                                                                                                                                                                                                                            |
 | errorOperationRemainingResources  | boolean, _false_              |                       |                                                                                                                                                                                                                                                                                                                          |
 | errorOperationOutputSizeExceeded  | boolean, _false_              |                       | Operations which produce single output files which exceed maxEntrySizeBytes will fail with a violation type which implies a user error. When disabled, the violation will indicate a transient error, with the action blacklisted.                                                                                       |
-| realInputDirectories              | List of Strings, _external_   |                       | A list of paths that will not be subject to the effects of linkInputDirectories setting, may also be used to provide writable directories as input roots for actions which expect to be able to write to an input location and will fail if they cannot                                                                  |
+| linkedInputDirectories            | List of Strings, _^(?!external$).*$_ |                       | A list of regular expressions matching input directories which will be subject to the effects of linkInputDirectories setting |
 | gracefulShutdownSeconds           | Integer, 0                    |                       | Time in seconds to allow for operations in flight to finish when shutdown signal is received                                                                                                                                                                                                                             |
 | createSymlinkOutputs              | boolean, _false_              |                       | Creates SymlinkNodes for symbolic links discovered in output paths for actions. No verification of the symlink target path occurs. Buildstream, for example, requires this.                                                                                                                                              |
 | zstdBufferPoolSize                | Integer, _2048_               |                       | Specifies the maximum number of zstd data buffers that may be in use concurrently by the filesystem CAS. Increase to improve compressed blob throughput, decrease to reduce memory usage.                                                                                                                                |
@@ -319,8 +319,8 @@ backplane:
 worker:
   port: 8981
   publicName: "localhost:8981"
-  realInputDirectories:
-    - "external"
+  linkedInputDirectories:
+    - "^path/to/common/directory/"
 ```
 
 ### Capabilities
