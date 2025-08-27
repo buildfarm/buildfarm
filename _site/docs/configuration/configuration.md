@@ -320,7 +320,7 @@ worker:
   port: 8981
   publicName: "localhost:8981"
   linkedInputDirectories:
-    - "^path/to/common/directory/"
+    - "^path/to/common/directory"
 ```
 
 ### Capabilities
