@@ -317,8 +317,8 @@ public final class BuildfarmConfigs {
       BuildfarmConfigs configs) {
     // Create a mapping from the execution wrappers to the features they enable.
     ExecutionWrapperProperties wrapperProperties = new ExecutionWrapperProperties();
-    
-    // Only add cgroups1 wrapper - cgroups2 continues to use Java implementation
+
+    // Add cgroups1 wrapper mapping for wrapper-based v1 approach
     wrapperProperties.mapping.put(
         new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups1())),
         new ArrayList<String>(

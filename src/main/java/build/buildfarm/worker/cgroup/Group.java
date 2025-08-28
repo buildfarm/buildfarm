@@ -115,29 +115,24 @@ public final class Group {
       try {
         // For cgroups v2, there's only one line, and it always starts with `0::`
         // For v1, there's other lines for cgroup subsystem managers.
-        Path procSelfCgroup = Paths.get("/proc/self/cgroup");
-        if (procSelfCgroup == null || !Files.exists(procSelfCgroup)) {
-          log.log(Level.WARNING, "/proc/self/cgroup does not exist, falling back to default");
-        } else {
-          List<String> myCgroups = Files.readAllLines(procSelfCgroup);
+        List<String> myCgroups = Files.readAllLines(Paths.get("/proc/self/cgroup"));
 
-          Optional<String> selfCgroup =
-              myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
-          if (selfCgroup.isPresent()) {
-            Path self = Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
-            if (self.endsWith(EVACUATION_CGROUP_NAME)) {
-              // but wait, there's more... we seem to have landed in an already-evacuated tree.
-              log.log(
-                  Level.WARNING,
-                  String.format(
-                      "Found pre-existing evacuation cgroup at %s. This indicates buildfarm did not"
-                          + " shutdown cleanly",
-                      self));
-              // Use the parent as the root.
-              return gatherAllCgroupChildProcesses(self.getParent());
-            }
-            return self;
+        Optional<String> selfCgroup =
+            myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
+        if (selfCgroup.isPresent()) {
+          Path self = Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
+          if (self.endsWith(EVACUATION_CGROUP_NAME)) {
+            // but wait, there's more... we seem to have landed in an already-evacuated tree.
+            log.log(
+                Level.WARNING,
+                String.format(
+                    "Found pre-existing evacuation cgroup at %s. This indicates buildfarm did not"
+                        + " shutdown cleanly",
+                    self));
+            // Use the parent as the root.
+            return gatherAllCgroupChildProcesses(self.getParent());
           }
+          return self;
         }
       } catch (IOException ioe) {
         log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
@@ -324,42 +319,7 @@ public final class Group {
 
   static void adoptPids(Path cgroupPath, Iterable<Integer> pids) {
     Path path = cgroupPath.resolve("cgroup.procs");
-
-    // Create the cgroup directory if it doesn't exist (especially important for v1)
-    if (!Files.exists(cgroupPath)) {
-      try {
-        Files.createDirectories(cgroupPath);
-        log.log(Level.FINE, "Created cgroup directory: " + cgroupPath);
-      } catch (IOException e) {
-        // Check if this is a system resource limit issue
-        if (e.getMessage() != null && e.getMessage().contains("No space left on device")) {
-          log.log(
-              Level.INFO,
-              "Cannot create cgroup directory due to system resource limits: "
-                  + cgroupPath
-                  + ". Process will run without cgroup limits. Consider cleaning up unused cgroups"
-                  + " or increasing kernel.keys.maxkeys limit.");
-        } else {
-          log.log(Level.WARNING, "Failed to create cgroup directory: " + cgroupPath, e);
-        }
-        // Return early - don't attempt to move processes if directory creation failed
-        return;
-      }
-    }
-
-    // For v1, the cgroup.procs file might not exist, so we need to handle this gracefully
-    if (!Files.exists(path)) {
-      // For v1, try the legacy tasks file as fallback
-      Path tasksFile = cgroupPath.resolve("tasks");
-      if (Files.exists(tasksFile)) {
-        path = tasksFile;
-        log.log(Level.FINE, "Using legacy tasks file for cgroup: " + cgroupPath);
-      } else {
-        log.log(Level.WARNING, "Neither cgroup.procs nor tasks file exists at: " + cgroupPath);
-        return;
-      }
-    }
-
+    verify(Files.exists(path), "cgroup.procs doesn't exist");
     // Only one process can be migrated on a single write(2) call.
     for (Integer pid : pids) {
       try {
@@ -600,93 +560,16 @@ public final class Group {
 
                   disableSubtreeControl(cgroupPath);
                   adoptPids(cgroupPath, getPids(childPath));
+                  verify(
+                      getPids(childPath).isEmpty(),
+                      "evacuated but processes remain in cgroup %s",
+                      childPath);
 
-                  // Verify evacuation completed, but don't fail if processes died naturally
-                  Set<Integer> remainingPids = getPids(childPath);
-                  if (!remainingPids.isEmpty()) {
-                    log.log(
-                        Level.WARNING,
-                        "Some processes remain in cgroup after evacuation: "
-                            + childPath
-                            + ", remaining PIDs: "
-                            + remainingPids);
-                  }
-
-                  // Try to delete the directory, with improved error handling
-                  boolean deleted = false;
-                  int retryCount = 0;
-                  final int maxRetries = 3;
-
-                  while (!deleted && retryCount < maxRetries) {
-                    try {
-                      Files.delete(childPath);
-                      deleted = true;
-                      log.log(Level.FINE, "Successfully deleted cgroup directory: " + childPath);
-                    } catch (IOException deleteError) {
-                      retryCount++;
-
-                      // Check if directory was already deleted by another process
-                      if (!Files.exists(childPath)) {
-                        log.log(Level.FINE, "Cgroup directory was already deleted: " + childPath);
-                        break;
-                      }
-
-                      if (retryCount < maxRetries) {
-                        log.log(
-                            Level.FINE,
-                            "Failed to delete cgroup directory, retrying: "
-                                + childPath
-                                + " (attempt "
-                                + retryCount
-                                + "/"
-                                + maxRetries
-                                + ")",
-                            deleteError);
-                        try {
-                          Thread.sleep(50 * retryCount); // Short exponential backoff
-                        } catch (InterruptedException ie) {
-                          Thread.currentThread().interrupt();
-                          log.log(
-                              Level.WARNING,
-                              "Interrupted while waiting to retry cgroup deletion: " + childPath);
-                          break;
-                        }
-                      } else {
-                        log.log(
-                            Level.WARNING,
-                            "Unable to delete cgroup directory after "
-                                + maxRetries
-                                + " attempts: "
-                                + childPath
-                                + ". Error: "
-                                + deleteError.getMessage());
-                        // Continue with other cleanups rather than failing entirely
-                      }
-                    }
-                  }
+                  Files.delete(childPath);
 
                 } catch (IOException e) {
                   log.log(
-                      Level.WARNING,
-                      "Failed to process child cgroup during cleanup: " + childPath,
-                      e);
-
-                  // Try to at least delete the directory even if process migration failed
-                  try {
-                    if (Files.exists(childPath)) {
-                      Files.delete(childPath);
-                      log.log(
-                          Level.INFO,
-                          "Deleted cgroup directory despite process migration failure: "
-                              + childPath);
-                    }
-                  } catch (IOException deleteError) {
-                    log.log(
-                        Level.WARNING,
-                        "Failed to delete cgroup directory after process migration failure: "
-                            + childPath,
-                        deleteError);
-                  }
+                      Level.WARNING, "Failed to move processes from child cgroup: " + childPath, e);
                 }
               });
     }
@@ -695,66 +578,5 @@ public final class Group {
     disableSubtreeControl(cgroupPath);
 
     return cgroupPath;
-  }
-
-  /**
-   * Utility method to safely delete a cgroup directory with retry logic and proper error handling.
-   * This method ensures that cgroup cleanup continues even if individual directories fail to
-   * delete.
-   *
-   * @param cgroupPath Path to the cgroup directory to delete
-   * @param maxRetries Maximum number of deletion attempts
-   * @return true if directory was successfully deleted or already didn't exist, false otherwise
-   */
-  static boolean safeCgroupDirectoryDelete(Path cgroupPath, int maxRetries) {
-    if (!Files.exists(cgroupPath)) {
-      return true; // Already deleted
-    }
-
-    for (int retryCount = 0; retryCount < maxRetries; retryCount++) {
-      try {
-        Files.delete(cgroupPath);
-        log.log(Level.FINE, "Successfully deleted cgroup directory: " + cgroupPath);
-        return true;
-      } catch (IOException e) {
-        // Check if directory was deleted by another process
-        if (!Files.exists(cgroupPath)) {
-          log.log(Level.FINE, "Cgroup directory was already deleted: " + cgroupPath);
-          return true;
-        }
-
-        if (retryCount < maxRetries - 1) {
-          log.log(
-              Level.FINE,
-              "Failed to delete cgroup directory, retrying: "
-                  + cgroupPath
-                  + " (attempt "
-                  + (retryCount + 1)
-                  + "/"
-                  + maxRetries
-                  + ")",
-              e);
-          try {
-            Thread.sleep(50 * (retryCount + 1)); // Exponential backoff
-          } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            log.log(
-                Level.WARNING, "Interrupted while waiting to retry cgroup deletion: " + cgroupPath);
-            return false;
-          }
-        } else {
-          log.log(
-              Level.WARNING,
-              "Unable to delete cgroup directory after "
-                  + maxRetries
-                  + " attempts: "
-                  + cgroupPath
-                  + ". Error: "
-                  + e.getMessage());
-          return false;
-        }
-      }
-    }
-    return false;
   }
 }
