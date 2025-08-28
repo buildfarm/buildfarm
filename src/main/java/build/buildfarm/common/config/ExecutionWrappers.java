@@ -26,6 +26,20 @@ import lombok.Data;
 @Data
 public class ExecutionWrappers {
   /**
+   * @field cgroups1
+   * @brief The program to use when running actions under cgroups v1.
+   * @details This program is expected to be packaged with the worker image.
+   */
+  private String cgroups1 = "/usr/bin/cgexec";
+
+  /**
+   * @field cgroups2
+   * @brief The program to use when running actions under cgroups v2.
+   * @details This program is expected to be packaged with the worker image.
+   */
+  private String cgroups2 = "/app/build_buildfarm/cgexec-wrapper";
+
+  /**
    * @field unshare
    * @brief The program to use when desiring to unshare namespaces from the action.
    * @details This program is expected to be packaged with the worker image.
