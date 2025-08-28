@@ -1056,12 +1056,25 @@ class ShardWorkerContext implements WorkerContext {
       return; // No cgroup restrictions to apply
     }
 
+    // For cgroups v1, we use wrapper-based approach, so we don't move processes via Java
+    // For cgroups v2, we continue using the Java implementation
+    CgroupVersionHandler.CgroupVersion version = cgroupHandler.getVersion();
+    if (version == CgroupVersionHandler.CgroupVersion.VERSION_1) {
+      // For v1, the cgexec wrapper will handle moving the process to the cgroup
+      // We don't need to do anything here - the wrapper approach handles it
+      log.log(
+          java.util.logging.Level.FINE,
+          "Skipping Java-based cgroup move for operation {0} - using cgroups v1 wrapper approach",
+          operationName);
+      return;
+    }
+
     try {
       String operationId = getOperationId(operationName);
       // Use the same hierarchy path as the Group fallback: executions/operations/{operationId}
       String cgroupPath = "executions/operations/" + operationId;
 
-      // First try the new cgroup handler that properly supports both v1 and v2
+      // For cgroups v2, use the Java-based cgroup handler
       boolean success = cgroupHandler.moveProcessToCgroup(pid, cgroupPath);
 
       if (success) {
