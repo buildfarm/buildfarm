@@ -86,6 +86,9 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -586,6 +589,19 @@ class Cat implements Callable<Integer> {
     }
   }
 
+  private static int elapsedMs(Operation operation) {
+    try {
+      ExecuteResponse response = operation.getResponse().unpack(ExecuteResponse.class);
+      ExecutedActionMetadata metadata = response.getResult().getExecutionMetadata();
+      return (int)
+          Durations.toMillis(
+              Timestamps.between(
+                  metadata.getQueuedTimestamp(), metadata.getWorkerCompletedTimestamp()));
+    } catch (InvalidProtocolBufferException e) {
+      return 1000000000;
+    }
+  }
+
   private static void listOperations(Instance instance, Iterable<String> args, IndentStream out) throws IOException {
     String pageToken = "";
     java.util.Iterator<String> arg = args.iterator();
@@ -597,17 +613,21 @@ class Cat implements Callable<Integer> {
     if (arg.hasNext()) {
       name = arg.next();
     }
+    ArrayList<Operation> operations = new ArrayList<>();
     do {
-      ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
       pageToken =
           instance.listOperations(
               name, LIST_OPERATIONS_MAXIMUM_PAGE_SIZE, pageToken, filter, operations::add);
-      System.out.println(pageToken);
-      System.out.println("Page size: " + operations.build().size());
-      for (Operation operation : operations.build()) {
-        printOperation(operation, out);
-      }
     } while (!pageToken.equals(Instance.SENTINEL_PAGE_TOKEN));
+    Collections.sort(operations, new Comparator<>() {
+      @Override
+      public int compare(Operation a, Operation b) {
+        return elapsedMs(a) - elapsedMs(b);
+      }
+    });
+    for (Operation operation : operations) {
+      printOperation(operation, out);
+    }
   }
 
   private static void printRequestMetadata(RequestMetadata metadata, IndentStream out) {
