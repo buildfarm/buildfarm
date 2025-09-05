@@ -42,7 +42,7 @@ public final class TracingMetadataUtils {
 
   /** Fetches a {@link RequestMetadata} defined on the current context, or the default instance. */
   public static RequestMetadata fromCurrentContext() {
-    RequestMetadata metadata = CONTEXT_KEY.get();
+    RequestMetadata metadata = CONTEXT_KEY.get(30, TimeUnit.SECONDS);
     if (metadata == null) {
       metadata = RequestMetadata.getDefaultInstance();
     }
