@@ -247,7 +247,7 @@ class Cat {
           indentLevel,
           "Input Fetch Start: " + Timestamps.toString(metadata.getInputFetchStartTimestamp()));
     }
-    if (metadata.hasQueuedTimestamp()) {
+    if (metadata.hasInputFetchCompletedTimestamp()) {
       indentOut(
           indentLevel,
           "Input Fetch Completed: "
