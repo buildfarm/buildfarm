@@ -316,7 +316,6 @@ class Executor {
             arguments,
             executionContext.command,
             workingDirectory)) {
-
       // Apply all other custom execution policies AFTER built-in wrappers
       for (ExecutionPolicy policy : policies) {
         if (!policy.isPrioritized() && policy.getExecutionWrapper() != null) {
@@ -571,6 +570,12 @@ class Executor {
     try {
       process = ProcessUtils.threadSafeStart(processBuilder);
       process.getOutputStream().close();
+
+      // Move the process to the appropriate cgroup if needed
+      // This Java-based approach works with both sandbox and non-sandbox scenarios
+      if (limits.cgroups && (limits.cpu.limit || limits.mem.limit)) {
+        workerContext.moveProcessToCgroup(operationName, process.pid(), limits);
+      }
     } catch (IOException e) {
       log.log(Level.SEVERE, format("error starting process for %s", operationName), e);
       // again, should we do something else here??
