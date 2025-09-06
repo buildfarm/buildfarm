@@ -1465,6 +1465,11 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
+  public boolean isReadOnly() {
+    return false;
+  }
+
+  @Override
   public Write getBlobWrite(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest digest,
@@ -1822,10 +1827,34 @@ public class ServerInstance extends NodeInstance {
             .setPlatform(queuedOperation.getCommand().getPlatform())
             .build();
     return transform(
-        writeBlobFuture(
-            queuedOperationDigest, queuedOperationBlob, executeEntry.getRequestMetadata(), timeout),
+        retryWriteBlobFuture(
+            queuedOperationDigest,
+            queuedOperationBlob,
+            executeEntry.getRequestMetadata(),
+            timeout,
+            5),
         (committedSize) -> new QueuedOperationResult(entry, metadata),
         service);
+  }
+
+  private ListenableFuture<Long> retryWriteBlobFuture(
+      build.buildfarm.v1test.Digest digest,
+      ByteString content,
+      RequestMetadata requestMetadata,
+      Duration timeout,
+      int maxRetries)
+      throws EntryLimitException {
+    ListenableFuture<Long> future = writeBlobFuture(digest, content, requestMetadata, timeout);
+    return catchingAsync(
+        future,
+        Throwable.class,
+        t -> {
+          if (maxRetries == 0 && SHARD_IS_RETRIABLE.test(Status.fromThrowable(t))) {
+            return immediateFailedFuture(t);
+          }
+          return retryWriteBlobFuture(digest, content, requestMetadata, timeout, maxRetries - 1);
+        },
+        directExecutor());
   }
 
   private ListenableFuture<Long> writeBlobFuture(
@@ -2771,8 +2800,8 @@ public class ServerInstance extends NodeInstance {
                   profiledQueuedMetadata.getQueuedOperationMetadata().getQueuedOperationDigest();
               long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
               return transform(
-                  writeBlobFuture(
-                      queuedOperationDigest, queuedOperationBlob, requestMetadata, timeout),
+                  retryWriteBlobFuture(
+                      queuedOperationDigest, queuedOperationBlob, requestMetadata, timeout, 5),
                   (committedSize) ->
                       profiledQueuedMetadata
                           .setUploadedIn(

@@ -4,8 +4,8 @@ pkg_rpm(
     name = "buildfarm-worker-rpm",
     data = [
         ":worker-service",
-        "//config:base_properties",
         "//examples:example_configs",
+        "//examples:example_properties",
         "//src/main/java/build/buildfarm:buildfarm-shard-worker_deploy.jar",
     ],
     release = "0",

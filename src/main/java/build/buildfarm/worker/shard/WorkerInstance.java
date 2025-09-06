@@ -91,6 +91,11 @@ public class WorkerInstance extends NodeInstance {
   }
 
   @Override
+  public boolean isReadOnly() {
+    return contentAddressableStorage.isReadOnly();
+  }
+
+  @Override
   public void getBlob(
       Compressor.Value compressor,
       Digest digest,
