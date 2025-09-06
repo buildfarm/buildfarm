@@ -3,7 +3,7 @@ headerPath = "ci/license-header.txt"
 includes = [
     "*.c",
     # "*.java", # TODO
-    # "*.sh", # TODO
+    "*.sh",
 ]
 
 [git]
