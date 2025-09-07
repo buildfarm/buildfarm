@@ -88,7 +88,7 @@ class Mount {
   }
 
   public static void main(String[] args) throws Exception {
-    if (args.length != 6) {
+    if (args.length != 5) {
       System.err.println("Usage: bf-mount <endpoint> <instance-name> <root> <digest> <name>");
       System.err.println("\nMount an REAPI directory specified by 'digest' at 'name' under 'root'");
       System.exit(1);
