@@ -34,7 +34,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
           .name("input_fetch_stall_time_ms")
           .help("Input fetch stall time in ms.")
           .register();
-  private final ConcurrentMap<String, InputFetcher> inputFetchers;
+  private final ConcurrentMap<String, InputFetcher> inputFetchers = Maps.newConcurrentMap();
 
   @GuardedBy("this")
   private int slotUsage;
@@ -47,7 +47,6 @@ public class InputFetchStage extends SuperscalarPipelineStage {
         output,
         error,
         workerContext.getInputFetchStageWidth());
-    inputFetchers = Maps.newConcurrentMap();
   }
 
   @Override

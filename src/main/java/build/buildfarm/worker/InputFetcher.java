@@ -326,7 +326,6 @@ public class InputFetcher implements Runnable {
             .setCommand(command)
             .setTree(tree)
             .build();
-    stalled = true;
     boolean claimed;
     // PMD exemption false positive: unused variable
     try (StallState state = new StallState()) {
