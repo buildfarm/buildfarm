@@ -91,7 +91,7 @@ maven.install(
         "com.google.auth:google-auth-library-credentials",  # Version is specified via the BOM below
         "com.google.auth:google-auth-library-oauth2-http",  # Version is specified via the BOM below
         "com.google.code.findbugs:jsr305:3.0.2",
-        "com.google.code.gson:gson:2.12.1",
+        "com.google.code.gson:gson:2.13.1",
         "com.google.errorprone:error_prone_annotations:2.37.0",
         "com.google.errorprone:error_prone_core:2.37.0",
         "com.google.guava:failureaccess:1.0.3",
