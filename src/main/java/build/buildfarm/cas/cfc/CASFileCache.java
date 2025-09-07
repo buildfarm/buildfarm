@@ -581,7 +581,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             e = null;
           }
         }
-        if (e.referenceCount >= 0) {
+        if (e != null && e.referenceCount >= 0) {
           accessed(ImmutableList.of(key));
         }
         if (input != null) {
