@@ -16,14 +16,17 @@ package build.buildfarm.common.redis;
 
 import static redis.clients.jedis.args.ListDirection.LEFT;
 import static redis.clients.jedis.args.ListDirection.RIGHT;
+import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
 import build.buildfarm.common.Queue;
 import build.buildfarm.common.Visitor;
+import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.util.List;
 import java.util.function.Supplier;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class RedisQueue
@@ -212,5 +215,19 @@ public class RedisQueue implements Queue<String> {
       index = nextIndex;
       nextIndex += entries.size();
     } while (entries.size() == listPageSize);
+  }
+
+  public ScanResult<String> scan(String cursor, int count, String match) {
+    int start = cursor.isEmpty() ? 0 : Integer.parseInt(cursor);
+    int stop = start + count - 1;
+
+    if (stop < start) {
+      // FIXME no support for the -1 reversal
+      return new ScanResult<>(SCAN_POINTER_START, ImmutableList.of());
+    }
+
+    List<String> range = jedis.lrange(name, start, stop);
+    return new ScanResult<>(
+        range.isEmpty() ? SCAN_POINTER_START : String.valueOf(start + range.size()), range);
   }
 }
