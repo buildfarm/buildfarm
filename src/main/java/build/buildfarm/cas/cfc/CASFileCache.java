@@ -1371,16 +1371,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private void deleteInvalidFileContent(List<Path> files, ExecutorService removeDirectoryService) {
-    try {
-      for (Path path : files) {
+    for (Path path : files) {
+      try {
         if (Files.isDirectory(path)) {
           Directories.remove(path, fileStore, removeDirectoryService);
         } else {
           Files.delete(path);
         }
+      } catch (Exception e) {
+        log.log(Level.SEVERE, "failure to delete CAS content: ", e);
       }
-    } catch (Exception e) {
-      log.log(Level.SEVERE, "failure to delete CAS content: ", e);
     }
   }
 
