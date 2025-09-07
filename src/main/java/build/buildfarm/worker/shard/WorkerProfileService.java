@@ -28,6 +28,8 @@ import io.grpc.stub.StreamObserver;
 import javax.annotation.Nullable;
 
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
+  private final String name;
+  private final String endpoint;
   private final @Nullable CASFileCache storage;
   private final @Nullable PipelineStage matchStage;
   private final @Nullable SuperscalarPipelineStage inputFetchStage;
@@ -36,12 +38,16 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final @Nullable PutOperationStage completeStage;
 
   public WorkerProfileService(
+      String name,
+      String endpoint,
       @Nullable CASFileCache storage,
       @Nullable PipelineStage matchStage,
       @Nullable SuperscalarPipelineStage inputFetchStage,
       @Nullable SuperscalarPipelineStage executeActionStage,
       @Nullable SuperscalarPipelineStage reportResultStage,
       @Nullable PutOperationStage completeStage) {
+    this.name = name;
+    this.endpoint = endpoint;
     this.storage = storage;
     this.matchStage = matchStage;
     this.inputFetchStage = inputFetchStage;
@@ -72,7 +78,8 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   public void getWorkerProfile(
       WorkerProfileRequest request, StreamObserver<WorkerProfileMessage> responseObserver) {
     // get usage of CASFileCache
-    WorkerProfileMessage.Builder replyBuilder = WorkerProfileMessage.newBuilder();
+    WorkerProfileMessage.Builder replyBuilder =
+        WorkerProfileMessage.newBuilder().setName(name).setEndpoint(endpoint);
 
     // FIXME deliver full local storage chain
     if (storage != null) {
