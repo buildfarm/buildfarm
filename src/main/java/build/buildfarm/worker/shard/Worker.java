@@ -100,6 +100,7 @@ import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -780,8 +781,12 @@ public final class Worker extends LoggingMain {
       pipeline.add(reportResultStage, 1);
     }
 
+    String workerName = InetAddress.getLocalHost().getHostName();
+
     WorkerProfileService workerProfileService =
         new WorkerProfileService(
+            workerName,
+            configs.getWorker().getPublicName(),
             (CASFileCache) storage,
             matchStage,
             inputFetchStage,

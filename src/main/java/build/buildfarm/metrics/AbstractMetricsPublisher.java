@@ -122,7 +122,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
           queuedTime.observe(
               Time.toDurationSeconds(
                   executionMetadata.getQueuedTimestamp(),
-                  executionMetadata.getExecutionStartTimestamp()));
+                  executionMetadata.getWorkerStartTimestamp()));
           outputUploadTime.observe(
               Time.toDurationSeconds(
                   executionMetadata.getOutputUploadStartTimestamp(),
