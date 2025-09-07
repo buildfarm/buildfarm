@@ -316,7 +316,6 @@ class Executor {
             arguments,
             executionContext.command,
             workingDirectory)) {
-
       // Apply all other custom execution policies AFTER built-in wrappers
       for (ExecutionPolicy policy : policies) {
         if (!policy.isPrioritized() && policy.getExecutionWrapper() != null) {
