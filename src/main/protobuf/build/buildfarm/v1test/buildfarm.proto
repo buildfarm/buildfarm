@@ -606,6 +606,12 @@ message BatchWorkerProfilesResponse {
 }
 
 message WorkerProfileMessage {
+  // useful name for worker
+  string name = 15;
+
+  // preferred way to contact this worker
+  string endpoint = 16;
+
   // number of Entry in CAS
   int64 cas_entry_count = 1;
 
