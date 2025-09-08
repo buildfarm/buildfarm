@@ -87,7 +87,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
-    if (!workerContext.isInputFetching()) {
+    if (!workerContext.inGracefulShutdown() && isPaused()) {
       return;
     }
     ExecutionContext executionContext = take();

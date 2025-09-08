@@ -98,8 +98,6 @@ public class DirectoryEntryCFC extends CASFileCache {
         externalInputStreamFactory);
   }
 
-  // needs to delete directories which have multiple references (link count > 1)
-
   private void computeDirectory(Path path, ImmutableList.Builder<Path> invalidDirectories) {
     String key = path.getFileName().toString();
     try {
@@ -109,9 +107,6 @@ public class DirectoryEntryCFC extends CASFileCache {
           new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-              // a bold option here: if we're dealing with a Legacy multi-link directory
-              // there will never be an overcharge on the committed size, and this directory
-              // can be deleted here or through expiration due to size, with no possible leaks
               if (attrs.isRegularFile()) {
                 blobSizeInBytes.addAndGet(attrs.size());
               }
