@@ -144,7 +144,7 @@ maven.install(
         "org.mockito:mockito-core:5.16.1",
         "org.openjdk.jmh:jmh-core:1.37",
         "org.openjdk.jmh:jmh-generator-annprocess:1.37",
-        "org.projectlombok:lombok:1.18.36",
+        "org.projectlombok:lombok:1.18.40",
         "org.redisson:redisson:3.45.1",
         "org.slf4j:slf4j-simple:2.0.17",
         "org.threeten:threetenbp:1.7.2",
