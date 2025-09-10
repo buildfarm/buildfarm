@@ -230,27 +230,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean isMatching() {
-    return !inGracefulShutdown() && !pauseMatch;
-  }
-
-  // later stages must drain with graceful shutdown
-  @Override
-  public boolean isInputFetching() {
-    return inGracefulShutdown() || !pauseInputFetch;
-  }
-
-  @Override
-  public boolean isExecuting() {
-    return inGracefulShutdown() || !pauseExecute;
-  }
-
-  @Override
-  public boolean isReportingResults() {
-    return inGracefulShutdown() || !pauseReportResult;
-  }
-
-  @Override
   public void prepareForGracefulShutdown() {
     inGracefulShutdown = true;
   }
@@ -425,14 +404,13 @@ class ShardWorkerContext implements WorkerContext {
   /** wait until matching should occur, false return indicates that we are shutting down */
   private boolean waitToMatch() throws InterruptedException {
     ContentAddressableStorage storage = execFileSystem.getStorage();
-    boolean isMatching = isMatching();
     synchronized (storage) {
-      while (isMatching && storage.isReadOnly()) {
+      // we may want to get interrupted when match is paused
+      while (!inGracefulShutdown && storage.isReadOnly()) {
         storage.waitForWritable(java.time.Duration.ofSeconds(1));
-        isMatching = isMatching();
       }
     }
-    return isMatching;
+    return !inGracefulShutdown;
   }
 
   @Override

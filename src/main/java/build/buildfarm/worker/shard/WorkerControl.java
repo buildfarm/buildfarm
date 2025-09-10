@@ -16,15 +16,17 @@ package build.buildfarm.worker.shard;
 
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
-import build.buildfarm.v1test.ShutDownWorkerGrpc;
+import build.buildfarm.v1test.WorkerControlGrpc;
+import build.buildfarm.v1test.WorkerPipelineChangeRequest;
+import build.buildfarm.v1test.WorkerPipelineChangeResponse;
 import io.grpc.stub.StreamObserver;
 import lombok.extern.java.Log;
 
 @Log
-public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerImplBase {
+public class WorkerControl extends WorkerControlGrpc.WorkerControlImplBase {
   private final Worker worker;
 
-  public ShutDownWorkerGracefully(Worker worker) {
+  public WorkerControl(Worker worker) {
     this.worker = worker;
   }
 
@@ -42,6 +44,22 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
     try {
       worker.initiateShutdown();
       responseObserver.onNext(PrepareWorkerForGracefulShutDownRequestResults.newBuilder().build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      responseObserver.onError(e);
+    }
+  }
+
+  @Override
+  public void pipelineChange(
+      WorkerPipelineChangeRequest request,
+      StreamObserver<WorkerPipelineChangeResponse> responseObserver) {
+    try {
+      WorkerPipelineChangeResponse response =
+          WorkerPipelineChangeResponse.newBuilder()
+              .addAllChanges(worker.pipelineChange(request.getChangesList()))
+              .build();
+      responseObserver.onNext(response);
       responseObserver.onCompleted();
     } catch (Exception e) {
       responseObserver.onError(e);

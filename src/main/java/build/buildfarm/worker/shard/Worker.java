@@ -60,6 +60,7 @@ import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.Digest;
+import build.buildfarm.v1test.PipelineChange;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.worker.CFCExecFileSystem;
 import build.buildfarm.worker.CFCLinkExecFileSystem;
@@ -81,6 +82,7 @@ import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.FutureCallback;
@@ -100,6 +102,7 @@ import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -242,7 +245,7 @@ public final class Worker extends LoggingMain {
     serverBuilder.addService(healthStatusManager.getHealthService());
     serverBuilder.addService(new ContentAddressableStorageService(instance));
     serverBuilder.addService(new ByteStreamService(instance));
-    serverBuilder.addService(new ShutDownWorkerGracefully(this));
+    serverBuilder.addService(new WorkerControl(this));
     serverBuilder.addService(ProtoReflectionServiceV1.newInstance());
     serverBuilder.addService(workerProfileService);
 
@@ -780,8 +783,12 @@ public final class Worker extends LoggingMain {
       pipeline.add(reportResultStage, 1);
     }
 
+    String workerName = InetAddress.getLocalHost().getHostName();
+
     WorkerProfileService workerProfileService =
         new WorkerProfileService(
+            workerName,
+            configs.getWorker().getPublicName(),
             (CASFileCache) storage,
             matchStage,
             inputFetchStage,
@@ -793,7 +800,7 @@ public final class Worker extends LoggingMain {
     removeWorker(configs.getWorker().getPublicName());
 
     boolean skipLoad = configs.getWorker().getStorages().getFirst().isSkipLoad();
-    ListenableFuture<Void> writable =
+    ListenableFuture<Void> fileSystemStarted =
         execFileSystem.start(
             (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()),
             skipLoad,
@@ -801,7 +808,7 @@ public final class Worker extends LoggingMain {
 
     server.start();
     Futures.addCallback(
-        writable,
+        fileSystemStarted,
         new FutureCallback<>() {
           @Override
           public void onSuccess(Void result) {
@@ -811,7 +818,9 @@ public final class Worker extends LoggingMain {
           }
 
           @Override
-          public void onFailure(Throwable t) {}
+          public void onFailure(Throwable t) {
+            log.log(SEVERE, "execFileSystem start failure", t);
+          }
         },
         directExecutor());
     startFailsafeRegistration();
@@ -850,6 +859,28 @@ public final class Worker extends LoggingMain {
         server.awaitTermination();
       }
     }
+  }
+
+  public Iterable<PipelineChange> pipelineChange(Iterable<PipelineChange> changes) {
+    for (PipelineChange change : changes) {
+      for (PipelineStage stage : pipeline) {
+        if (change.getStage().equals(stage.getName())) {
+          stage.setPaused(change.getPaused());
+          if (change.getWidth() > 0) {
+            stage.setWidth(change.getWidth());
+          }
+        }
+      }
+    }
+
+    return Iterables.transform(
+        pipeline,
+        stage ->
+            PipelineChange.newBuilder()
+                .setStage(stage.getName())
+                .setPaused(stage.isPaused())
+                .setWidth(stage.getWidth())
+                .build());
   }
 
   public void initiateShutdown() {
@@ -903,7 +934,11 @@ public final class Worker extends LoggingMain {
     inputFetchSlotsTotal.set(0);
     if (execFileSystem != null) {
       log.info("Stopping exec filesystem");
-      execFileSystem.stop();
+      try {
+        execFileSystem.stop();
+      } catch (IOException e) {
+        log.log(SEVERE, "error shutting down exec filesystem", e);
+      }
       execFileSystem = null;
     }
     if (server != null) {

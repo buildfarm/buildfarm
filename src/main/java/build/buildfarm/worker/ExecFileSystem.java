@@ -38,7 +38,7 @@ public interface ExecFileSystem extends InputStreamFactory {
   ListenableFuture<Void> start(Consumer<List<Digest>> onDigests, boolean skipLoad, boolean writable)
       throws IOException, InterruptedException;
 
-  void stop() throws InterruptedException;
+  void stop() throws IOException, InterruptedException;
 
   Path root();
 

@@ -606,6 +606,12 @@ message BatchWorkerProfilesResponse {
 }
 
 message WorkerProfileMessage {
+  // useful name for worker
+  string name = 15;
+
+  // preferred way to contact this worker
+  string endpoint = 16;
+
   // number of Entry in CAS
   int64 cas_entry_count = 1;
 
@@ -664,9 +670,42 @@ message PrepareWorkerForGracefulShutDownRequest {
 
 message PrepareWorkerForGracefulShutDownRequestResults {}
 
-service ShutDownWorker {
+service WorkerControl {
   rpc PrepareWorkerForGracefulShutdown(PrepareWorkerForGracefulShutDownRequest)
-      returns (PrepareWorkerForGracefulShutDownRequestResults) {}
+      returns (PrepareWorkerForGracefulShutDownRequestResults) {
+    option (google.api.http) = {
+      post: "/v1test/{instance_name=**}/pipeline:change"
+      body: "*"
+    };
+  }
+
+  rpc PipelineChange(WorkerPipelineChangeRequest)
+      returns (WorkerPipelineChangeResponse) {
+    option (google.api.http) = {
+      post: "/v1test/{instance_name=**}/pipeline:change"
+      body: "*"
+    };
+  }
+}
+
+message PipelineChange {
+  string stage = 1;
+
+  bool paused = 2;
+
+  int32 width = 3;
+}
+
+message WorkerPipelineChangeRequest {
+  string instance_name = 1;
+
+  string worker_name = 2;
+
+  repeated PipelineChange changes = 3;
+}
+
+message WorkerPipelineChangeResponse {
+  repeated PipelineChange changes = 1;
 }
 
 message FetchQualifiers {
