@@ -70,26 +70,6 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean isMatching() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean isInputFetching() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean isExecuting() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean isReportingResults() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public void prepareForGracefulShutdown() {
     throw new UnsupportedOperationException();
   }

@@ -14,9 +14,12 @@
 
 package build.buildfarm.common.redis;
 
+import static com.google.common.collect.Lists.newArrayList;
+
 import build.buildfarm.common.Queue;
 import build.buildfarm.common.Visitor;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -24,6 +27,9 @@ import java.util.function.Supplier;
 import lombok.Getter;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
+import redis.clients.jedis.resps.Tuple;
 
 /**
  * @class RedisPriorityQueue
@@ -315,5 +321,32 @@ public class RedisPriorityQueue implements Queue<String> {
    */
   private boolean isEmpty(String val) {
     return val == null || val.isEmpty() || val.equalsIgnoreCase("null");
+  }
+
+  /** responses from zscan are score:value */
+  private String entryValue(String entry) {
+    int sepIndex = entry.indexOf(':');
+    return entry.substring(sepIndex + 1);
+  }
+
+  public ScanResult<String> scan(String queueCursor, int count, String match) {
+    // redis has much worse performance when scanning for small counts
+    // break even is around 5k
+    int scanCount = 5000;
+    // maybe use type regular?
+    // TODO might be some optimization around unspecified match, look into this
+    ScanParams scanParams = new ScanParams().count(scanCount).match(match);
+    return new OffsetScanner<String>() {
+      @Override
+      protected ScanResult<String> scan(String cursor, int remaining) {
+        // do we strip here or in transform??
+        ScanResult<Tuple> scanResult = jedis.zscan(name, cursor, scanParams);
+        return new ScanResult<>(
+            scanResult.getCursor(),
+            newArrayList(
+                Iterables.transform(
+                    scanResult.getResult(), entry -> entryValue(entry.getElement()))));
+      }
+    }.fill(queueCursor, count);
   }
 }
