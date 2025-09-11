@@ -65,6 +65,16 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
+  public boolean inGracefulShutdown() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void prepareForGracefulShutdown() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public void match(MatchListener listener) throws InterruptedException {
     throw new UnsupportedOperationException();
   }

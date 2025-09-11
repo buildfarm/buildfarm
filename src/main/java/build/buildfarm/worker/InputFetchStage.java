@@ -14,8 +14,11 @@
 
 package build.buildfarm.worker;
 
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
@@ -31,6 +34,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
           .name("input_fetch_stall_time_ms")
           .help("Input fetch stall time in ms.")
           .register();
+  private final ConcurrentMap<String, InputFetcher> inputFetchers = Maps.newConcurrentMap();
 
   @GuardedBy("this")
   private int slotUsage;
@@ -60,6 +64,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   public void releaseInputFetcher(
       String operationName, long usecs, long stallUSecs, boolean success) {
     int size = removeAndRelease(operationName);
+    inputFetchers.remove(operationName);
     inputFetchTime.observe(usecs / 1000.0);
     inputFetchStallTime.observe(stallUSecs / 1000.0);
     complete(
@@ -75,10 +80,20 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   }
 
   @Override
+  public boolean isStalled() {
+    // true iff any of the current fetchers are waiting to advance to execute
+    return Iterables.any(inputFetchers.values(), inputFetcher -> inputFetcher.isStalled());
+  }
+
+  @Override
   protected void iterate() throws InterruptedException {
+    if (!workerContext.inGracefulShutdown() && isPaused()) {
+      return;
+    }
     ExecutionContext executionContext = take();
     InputFetcher inputFetcher =
         new InputFetcher(workerContext, executionContext, this, pollerExecutor);
+    inputFetchers.put(executionContext.operation.getName(), inputFetcher);
 
     synchronized (this) {
       slotUsage++;

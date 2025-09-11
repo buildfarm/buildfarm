@@ -30,6 +30,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.Claim;
 import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestPath;
@@ -142,6 +143,11 @@ class ShardWorkerContext implements WorkerContext {
   private final LocalResourceSet resourceSet;
   private final boolean errorOperationOutputSizeExceeded;
   private final boolean provideOwnedClaim;
+  private boolean inGracefulShutdown = false;
+  private boolean pauseMatch = false;
+  private boolean pauseInputFetch = false;
+  private boolean pauseExecute = false;
+  private boolean pauseReportResult = false;
 
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, String name, int executeStageWidth) {
@@ -216,6 +222,16 @@ class ShardWorkerContext implements WorkerContext {
             /*options.experimentalRemoteRetryJitter=*/ 0.1,
             /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
         Retrier.REDIS_IS_RETRIABLE);
+  }
+
+  @Override
+  public boolean inGracefulShutdown() {
+    return inGracefulShutdown;
+  }
+
+  @Override
+  public void prepareForGracefulShutdown() {
+    inGracefulShutdown = true;
   }
 
   @Override
@@ -385,6 +401,18 @@ class ShardWorkerContext implements WorkerContext {
     return queueEntry;
   }
 
+  /** wait until matching should occur, false return indicates that we are shutting down */
+  private boolean waitToMatch() throws InterruptedException {
+    ContentAddressableStorage storage = execFileSystem.getStorage();
+    synchronized (storage) {
+      // we may want to get interrupted when match is paused
+      while (!inGracefulShutdown && storage.isReadOnly()) {
+        storage.waitForWritable(java.time.Duration.ofSeconds(1));
+      }
+    }
+    return !inGracefulShutdown;
+  }
+
   @Override
   public void match(MatchListener listener) throws InterruptedException {
     RetryingMatchListener dedupMatchListener =
@@ -444,7 +472,7 @@ class ShardWorkerContext implements WorkerContext {
             throw new RuntimeException(t);
           }
         };
-    while (!dedupMatchListener.isMatched()) {
+    while (waitToMatch() && !dedupMatchListener.isMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
@@ -828,10 +856,7 @@ class ShardWorkerContext implements WorkerContext {
 
   void createOperationExecutionLimits() {
     try {
-      int availableProcessors = SystemProcessors.get();
-      Preconditions.checkState(availableProcessors >= executeStageWidth);
-      executionsGroup.getCpu().setMaxCpu(executeStageWidth);
-      if (executeStageWidth < availableProcessors) {
+      if (executeStageWidth < SystemProcessors.get()) {
         /* only divide up our cfs quota if we need to limit below the available processors for executions */
         executionsGroup.getCpu().setMaxCpu(executeStageWidth);
       }

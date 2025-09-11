@@ -1,0 +1,19 @@
+name: PR Tests
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  license:
+    name: Check license headers
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8     # v5.0.0
+      with:
+        fetch-depth: 0
+
+    - name: Check License Header
+      run: docker run --rm -v "$(pwd):/github/workspace" ghcr.io/korandoru/hawkeye:v6.1.1 check

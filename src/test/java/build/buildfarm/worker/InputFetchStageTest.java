@@ -123,6 +123,7 @@ public class InputFetchStageTest {
             any(Runnable.class),
             any(Deadline.class),
             any(Executor.class));
+    verify(workerContext, times(2)).inGracefulShutdown();
     verifyNoMoreInteractions(workerContext);
     ExecutionContext executionContext = error.getExecutionContexts().getFirst();
     assertThat(executionContext).isEqualTo(badContext);

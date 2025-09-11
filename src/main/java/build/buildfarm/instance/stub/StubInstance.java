@@ -96,9 +96,9 @@ import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
-import build.buildfarm.v1test.ShutDownWorkerGrpc;
-import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerControlGrpc;
+import build.buildfarm.v1test.WorkerControlGrpc.WorkerControlBlockingStub;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileFutureStub;
 import build.buildfarm.v1test.WorkerProfileMessage;
@@ -354,12 +354,12 @@ public class StubInstance extends InstanceBase {
           });
 
   @SuppressWarnings("Guava")
-  private final Supplier<ShutDownWorkerBlockingStub> shutDownWorkerBlockingStub =
+  private final Supplier<WorkerControlBlockingStub> workerControlBlockingStub =
       Suppliers.memoize(
           new Supplier<>() {
             @Override
-            public ShutDownWorkerBlockingStub get() {
-              return ShutDownWorkerGrpc.newBlockingStub(channel);
+            public WorkerControlBlockingStub get() {
+              return WorkerControlGrpc.newBlockingStub(channel);
             }
           });
 
@@ -539,6 +539,11 @@ public class StubInstance extends InstanceBase {
               response.getBlobDigest(), expectedDigest.getDigestFunction());
         },
         directExecutor());
+  }
+
+  @Override
+  public boolean isReadOnly() {
+    return false;
   }
 
   @Override
@@ -983,7 +988,7 @@ public class StubInstance extends InstanceBase {
   @Override
   public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throwIfStopped();
-    return shutDownWorkerBlockingStub
+    return workerControlBlockingStub
         .get()
         .prepareWorkerForGracefulShutdown(
             PrepareWorkerForGracefulShutDownRequest.newBuilder().build());

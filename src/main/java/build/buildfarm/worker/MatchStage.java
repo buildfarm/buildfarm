@@ -20,7 +20,10 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Claim;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
@@ -42,7 +45,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class MatchStage extends PipelineStage {
-  private boolean inGracefulShutdown = false;
   private ExecutorService pollerExecutor = newSingleThreadExecutor();
 
   public MatchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -70,7 +72,7 @@ public class MatchStage extends PipelineStage {
     @Override
     public boolean onWaitStart() {
       waitStart = stopwatch.elapsed(MICROSECONDS);
-      return !inGracefulShutdown;
+      return !workerContext.inGracefulShutdown();
     }
 
     @Override
@@ -84,7 +86,7 @@ public class MatchStage extends PipelineStage {
     @Override
     public boolean onEntry(@Nullable QueueEntry queueEntry, Claim claim)
         throws InterruptedException {
-      if (inGracefulShutdown) {
+      if (workerContext.inGracefulShutdown()) {
         throw new InterruptedException();
       }
 
@@ -92,10 +94,23 @@ public class MatchStage extends PipelineStage {
         return false;
       }
 
+      ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+      RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
+      if (requestMetadata.getActionMnemonic().equals("buildfarm:halt-on-dequeue")) {
+        putOperation(
+            Operation.newBuilder()
+                .setName(executeEntry.getOperationName())
+                .setDone(true)
+                .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+                .setResponse(Any.pack(ExecuteResponse.getDefaultInstance()))
+                .build());
+        return false;
+      }
+
       executionContext
           .metadata
           .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
-          .setRequestMetadata(queueEntry.getExecuteEntry().getRequestMetadata())
+          .setRequestMetadata(requestMetadata)
           .getExecuteOperationMetadataBuilder()
           .setDigestFunction(queueEntry.getExecuteEntry().getActionDigest().getDigestFunction());
 
@@ -146,7 +161,7 @@ public class MatchStage extends PipelineStage {
   protected void iterate() throws InterruptedException {
     start(); // clear any previous operation
     // stop matching and picking up any works if the worker is in graceful shutdown.
-    if (inGracefulShutdown) {
+    if (workerContext.inGracefulShutdown() || isPaused() || output.isStalled()) {
       return;
     }
     Stopwatch stopwatch = Stopwatch.createStarted();
@@ -162,10 +177,6 @@ public class MatchStage extends PipelineStage {
         output.release();
       }
     }
-  }
-
-  void prepareForGracefulShutdown() {
-    inGracefulShutdown = true;
   }
 
   private void putOperation(Operation operation) throws InterruptedException {

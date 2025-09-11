@@ -63,6 +63,7 @@ backplane:
   jedisPoolMaxIdle: 8
   jedisPoolMinIdle: 0
   jedisTimeBetweenEvictionRunsMillis: 30000
+  connectionValidatedOnBorrow: false
   workersHashName: Workers
   workerChannel: WorkerChannel
   actionCachePrefix: ActionCache
@@ -156,6 +157,7 @@ worker:
   zstdBufferPoolSize: 2048
   executionPolicies:
   - name: test
+    prioritized: false
     executionWrapper:
       path: /
       arguments:

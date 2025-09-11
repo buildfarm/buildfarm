@@ -28,20 +28,26 @@ import io.grpc.stub.StreamObserver;
 import javax.annotation.Nullable;
 
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
+  private final String name;
+  private final String endpoint;
   private final @Nullable CASFileCache storage;
-  private final PipelineStage matchStage;
-  private final SuperscalarPipelineStage inputFetchStage;
-  private final SuperscalarPipelineStage executeActionStage;
-  private final SuperscalarPipelineStage reportResultStage;
-  private final PutOperationStage completeStage;
+  private final @Nullable PipelineStage matchStage;
+  private final @Nullable SuperscalarPipelineStage inputFetchStage;
+  private final @Nullable SuperscalarPipelineStage executeActionStage;
+  private final @Nullable SuperscalarPipelineStage reportResultStage;
+  private final @Nullable PutOperationStage completeStage;
 
   public WorkerProfileService(
+      String name,
+      String endpoint,
       @Nullable CASFileCache storage,
-      PipelineStage matchStage,
-      SuperscalarPipelineStage inputFetchStage,
-      SuperscalarPipelineStage executeActionStage,
-      SuperscalarPipelineStage reportResultStage,
-      PutOperationStage completeStage) {
+      @Nullable PipelineStage matchStage,
+      @Nullable SuperscalarPipelineStage inputFetchStage,
+      @Nullable SuperscalarPipelineStage executeActionStage,
+      @Nullable SuperscalarPipelineStage reportResultStage,
+      @Nullable PutOperationStage completeStage) {
+    this.name = name;
+    this.endpoint = endpoint;
     this.storage = storage;
     this.matchStage = matchStage;
     this.inputFetchStage = inputFetchStage;
@@ -72,7 +78,8 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   public void getWorkerProfile(
       WorkerProfileRequest request, StreamObserver<WorkerProfileMessage> responseObserver) {
     // get usage of CASFileCache
-    WorkerProfileMessage.Builder replyBuilder = WorkerProfileMessage.newBuilder();
+    WorkerProfileMessage.Builder replyBuilder =
+        WorkerProfileMessage.newBuilder().setName(name).setEndpoint(endpoint);
 
     // FIXME deliver full local storage chain
     if (storage != null) {
@@ -93,27 +100,34 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     // produce: slots that are not consistent with operations, operations
     // in multiple stages even in reverse due to claim progress
     // in short: this is for monitoring, not for guaranteed consistency checks
-    String matchOperation = matchStage.getOperationName();
-    replyBuilder
-        .addStages(superscalarStageInformation(reportResultStage))
-        .addStages(superscalarStageInformation(executeActionStage))
-        .addStages(superscalarStageInformation(inputFetchStage))
-        .addStages(unaryStageInformation(matchStage.getName(), matchOperation));
+    if (matchStage != null
+        && inputFetchStage != null
+        && executeActionStage != null
+        && reportResultStage != null) {
+      String matchOperation = matchStage.getOperationName();
+      replyBuilder
+          .addStages(superscalarStageInformation(reportResultStage))
+          .addStages(superscalarStageInformation(executeActionStage))
+          .addStages(superscalarStageInformation(inputFetchStage))
+          .addStages(unaryStageInformation(matchStage.getName(), matchOperation));
+    }
 
     // get average time costs on each stage
-    OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
-    for (OperationStageDurations duration : durations) {
-      replyBuilder
-          .addTimesBuilder()
-          .setQueuedToMatch(duration.queuedToMatch)
-          .setMatchToInputFetchStart(duration.matchToInputFetchStart)
-          .setInputFetchStartToComplete(duration.inputFetchStartToComplete)
-          .setInputFetchCompleteToExecutionStart(duration.inputFetchCompleteToExecutionStart)
-          .setExecutionStartToComplete(duration.executionStartToComplete)
-          .setExecutionCompleteToOutputUploadStart(duration.executionCompleteToOutputUploadStart)
-          .setOutputUploadStartToComplete(duration.outputUploadStartToComplete)
-          .setOperationCount(duration.operationCount)
-          .setPeriod(duration.period);
+    if (completeStage != null) {
+      OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
+      for (OperationStageDurations duration : durations) {
+        replyBuilder
+            .addTimesBuilder()
+            .setQueuedToMatch(duration.queuedToMatch)
+            .setMatchToInputFetchStart(duration.matchToInputFetchStart)
+            .setInputFetchStartToComplete(duration.inputFetchStartToComplete)
+            .setInputFetchCompleteToExecutionStart(duration.inputFetchCompleteToExecutionStart)
+            .setExecutionStartToComplete(duration.executionStartToComplete)
+            .setExecutionCompleteToOutputUploadStart(duration.executionCompleteToOutputUploadStart)
+            .setOutputUploadStartToComplete(duration.outputUploadStartToComplete)
+            .setOperationCount(duration.operationCount)
+            .setPeriod(duration.period);
+      }
     }
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();

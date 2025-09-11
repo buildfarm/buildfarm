@@ -24,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.SortedMap;
-import persistent.bazel.client.PersistentWorker;
 import persistent.bazel.client.WorkerKey;
 
 /** Much of the logic (hashing) is from Bazel itself (private library/methods, i.e. WorkerKey). */
@@ -52,10 +51,9 @@ public class Keymaker {
             executionName,
             sandboxed,
             cancellable);
-    Path toolsRoot = workRoot.resolve(PersistentWorker.TOOL_INPUT_SUBDIR);
 
     SortedMap<Path, HashCode> hashedTools = workerFilesWithHashes(workerFiles);
-    HashCode combinedToolsHash = workerFilesCombinedHash(toolsRoot, hashedTools);
+    HashCode combinedToolsHash = workerFilesCombinedHash(hashedTools);
 
     return new WorkerKey(
         workerInitCmd,
@@ -99,12 +97,11 @@ public class Keymaker {
   }
 
   // Even though we hash the toolsRoot-resolved path, it doesn't exist yet.
-  private static HashCode workerFilesCombinedHash(
-      Path toolsRoot, SortedMap<Path, HashCode> hashedTools) {
+  private static HashCode workerFilesCombinedHash(SortedMap<Path, HashCode> hashedTools) {
     Hasher hasher = Hashing.sha256().newHasher();
     hashedTools.forEach(
         (relPath, toolHash) -> {
-          hasher.putString(toolsRoot.resolve(relPath).toString(), StandardCharsets.UTF_8);
+          hasher.putString(relPath.toString(), StandardCharsets.UTF_8);
           hasher.putBytes(toolHash.asBytes());
         });
     return hasher.hash();

@@ -82,6 +82,7 @@ import com.google.rpc.Status;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -121,6 +122,13 @@ public class RedisShardBackplane implements Backplane {
 
   static final JsonFormat.Printer actionResultPrinter =
       JsonFormat.printer()
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+                  .add(WorkerExecutedMetadata.getDescriptor())
+                  .build());
+
+  static final JsonFormat.Parser actionResultParser =
+      JsonFormat.parser()
           .usingTypeRegistry(
               JsonFormat.TypeRegistry.newBuilder()
                   .add(WorkerExecutedMetadata.getDescriptor())
@@ -195,7 +203,7 @@ public class RedisShardBackplane implements Backplane {
     protected abstract void visit(ExecuteEntry executeEntry, BalancedQueueEntry balancedQueueEntry);
 
     public void visit(BalancedQueueEntry balancedQueueEntry) {
-      String entry = balancedQueueEntry.getValue();
+      String entry = balancedQueueEntry.value();
       ExecuteEntry.Builder executeEntry = ExecuteEntry.newBuilder();
       try {
         JsonFormat.parser().merge(entry, executeEntry);
@@ -259,7 +267,7 @@ public class RedisShardBackplane implements Backplane {
         new Visitor<>() {
           @Override
           public void visit(ExecutionQueueEntry executionQueueEntry) {
-            QueueEntry queueEntry = executionQueueEntry.getQueueEntry();
+            QueueEntry queueEntry = executionQueueEntry.queueEntry();
             String executionName = queueEntry.getExecuteEntry().getOperationName();
             String value = state.dispatchingExecutions.get(jedis, executionName);
             long dispatchingTimeout_ms = configs.getBackplane().getDispatchingTimeoutMillis();
@@ -308,7 +316,7 @@ public class RedisShardBackplane implements Backplane {
         new Visitor<>() {
           @Override
           public void visit(ExecutionQueueEntry executionQueueEntry) {
-            QueueEntry queueEntry = executionQueueEntry.getQueueEntry();
+            QueueEntry queueEntry = executionQueueEntry.queueEntry();
             onOperationName.accept(queueEntry.getExecuteEntry().getOperationName());
           }
         });
@@ -882,10 +890,10 @@ public class RedisShardBackplane implements Backplane {
     return returnWorkers;
   }
 
-  private static ActionResult parseActionResult(String json) {
+  public static ActionResult parseActionResult(String json) {
     try {
       ActionResult.Builder builder = ActionResult.newBuilder();
-      JsonFormat.parser().merge(json, builder);
+      actionResultParser.merge(json, builder);
       return builder.build();
     } catch (InvalidProtocolBufferException e) {
       return null;
@@ -895,7 +903,11 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
-    String json = client.call(jedis -> state.actionCache.get(jedis, actionKey.toString()));
+    String json =
+        client.call(
+            jedis ->
+                state.actionCache.getex(
+                    jedis, actionKey.toString(), configs.getBackplane().getActionCacheExpire()));
     if (json == null) {
       return null;
     }
@@ -1132,6 +1144,37 @@ public class RedisShardBackplane implements Backplane {
     return new ScanResult(tokenFromRedisCursor(scanResult.getCursor()), builder.build());
   }
 
+  @Override
+  public ScanResult<Map.Entry<String, QueueEntry>> scanQueuedOperations(String cursor, int count)
+      throws IOException {
+    ImmutableList.Builder<Map.Entry<String, QueueEntry>> builder = ImmutableList.builder();
+    redis.clients.jedis.resps.ScanResult<ExecutionQueueEntry> scanResult =
+        client.call(jedis -> state.executionQueue.scan(jedis, cursor, count, /* match= */ "*"));
+    for (ExecutionQueueEntry entry : scanResult.getResult()) {
+      builder.add(new AbstractMap.SimpleEntry<>(entry.queue().getName(), entry.queueEntry()));
+    }
+    return new ScanResult(tokenFromRedisCursor(scanResult.getCursor()), builder.build());
+  }
+
+  @Override
+  public ScanResult<ExecuteEntry> scanPrequeuedOperations(String cursor, int count)
+      throws IOException {
+    ImmutableList.Builder<ExecuteEntry> builder = ImmutableList.builder();
+    redis.clients.jedis.resps.ScanResult<BalancedQueueEntry> scanResult =
+        client.call(jedis -> state.prequeue.scan(jedis, cursor, count, /* match= */ "*"));
+    for (BalancedQueueEntry entry : scanResult.getResult()) {
+      ExecuteEntry.Builder executeEntryBuilder = ExecuteEntry.newBuilder();
+      try {
+        JsonFormat.parser().merge(entry.value(), executeEntryBuilder);
+        ExecuteEntry executeEntry = executeEntryBuilder.build();
+        builder.add(executeEntry);
+      } catch (InvalidProtocolBufferException e) {
+        log.log(Level.SEVERE, "error parsing execute entry", e);
+      }
+    }
+    return new ScanResult(tokenFromRedisCursor(scanResult.getCursor()), builder.build());
+  }
+
   private synchronized ExecutorService getDequeueService() {
     if (dequeueService == null) {
       dequeueService = BuildfarmExecutors.getDequeuePool();
@@ -1147,7 +1190,7 @@ public class RedisShardBackplane implements Backplane {
 
     ExecuteEntry.Builder executeEntryBuilder = ExecuteEntry.newBuilder();
     try {
-      JsonFormat.parser().merge(balancedQueueEntry.getValue(), executeEntryBuilder);
+      JsonFormat.parser().merge(balancedQueueEntry.value(), executeEntryBuilder);
       ExecuteEntry executeEntry = executeEntryBuilder.build();
       String executionName = executeEntry.getOperationName();
 
@@ -1185,7 +1228,7 @@ public class RedisShardBackplane implements Backplane {
       return null;
     }
 
-    QueueEntry queueEntry = executionQueueEntry.getQueueEntry();
+    QueueEntry queueEntry = executionQueueEntry.queueEntry();
     String executionName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveExecution(executionName);
     Unified unified = (Unified) jedis;

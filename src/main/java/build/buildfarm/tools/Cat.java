@@ -33,6 +33,7 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
@@ -47,7 +48,10 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.Digest;
+import build.buildfarm.v1test.DispatchedOperation;
+import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
+import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.StageInformation;
@@ -247,7 +251,7 @@ class Cat {
           indentLevel,
           "Input Fetch Start: " + Timestamps.toString(metadata.getInputFetchStartTimestamp()));
     }
-    if (metadata.hasQueuedTimestamp()) {
+    if (metadata.hasInputFetchCompletedTimestamp()) {
       indentOut(
           indentLevel,
           "Input Fetch Completed: "
@@ -622,6 +626,15 @@ class Cat {
     // FIXME server_logs
   }
 
+  private static ExecuteOperationMetadata executeEntryMetadata(
+      ExecuteEntry executeEntry, ExecutionStage.Value stage) {
+    return ExecuteOperationMetadata.newBuilder()
+        .setStage(stage)
+        .setActionDigest(DigestUtil.toDigest(executeEntry.getActionDigest()))
+        .setDigestFunction(executeEntry.getActionDigest().getDigestFunction())
+        .build();
+  }
+
   private static void printOperation(Operation operation) {
     System.out.println("Operation: " + operation.getName());
     if (operation.getDone()) {
@@ -636,20 +649,39 @@ class Cat {
             operation.getMetadata().unpack(QueuedOperationMetadata.class);
         metadata = queuedOperationMetadata.getExecuteOperationMetadata();
         requestMetadata = queuedOperationMetadata.getRequestMetadata();
+      } else if (operation.getMetadata().is(ExecuteEntry.class)) {
+        ExecuteEntry executeEntry = operation.getMetadata().unpack(ExecuteEntry.class);
+        metadata = executeEntryMetadata(executeEntry, ExecutionStage.Value.UNKNOWN);
+        requestMetadata = executeEntry.getRequestMetadata();
+      } else if (operation.getMetadata().is(QueueEntry.class)) {
+        QueueEntry queueEntry = operation.getMetadata().unpack(QueueEntry.class);
+        ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+        metadata = executeEntryMetadata(executeEntry, ExecutionStage.Value.QUEUED);
+        requestMetadata = executeEntry.getRequestMetadata();
+      } else if (operation.getMetadata().is(DispatchedOperation.class)) {
+        DispatchedOperation dispatchedOperation =
+            operation.getMetadata().unpack(DispatchedOperation.class);
+        ExecuteEntry executeEntry = dispatchedOperation.getQueueEntry().getExecuteEntry();
+        metadata =
+            executeEntryMetadata(
+                executeEntry, ExecutionStage.Value.QUEUED); // latest we can know about here
+        requestMetadata = executeEntry.getRequestMetadata();
       } else {
         metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
         requestMetadata = null;
       }
-      printExecutedActionMetadata(metadata.getPartialExecutionMetadata(), 1);
-      System.out.println("Metadata:");
-      System.out.println("  Stage: " + metadata.getStage());
-      digestFunction = metadata.getDigestFunction();
-      System.out.println(
-          "  Action: "
-              + DigestUtil.toString(
-                  DigestUtil.fromDigest(metadata.getActionDigest(), digestFunction)));
-      System.out.println("  Stdout Stream: " + metadata.getStdoutStreamName());
-      System.out.println("  Stderr Stream: " + metadata.getStderrStreamName());
+      if (metadata != null) {
+        printExecutedActionMetadata(metadata.getPartialExecutionMetadata(), 1);
+        System.out.println("Metadata:");
+        System.out.println("  Stage: " + metadata.getStage());
+        digestFunction = metadata.getDigestFunction();
+        System.out.println(
+            "  Action: "
+                + DigestUtil.toString(
+                    DigestUtil.fromDigest(metadata.getActionDigest(), digestFunction)));
+        System.out.println("  Stdout Stream: " + metadata.getStdoutStreamName());
+        System.out.println("  Stderr Stream: " + metadata.getStderrStreamName());
+      }
       if (requestMetadata != null) {
         printRequestMetadata(requestMetadata);
       }

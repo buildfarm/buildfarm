@@ -15,7 +15,6 @@
 package build.buildfarm.worker.persistent;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static persistent.bazel.client.PersistentWorker.TOOL_INPUT_SUBDIR;
 
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
@@ -48,10 +47,12 @@ import persistent.bazel.client.WorkerSupervisor;
 public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, CommonsWorkerPool> {
   private static final String WORKER_INIT_LOG_SUFFIX = ".initargs.log";
 
-  private static final ConcurrentHashMap<RequestCtx, PersistentWorker> pendingReqs =
+  private record PendingRequest(PersistentWorker worker, RequestTimeoutHandler task) {}
+
+  private static final ConcurrentHashMap<RequestCtx, PendingRequest> pendingReqs =
       new ConcurrentHashMap<>();
 
-  private static final Timer timeoutScheduler = new Timer("persistent-worker-timeout", true);
+  private final Timer timeoutScheduler = new Timer("persistent-worker-timeout", true);
 
   // Synchronize writes to the tool input directory per WorkerKey
   // TODO: We only need a Set of WorkerKeys to synchronize on, but no ConcurrentHashSet
@@ -65,6 +66,16 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
 
   public ProtoCoordinator(CommonsWorkerPool workerPool) {
     super(workerPool);
+
+    timeoutScheduler.scheduleAtFixedRate(
+        new TimerTask() {
+          @Override
+          public void run() {
+            timeoutScheduler.purge();
+          }
+        },
+        10000,
+        10000);
   }
 
   private ProtoCoordinator(WorkerSupervisor supervisor, int maxWorkersPerKey) {
@@ -109,7 +120,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     synchronized (lock) {
       try {
         // Copy tool inputs as needed
-        Path workToolRoot = key.getExecRoot().resolve(PersistentWorker.TOOL_INPUT_SUBDIR);
+        Path workToolRoot = key.getToolRoot();
         for (Path opToolPath : workerFiles.opToolInputs) {
           Path workToolPath = workerFiles.relativizeInput(workToolRoot, opToolPath);
           if (!Files.exists(workToolPath)) {
@@ -135,7 +146,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
       throws IOException {
     log.log(Level.FINE, "loadToolsIntoWorkerRoot() into: " + workerExecRoot);
 
-    Path toolInputRoot = key.getExecRoot().resolve(TOOL_INPUT_SUBDIR);
+    Path toolInputRoot = key.getToolRoot();
     for (Path relPath : key.getWorkerFilesWithHashes().keySet()) {
       Path toolInputPath = toolInputRoot.resolve(relPath);
       Path execRootPath = workerExecRoot.resolve(relPath);
@@ -147,10 +158,12 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
   @Override
   public WorkRequest preWorkInit(WorkerKey key, RequestCtx request, PersistentWorker worker)
       throws IOException {
-    PersistentWorker pendingWorker = pendingReqs.putIfAbsent(request, worker);
+    checkNotNull(request.timeout);
+    PendingRequest pendingRequest = new PendingRequest(worker, new RequestTimeoutHandler(request));
+    PendingRequest alreadyPendingRequest = pendingReqs.putIfAbsent(request, pendingRequest);
     // null means that this request was not in pendingReqs (the expected case)
-    if (pendingWorker != null) {
-      if (pendingWorker != worker) {
+    if (alreadyPendingRequest != null) {
+      if (alreadyPendingRequest.worker != worker) {
         throw new IllegalArgumentException(
             "Already have a persistent worker on the job: " + request.request);
       } else {
@@ -158,7 +171,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
             "Got the same request for the same worker while it's running: " + request.request);
       }
     }
-    startTimeoutTimer(request);
+    timeoutScheduler.schedule(pendingRequest.task, Durations.toMillis(request.timeout));
 
     // Symlinking should hypothetically be faster+leaner than copying inputs, but it's buggy.
     copyNontoolInputs(request.workerInputs, worker.getExecRoot());
@@ -170,7 +183,11 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
   @Override
   public ResponseCtx postWorkCleanup(
       WorkResponse response, PersistentWorker worker, RequestCtx request) throws IOException {
-    pendingReqs.remove(request);
+    PendingRequest pendingRequest = pendingReqs.remove(request);
+
+    if (pendingRequest != null) {
+      pendingRequest.task.cancel();
+    }
 
     if (response == null) {
       throw new RuntimeException("postWorkCleanup: WorkResponse was null!");
@@ -248,17 +265,6 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     }
   }
 
-  /**
-   * Start a timeout timer based on the request's timeout.
-   *
-   * @param request
-   */
-  private void startTimeoutTimer(RequestCtx request) {
-    checkNotNull(request.timeout);
-    timeoutScheduler.schedule(
-        new RequestTimeoutHandler(request), Durations.toMillis(request.timeout));
-  }
-
   private final class RequestTimeoutHandler extends TimerTask {
     private final RequestCtx request;
 
@@ -268,7 +274,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
 
     @Override
     public void run() {
-      onTimeout(this.request, pendingReqs.get(this.request));
+      onTimeout(this.request, pendingReqs.get(this.request).worker);
     }
   }
 

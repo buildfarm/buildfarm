@@ -16,13 +16,14 @@ package build.buildfarm.worker;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
-public class Pipeline {
+public class Pipeline implements Iterable<PipelineStage> {
   private final Map<PipelineStage, Thread> stageThreads;
   private final Map<PipelineStage, Integer> stageClosePriorities;
   private Thread joiningThread = null;
@@ -35,12 +36,21 @@ public class Pipeline {
     stageClosePriorities = new HashMap<>();
   }
 
+  @Override
+  public Iterator<PipelineStage> iterator() {
+    return stageClosePriorities.keySet().iterator();
+  }
+
   public void add(PipelineStage stage, int closePriority) {
     stageThreads.put(stage, new Thread(stage));
     if (closePriority < 0) {
       throw new IllegalArgumentException("closePriority cannot be negative");
     }
     stageClosePriorities.put(stage, closePriority);
+  }
+
+  public void interrupt(PipelineStage stage) {
+    stageThreads.get(stage).interrupt();
   }
 
   public void start() {
@@ -58,18 +68,6 @@ public class Pipeline {
       }
     }
     join(true);
-  }
-
-  /** Inform MatchStage to stop matching or picking up new Operations from queue. */
-  public void stopMatchingOperations() {
-    for (Map.Entry<PipelineStage, Thread> entry : stageThreads.entrySet()) {
-      PipelineStage stage = entry.getKey();
-      if (stage instanceof MatchStage matchStage) {
-        matchStage.prepareForGracefulShutdown();
-        entry.getValue().interrupt();
-        return;
-      }
-    }
   }
 
   /**
@@ -164,7 +162,7 @@ public class Pipeline {
             log.log(
                 Level.FINER,
                 "Stage "
-                    + stage.name()
+                    + stage.getName()
                     + " has exited at priority "
                     + stageClosePriorities.get(stage));
             inactiveStages.add(stage);
@@ -172,7 +170,7 @@ public class Pipeline {
             log.log(
                 Level.INFO,
                 "Interrupting unterminated closed thread in stage "
-                    + stage.name()
+                    + stage.getName()
                     + " at priority "
                     + stageClosePriorities.get(stage));
             thread.interrupt();
