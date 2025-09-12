@@ -480,7 +480,7 @@ public class RedisShardBackplaneTest {
         ShardWorker.newBuilder()
             .setWorkerType(3)
             .setFirstRegisteredAt(1703065913000L)
-            .setGroupName("test-queue")
+            .addTags("test-queue")
             .build();
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
