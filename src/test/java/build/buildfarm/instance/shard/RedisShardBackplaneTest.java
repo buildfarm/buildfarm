@@ -483,7 +483,11 @@ public class RedisShardBackplaneTest {
   @Test
   public void testAddWorker() throws IOException {
     ShardWorker shardWorker =
-        ShardWorker.newBuilder().setWorkerType(3).setFirstRegisteredAt(1703065913000L).build();
+        ShardWorker.newBuilder()
+            .setWorkerType(3)
+            .setFirstRegisteredAt(1703065913000L)
+            .setGroupName("test-queue")
+            .build();
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
     when(jedis.hset(anyString(), anyString(), anyString())).thenReturn(1L);

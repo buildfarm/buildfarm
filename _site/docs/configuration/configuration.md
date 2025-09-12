@@ -290,6 +290,7 @@ backplane:
 |-----------------------------------|-------------------------------|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | port                              | Integer, _8981_               |                       | Listening port of the worker                                                                                                                                                                                                                                                                                             |
 | publicName                        | String, _DERIVED:port_        | INSTANCE_NAME         | Host:port of the GRPC server, required to be accessible by all servers                                                                                                                                                                                                                                                   |
+| groupName                         | String, _""_                  |                       | Optional group name for the worker, used for categorizing workers (e.g., "gpu", "cpu", "high-memory"). Default is empty string                                                                                                                                                                                           |
 | root                              | String, _/tmp/worker_         |                       | Path for all operation content storage                                                                                                                                                                                                                                                                                   |
 | inlineContentLimit                | Integer, _1048567_            |                       | Total size in bytes of inline content for action results, output files, stdout, stderr content                                                                                                                                                                                                                           |
 | operationPollPeriod               | Integer, _1_                  |                       | Period between poll operations at any stage                                                                                                                                                                                                                                                                              |
@@ -320,6 +321,9 @@ worker:
   publicName: "localhost:8981"
   realInputDirectories:
     - "external"
+  groupName: "gpu"  # Optional: categorize worker (e.g., "gpu", "cpu", "high-memory")
+  linkedInputDirectories:
+    - "^path/to/common/directory"
 ```
 
 ### Capabilities
