@@ -66,6 +66,8 @@ public class DistributedStateCreator {
         new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_execute");
     state.storageWorkers =
         new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_storage");
+    state.servers =
+        new RedisHashMap(configs.getBackplane().getWorkersHashName().replace("Workers", "Servers"));
     state.correlatedInvocationsIndex =
         new RedisSetMap(
             configs.getBackplane().getCorrelatedInvocationsIndexPrefix(),
