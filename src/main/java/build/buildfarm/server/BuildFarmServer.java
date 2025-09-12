@@ -21,6 +21,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
 
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.GrpcMetrics;
@@ -79,6 +80,11 @@ public class BuildFarmServer extends LoggingMain {
   private InvocationsCollector invocationsCollector;
   private Thread invocationsCollectorThread;
 
+  // Server registration fields
+  private Thread serverRegistrationThread = null;
+  private String serverName = null;
+  private volatile boolean serverRegistrationStopped = false;
+
   BuildFarmServer() {
     super("BuildFarmServer");
   }
@@ -118,6 +124,40 @@ public class BuildFarmServer extends LoggingMain {
         configs.getServer().getName(),
         configs.getServer().getSession() + "-" + configs.getServer().getName(),
         this::initiateShutdown);
+  }
+
+  private void startServerRegistration() {
+    String serverName = configs.getServer().getPublicName();
+    serverRegistrationStopped = false;
+    serverRegistrationThread =
+        new Thread(
+            () -> {
+              int registrationIntervalMillis = 10000;
+              long serverRegistrationExpiresAt = 0;
+              Backplane backplane = ((ServerInstance) instance).getBackplane();
+
+              while (!shutdownInitiated.get() && !serverRegistrationStopped) {
+                try {
+                  long now = System.currentTimeMillis();
+                  if (now >= serverRegistrationExpiresAt) {
+                    // Register server with backplane
+                    String serverType = configs.getBackplane().getType().name().toLowerCase();
+                    backplane.addServer(serverName, serverType);
+                    // Update every 10 seconds
+                    serverRegistrationExpiresAt = now + registrationIntervalMillis;
+                  }
+                  SECONDS.sleep(1);
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  break;
+                } catch (Exception e) {
+                  log.log(SEVERE, "error while updating server registration", e);
+                }
+              }
+            },
+            "Server Registration");
+
+    serverRegistrationThread.start();
   }
 
   public synchronized void start(ServerBuilder<?> serverBuilder, String publicName)
@@ -180,6 +220,10 @@ public class BuildFarmServer extends LoggingMain {
     instance.start(publicName);
     server.start();
 
+    // Start server registration with backplane
+    this.serverName = publicName;
+    startServerRegistration();
+
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
@@ -204,6 +248,23 @@ public class BuildFarmServer extends LoggingMain {
   private void shutdown() throws InterruptedException {
     log.info("*** shutting down gRPC server since JVM is shutting down");
     prepareServerForGracefulShutdown();
+
+    // Stop server registration and deregister server
+    if (serverRegistrationThread != null) {
+      serverRegistrationStopped = true;
+      serverRegistrationThread.interrupt();
+      serverRegistrationThread.join();
+      log.info("serverRegistrationThread has been stopped");
+    }
+    if (serverName != null && instance != null) {
+      try {
+        ((ServerInstance) instance).getBackplane().deregisterServer(serverName);
+        log.info("server has been deregistered");
+      } catch (Exception e) {
+        log.log(WARNING, "failed to deregister server", e);
+      }
+    }
+
     if (healthStatusManager != null) {
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);

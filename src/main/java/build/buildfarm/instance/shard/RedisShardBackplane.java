@@ -156,11 +156,6 @@ public class RedisShardBackplane implements Backplane {
   private final Map<String, ShardWorker> storageWorkers = new ConcurrentHashMap<>();
   private final Supplier<Set<String>> recentExecuteWorkers;
 
-  // Server registration fields
-  private Thread serverRegistrationThread = null;
-  private String serverName = null;
-  private volatile boolean serverRegistrationStopped = false;
-
   private DistributedState state = new DistributedState();
 
   public RedisShardBackplane(
@@ -535,40 +530,6 @@ public class RedisShardBackplane implements Backplane {
     failsafeOperationThread.start();
   }
 
-  private void startServerRegistrationThread() {
-    serverRegistrationStopped = false;
-    serverRegistrationThread =
-        new Thread(
-            () -> {
-              int registrationIntervalMillis = 10000; // 10 seconds to match workers
-              long serverRegistrationExpiresAt = 0;
-
-              while (!Thread.currentThread().isInterrupted() && !serverRegistrationStopped) {
-                try {
-                  long now = System.currentTimeMillis();
-                  if (now >= serverRegistrationExpiresAt && state.servers != null) {
-                    // Update server registration with current timestamp
-                    String serverJson = String.format(
-                        "{\"name\":\"%s\",\"firstRegisteredAt\":%d,\"lastRegisteredAt\":%d}",
-                        serverName, now, now);
-                    client.run(jedis -> state.servers.insert(jedis, serverName, serverJson));
-                    // Update every 10 seconds
-                    serverRegistrationExpiresAt = now + registrationIntervalMillis;
-                  }
-                  SECONDS.sleep(1);
-                } catch (InterruptedException e) {
-                  Thread.currentThread().interrupt();
-                  break;
-                } catch (Exception e) {
-                  log.log(Level.SEVERE, "error while updating server registration", e);
-                }
-              }
-            },
-            "Server Registration");
-
-    serverRegistrationThread.start();
-  }
-
   @Override
   public void start(String clientPublicName, Consumer<String> onWorkerRemoved) throws IOException {
     // Construct a single redis client to be used throughout the entire backplane.
@@ -600,32 +561,11 @@ public class RedisShardBackplane implements Backplane {
       startFailsafeOperationThread();
     }
     pipelineExecutor = BuildfarmExecutors.getPipelinePool();
-
-    // Register server and start heartbeat
-    this.serverName = clientPublicName;
-    addServer(serverName);
-    startServerRegistrationThread();
   }
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public synchronized void stop() throws InterruptedException {
-    // Stop server registration and deregister server
-    if (serverRegistrationThread != null) {
-      serverRegistrationStopped = true;
-      serverRegistrationThread.interrupt();
-      serverRegistrationThread.join();
-      log.log(Level.FINER, "serverRegistrationThread has been stopped");
-    }
-    if (serverName != null && client != null) {
-      try {
-        deregisterServer(serverName);
-        log.log(Level.FINER, "server has been deregistered");
-      } catch (Exception e) {
-        log.log(Level.WARNING, "failed to deregister server", e);
-      }
-    }
-    
     if (failsafeOperationThread != null) {
       failsafeOperationThread.interrupt();
       failsafeOperationThread.join();
@@ -854,7 +794,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public void addServer(String serverName) throws IOException {
+  public void addServer(String serverName, String serverType) throws IOException {
     // Skip server registration if servers map is not initialized (e.g., in tests)
     if (state.servers == null) {
       return;
@@ -862,8 +802,8 @@ public class RedisShardBackplane implements Backplane {
     
     long currentTimeMillis = System.currentTimeMillis();
     String serverJson = String.format(
-        "{\"name\":\"%s\",\"firstRegisteredAt\":%d,\"lastRegisteredAt\":%d}",
-        serverName, currentTimeMillis, currentTimeMillis);
+        "{\"name\":\"%s\",\"type\":\"%s\",\"firstRegisteredAt\":%d,\"lastRegisteredAt\":%d}",
+        serverName, serverType, currentTimeMillis, currentTimeMillis);
     
     client.run(jedis -> state.servers.insert(jedis, serverName, serverJson));
   }
@@ -1644,47 +1584,33 @@ public class RedisShardBackplane implements Backplane {
   public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request)
       throws IOException {
     List<GetClientStartTime> startTimes = new ArrayList<>();
-    for (String key : request.getHostNameList()) {
+    for (String serverName : request.getHostNameList()) {
       try {
-        // First try the new server registration system
-        String serverName = key.startsWith("startTime/") ? key.substring("startTime/".length()) : key;
-        String serverJson = null;
         if (state.servers != null) {
           List<String> serverValues = client.call(jedis -> state.servers.mget(jedis, List.of(serverName)));
-          serverJson = serverValues.isEmpty() ? null : serverValues.get(0);
-        }
-        
-        if (serverJson != null) {
-          // Parse JSON to get firstRegisteredAt timestamp
-          // Simple JSON parsing for: {"name":"serverName","firstRegisteredAt":123456789,"lastRegisteredAt":123456789}
-          int firstRegisteredAtIndex = serverJson.indexOf("\"firstRegisteredAt\":");
-          if (firstRegisteredAtIndex != -1) {
-            int start = firstRegisteredAtIndex + "\"firstRegisteredAt\":".length();
-            int end = serverJson.indexOf(",", start);
-            if (end == -1) end = serverJson.indexOf("}", start);
-            if (end != -1) {
-              long startTimeMillis = Long.parseLong(serverJson.substring(start, end));
-              startTimes.add(
-                  GetClientStartTime.newBuilder()
-                      .setInstanceName(key)
-                      .setClientStartTime(Timestamps.fromMillis(startTimeMillis))
-                      .build());
-              continue;
+          String serverJson = serverValues.isEmpty() ? null : serverValues.get(0);
+          
+          if (serverJson != null) {
+            // Parse JSON to get firstRegisteredAt timestamp
+            // Simple JSON parsing for: {"name":"serverName","firstRegisteredAt":123456789,"lastRegisteredAt":123456789}
+            int firstRegisteredAtIndex = serverJson.indexOf("\"firstRegisteredAt\":");
+            if (firstRegisteredAtIndex != -1) {
+              int start = firstRegisteredAtIndex + "\"firstRegisteredAt\":".length();
+              int end = serverJson.indexOf(",", start);
+              if (end == -1) end = serverJson.indexOf("}", start);
+              if (end != -1) {
+                long startTimeMillis = Long.parseLong(serverJson.substring(start, end));
+                startTimes.add(
+                    GetClientStartTime.newBuilder()
+                        .setInstanceName(serverName)
+                        .setClientStartTime(Timestamps.fromMillis(startTimeMillis))
+                        .build());
+              }
             }
           }
         }
-        
-        // Fallback to old startTime key for backward compatibility
-        String oldStartTime = client.call(jedis -> jedis.get(key));
-        if (oldStartTime != null) {
-          startTimes.add(
-              GetClientStartTime.newBuilder()
-                  .setInstanceName(key)
-                  .setClientStartTime(Timestamps.fromMillis(Long.parseLong(oldStartTime)))
-                  .build());
-        }
       } catch (Exception e) {
-        log.warning("Could not obtain start time for " + key + ": " + e.getMessage());
+        log.warning("Could not obtain start time for " + serverName + ": " + e.getMessage());
       }
     }
     return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
