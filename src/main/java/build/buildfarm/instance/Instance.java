@@ -33,8 +33,6 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerProfileMessage;
@@ -164,8 +162,6 @@ public interface Instance {
   ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names);
 
   PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
-
-  GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
   CasIndexResults reindexCas();
 
