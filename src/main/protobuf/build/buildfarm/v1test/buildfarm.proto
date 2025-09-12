@@ -277,7 +277,7 @@ message ShardWorker {
 
   int64 first_registered_at = 4;
 
-  string group_name = 5;
+  repeated string tags = 5;
 }
 
 message WorkerChange {
@@ -730,4 +730,6 @@ message WorkerExecutedMetadata {
   int64 fetched_bytes = 1;
 
   repeated string linked_input_directories = 2;
+
+  repeated string tags = 3;
 }

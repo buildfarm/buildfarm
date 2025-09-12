@@ -571,7 +571,7 @@ public final class Worker extends LoggingMain {
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
     worker.setWorkerType(configs.getWorker().getWorkerType());
     worker.setFirstRegisteredAt(loadWorkerStartTimeInMillis());
-    worker.setGroupName(configs.getWorker().getGroupName());
+    worker.addAllTags(configs.getWorker().getTags());
     int registrationIntervalMillis = 10000;
     int registrationOffsetMillis = registrationIntervalMillis * 3;
     new Thread(
