@@ -715,6 +715,10 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
+  public Backplane getBackplane() {
+    return backplane;
+  }
+
   @Override
   public void stop() throws InterruptedException {
     if (stopped || stopping) {
