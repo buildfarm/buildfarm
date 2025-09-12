@@ -1,5 +1,4 @@
 publicName: localhost:8981
-groupName: ""
 dequeueMatchSettings:
   allowUnmatched: true
 linkedInputDirectories:
