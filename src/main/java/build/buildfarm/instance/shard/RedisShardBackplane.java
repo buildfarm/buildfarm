@@ -48,9 +48,6 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.GetClientStartTime;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueEntry;
@@ -86,7 +83,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -799,12 +795,13 @@ public class RedisShardBackplane implements Backplane {
     if (state.servers == null) {
       return;
     }
-    
+
     long currentTimeMillis = System.currentTimeMillis();
-    String serverJson = String.format(
-        "{\"name\":\"%s\",\"type\":\"%s\",\"firstRegisteredAt\":%d,\"lastRegisteredAt\":%d}",
-        serverName, serverType, currentTimeMillis, currentTimeMillis);
-    
+    String serverJson =
+        String.format(
+            "{\"name\":\"%s\",\"type\":\"%s\",\"firstRegisteredAt\":%d,\"lastRegisteredAt\":%d}",
+            serverName, serverType, currentTimeMillis, currentTimeMillis);
+
     client.run(jedis -> state.servers.insert(jedis, serverName, serverJson));
   }
 
@@ -1577,43 +1574,6 @@ public class RedisShardBackplane implements Backplane {
           .setDispatchedSize(dispatchedSize.get())
           .build();
     }
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request)
-      throws IOException {
-    List<GetClientStartTime> startTimes = new ArrayList<>();
-    for (String serverName : request.getHostNameList()) {
-      try {
-        if (state.servers != null) {
-          List<String> serverValues = client.call(jedis -> state.servers.mget(jedis, List.of(serverName)));
-          String serverJson = serverValues.isEmpty() ? null : serverValues.get(0);
-          
-          if (serverJson != null) {
-            // Parse JSON to get firstRegisteredAt timestamp
-            // Simple JSON parsing for: {"name":"serverName","firstRegisteredAt":123456789,"lastRegisteredAt":123456789}
-            int firstRegisteredAtIndex = serverJson.indexOf("\"firstRegisteredAt\":");
-            if (firstRegisteredAtIndex != -1) {
-              int start = firstRegisteredAtIndex + "\"firstRegisteredAt\":".length();
-              int end = serverJson.indexOf(",", start);
-              if (end == -1) end = serverJson.indexOf("}", start);
-              if (end != -1) {
-                long startTimeMillis = Long.parseLong(serverJson.substring(start, end));
-                startTimes.add(
-                    GetClientStartTime.newBuilder()
-                        .setInstanceName(serverName)
-                        .setClientStartTime(Timestamps.fromMillis(startTimeMillis))
-                        .build());
-              }
-            }
-          }
-        }
-      } catch (Exception e) {
-        log.warning("Could not obtain start time for " + serverName + ": " + e.getMessage());
-      }
-    }
-    return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
   }
 
   @Override
