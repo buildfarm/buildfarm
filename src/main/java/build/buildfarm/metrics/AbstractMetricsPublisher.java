@@ -55,6 +55,13 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
           .help("Operations per worker.")
           .register();
 
+  private static final Counter operationsPerTag =
+      Counter.build()
+          .name("operation_tag")
+          .labelNames("tag")
+          .help("Operations per worker tag.")
+          .register();
+
   private static final Counter operationExitCode =
       Counter.build()
           .name("operation_exit_code")
@@ -119,6 +126,26 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
           ExecutedActionMetadata executionMetadata =
               operationRequestMetadata.getExecuteResponse().getResult().getExecutionMetadata();
           operationsPerWorker.labels(executionMetadata.getWorker()).inc();
+
+          // Extract tags from WorkerExecutedMetadata if available
+          for (com.google.protobuf.Any auxiliary : executionMetadata.getAuxiliaryMetadataList()) {
+            if (auxiliary.is(WorkerExecutedMetadata.class)) {
+              try {
+                WorkerExecutedMetadata workerMetadata =
+                    auxiliary.unpack(WorkerExecutedMetadata.class);
+                for (String tag : workerMetadata.getTagsList()) {
+                  if (!tag.isEmpty()) {
+                    operationsPerTag.labels(tag).inc();
+                  }
+                }
+                break;
+              } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+                // Log and continue if unpacking fails
+                log.log(Level.WARNING, "Failed to unpack WorkerExecutedMetadata", e);
+              }
+            }
+          }
+
           queuedTime.observe(
               Time.toDurationSeconds(
                   executionMetadata.getQueuedTimestamp(),
