@@ -27,8 +27,6 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.worker.resources.LocalResourceSet;
@@ -335,8 +333,6 @@ public interface Backplane {
   BackplaneStatus backplaneStatus() throws IOException;
 
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
-
-  GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) throws IOException;
 
   /** Set expiry time for digests */
   void updateDigestsExpiry(Iterable<Digest> digests) throws IOException;
