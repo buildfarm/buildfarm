@@ -691,4 +691,6 @@ message WorkerExecutedMetadata {
   int64 fetched_bytes = 1;
 
   repeated string linked_input_directories = 2;
+
+  string group_name = 3;
 }

@@ -798,6 +798,8 @@ class ShardWorkerContext implements WorkerContext {
       @Nullable UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
+    // Set the group name from worker configuration
+    workerExecutedMetadata.setGroupName(configs.getWorker().getGroupName());
     return execFileSystem.createExecDir(
         operationName,
         directoriesIndex,
