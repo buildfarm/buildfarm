@@ -90,6 +90,18 @@ public interface Backplane {
 
   void deregisterWorker(String hostName) throws IOException;
 
+  /** Registers a server to the set of active servers. */
+  void addServer(String serverName) throws IOException;
+
+  /** Removes a server from the set of active servers. */
+  boolean removeServer(String serverName, String reason) throws IOException;
+
+  /** Deregisters a server. */
+  void deregisterServer(String serverName) throws IOException;
+
+  /** Gets all active servers. */
+  Set<String> getServers() throws IOException;
+
   /** Page all operations */
   ScanResult<Operation> scanExecutions(String cursor, int count) throws IOException;
 
