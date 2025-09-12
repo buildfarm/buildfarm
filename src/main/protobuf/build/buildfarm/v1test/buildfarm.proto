@@ -276,6 +276,8 @@ message ShardWorker {
   int32 worker_type = 3;
 
   int64 first_registered_at = 4;
+
+  string group_name = 5;
 }
 
 message WorkerChange {
