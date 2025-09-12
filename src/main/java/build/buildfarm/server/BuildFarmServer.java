@@ -132,7 +132,7 @@ public class BuildFarmServer extends LoggingMain {
     serverRegistrationThread =
         new Thread(
             () -> {
-              int registrationIntervalMillis = 10000;
+              int registrationIntervalMillis = 60000;
               long serverRegistrationExpiresAt = 0;
               Backplane backplane = ((ServerInstance) instance).getBackplane();
 
@@ -143,7 +143,7 @@ public class BuildFarmServer extends LoggingMain {
                     // Register server with backplane
                     String serverType = configs.getBackplane().getType().name().toLowerCase();
                     backplane.addServer(serverName, serverType);
-                    // Update every 10 seconds
+                    // Update every 60 seconds
                     serverRegistrationExpiresAt = now + registrationIntervalMillis;
                   }
                   SECONDS.sleep(1);

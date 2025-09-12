@@ -63,8 +63,6 @@ import build.buildfarm.common.net.URL;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.Digest;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.collect.ImmutableList;
@@ -135,11 +133,6 @@ public class NodeInstanceTest {
     @Override
     protected TokenizableIterator<DirectoryEntry> createTreeIterator(
         String reason, Digest rootDigest, String pageToken) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
       throw new UnsupportedOperationException();
     }
 
