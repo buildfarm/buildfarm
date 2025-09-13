@@ -24,6 +24,7 @@ public class Backplane {
   private long jedisTimeBetweenEvictionRunsMillis = 30000L;
   private boolean connectionValidatedOnBorrow = false;
   private String workersHashName = "Workers";
+  private String serversHashName = "Servers";
   private String workerChannel = "WorkerChannel";
   private String actionCachePrefix = "ActionCache";
   private int actionCacheExpire = 2419200; // 4 Weeks

@@ -65,6 +65,7 @@ backplane:
   jedisTimeBetweenEvictionRunsMillis: 30000
   connectionValidatedOnBorrow: false
   workersHashName: Workers
+  serversHashName: Servers
   workerChannel: WorkerChannel
   actionCachePrefix: ActionCache
   actionCacheExpire: 2419200 # 4 weeks
