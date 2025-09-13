@@ -141,7 +141,7 @@ maven.install(
         "org.bouncycastle:bcprov-jdk15on:1.70",
         "org.checkerframework:checker-qual:3.51.0",
         "org.jetbrains:annotations:26.0.2-1",
-        "org.mockito:mockito-core:5.16.1",
+        "org.mockito:mockito-core:5.19.0",
         "org.openjdk.jmh:jmh-core:1.37",
         "org.openjdk.jmh:jmh-generator-annprocess:1.37",
         "org.projectlombok:lombok:1.18.40",
