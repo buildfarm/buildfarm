@@ -73,7 +73,7 @@ maven.install(
         "com.amazonaws:aws-java-sdk-core",  # Version is specified via the BOM below
         "com.amazonaws:aws-java-sdk-s3",
         "com.amazonaws:aws-java-sdk-secretsmanager",
-        "com.fasterxml.jackson.core:jackson-databind:2.18.3",
+        "com.fasterxml.jackson.core:jackson-databind:2.20.0",
         "com.github.ben-manes.caffeine:caffeine:3.2.2",
         "com.github.docker-java:docker-java",
         "com.github.docker-java:docker-java-api",
