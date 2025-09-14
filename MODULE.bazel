@@ -145,7 +145,7 @@ maven.install(
         "org.openjdk.jmh:jmh-core:1.37",
         "org.openjdk.jmh:jmh-generator-annprocess:1.37",
         "org.projectlombok:lombok:1.18.40",
-        "org.redisson:redisson:3.45.1",
+        "org.redisson:redisson:3.51.0",
         "org.slf4j:slf4j-simple:2.0.17",
         "org.threeten:threetenbp:1.7.2",
         "org.xerial:sqlite-jdbc:3.50.3.0",
