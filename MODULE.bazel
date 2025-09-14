@@ -212,7 +212,7 @@ oci.pull(
 # Worker base image
 oci.pull(
     name = "ubuntu_noble",  # aka 24
-    digest = "sha256:f18e19d1329c0df38dd5f6bfd931c7764fa1e3acf6b3280da62015a338805ce8",
+    digest = "sha256:a1da084ca1429dd84a71e364e88985b4b85934f3d8717bfdc00f2fd06170158a",
     image = "index.docker.io/bazelbuild/buildfarm-worker-base",
     platforms = [
         "linux/amd64",
