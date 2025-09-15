@@ -8,7 +8,6 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
-        "//src/main/java/build/buildfarm/instance",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_google_code_findbugs_jsr305",
         "@buildfarm_maven//:com_google_code_gson_gson",

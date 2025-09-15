@@ -8,12 +8,9 @@ java_test(
     deps = [
         "//persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers",
         "//persistentworkers/src/main/java/persistent/common:persistent-common",
-        "//persistentworkers/src/main/java/persistent/common/util",
         "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
-        "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/worker",
         "//src/main/java/build/buildfarm/worker/persistent",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",

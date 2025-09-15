@@ -22,6 +22,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
+import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -34,10 +35,10 @@ import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
 public interface ExecFileSystem extends InputStreamFactory {
-  void start(Consumer<List<Digest>> onDigests, boolean skipLoad)
+  ListenableFuture<Void> start(Consumer<List<Digest>> onDigests, boolean skipLoad, boolean writable)
       throws IOException, InterruptedException;
 
-  void stop() throws InterruptedException;
+  void stop() throws IOException, InterruptedException;
 
   Path root();
 

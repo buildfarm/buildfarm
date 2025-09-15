@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
 import static build.buildfarm.common.io.Utils.readdir;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.allAsList;
@@ -105,7 +104,8 @@ public class CFCExecFileSystem implements ExecFileSystem {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public void start(Consumer<List<Digest>> onDigests, boolean skipLoad)
+  public ListenableFuture<Void> start(
+      Consumer<List<Digest>> onDigests, boolean skipLoad, boolean writable)
       throws IOException, InterruptedException {
     fileStore = Files.getFileStore(root);
     List<Dirent> dirents = null;
@@ -128,21 +128,31 @@ public class CFCExecFileSystem implements ExecFileSystem {
     }
 
     ImmutableList.Builder<Digest> blobDigests = ImmutableList.builder();
-    fileCache.start(
-        digest -> {
-          synchronized (blobDigests) {
-            blobDigests.add(digest);
-          }
-        },
-        removeDirectoryService,
-        skipLoad);
-    onDigests.accept(blobDigests.build());
+    ListenableFuture<Void> fileCacheWritable =
+        fileCache.start(
+            digest -> {
+              synchronized (blobDigests) {
+                blobDigests.add(digest);
+              }
+            },
+            removeDirectoryService,
+            skipLoad,
+            writable);
+    fileCacheWritable =
+        transformAsync(
+            fileCacheWritable,
+            result -> {
+              onDigests.accept(blobDigests.build());
+              return immediateFuture(null);
+            },
+            directExecutor());
+    removeDirectoryFutures.add(fileCacheWritable);
 
-    getInterruptiblyOrIOException(allAsList(removeDirectoryFutures.build()));
+    return transform(allAsList(removeDirectoryFutures.build()), results -> null, directExecutor());
   }
 
   @Override
-  public void stop() throws InterruptedException {
+  public void stop() throws IOException, InterruptedException {
     fileCache.stop();
     if (!shutdownAndAwaitTermination(fetchService, 1, MINUTES)) {
       log.log(Level.SEVERE, "could not terminate fetchService");

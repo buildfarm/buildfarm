@@ -7,7 +7,6 @@ java_test(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/base",
-        "//src/main/java/build/buildfarm/common/grpc",
         "//src/test/java/build/buildfarm:test_runner",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_jimfs_jimfs",
@@ -20,7 +19,6 @@ java_test(
         "@buildfarm_maven//:io_grpc_grpc_testing",
         "@buildfarm_maven//:org_apache_commons_commons_compress",
         "@buildfarm_maven//:org_mockito_mockito_core",
-        "@googleapis//google/bytestream:bytestream_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_proto",
     ],
 )

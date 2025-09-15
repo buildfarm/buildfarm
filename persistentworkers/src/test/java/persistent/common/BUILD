@@ -7,7 +7,6 @@ java_test(
     deps = [
         "//persistentworkers/src/main/java/persistent/common:persistent-common",
         "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
-        "//persistentworkers/src/test/java/persistent/testutil",
         "@buildfarm_maven//:com_google_truth_truth",
         "@buildfarm_maven//:commons_io_commons_io",
         "@buildfarm_maven//:org_mockito_mockito_core",

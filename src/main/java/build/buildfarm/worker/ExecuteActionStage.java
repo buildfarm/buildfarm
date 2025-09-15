@@ -106,6 +106,9 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
+    if (!workerContext.inGracefulShutdown() && isPaused()) {
+      return;
+    }
     ExecutionContext executionContext = take();
     ResourceLimits limits = workerContext.commandExecutionSettings(executionContext.command);
     Executor actionExecutor = new Executor(workerContext, executionContext, this, pollerExecutor);
