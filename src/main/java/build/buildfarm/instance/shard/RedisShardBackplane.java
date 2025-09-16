@@ -22,6 +22,7 @@ import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -72,6 +73,7 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
@@ -940,10 +942,45 @@ public class RedisShardBackplane implements Backplane {
                 jedis, actionId, "", configs.getBackplane().getActionBlacklistExpire()));
   }
 
+  private String printActionResult(ActionResult actionResult)
+      throws InvalidProtocolBufferException {
+    InvalidProtocolBufferException cause;
+    try {
+      return actionResultPrinter.print(actionResult);
+    } catch (InvalidProtocolBufferException e) {
+      // can happen with unknown types in auxiliary_metadata
+      // this is extremely brittle and will have issues with any novel introduction of Any in remote
+      // apis releases
+      cause = e;
+    }
+
+    ActionResult.Builder builder = actionResult.toBuilder();
+    ExecutedActionMetadata.Builder metadata =
+        builder.getExecutionMetadataBuilder().clearAuxiliaryMetadata();
+    for (Any auxiliaryMetadata : actionResult.getExecutionMetadata().getAuxiliaryMetadataList()) {
+      try {
+        // test the serialization capacity of this any
+        actionResultPrinter.print(auxiliaryMetadata);
+        // serialization passed, re-add it
+        metadata.addAuxiliaryMetadata(auxiliaryMetadata);
+      } catch (InvalidProtocolBufferException e) {
+        // ignore
+      }
+    }
+
+    String json = actionResultPrinter.print(builder.build());
+    // purge must have succeeded, indicate as much to the server log
+    log.log(
+        Level.WARNING,
+        "error printing auxiliary_metadata for key %s, unrecognized content purged",
+        cause);
+    return json;
+  }
+
   @SuppressWarnings("ConstantConditions")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
-    String json = actionResultPrinter.print(actionResult);
+    String json = printActionResult(actionResult);
     client.run(
         jedis ->
             state.actionCache.insert(
