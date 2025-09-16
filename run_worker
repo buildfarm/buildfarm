@@ -15,10 +15,10 @@ fi
 # Determine which configuration file to use - default or user provided
 if [[ -z ${1:-} ]]
 then
-  config="$PWD/config/config.minimal.yml"
+  config="$PWD/examples/config.minimal.yml"
 else
   config=$1
 fi
 
 # Run Worker
-bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file="$PWD/config/logging.properties" --prometheus_port=9091 "$config"
+bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file="$PWD/examples/logging.properties" --prometheus_port=9091 "$config"
