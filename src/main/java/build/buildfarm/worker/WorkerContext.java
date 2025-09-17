@@ -145,4 +145,17 @@ public interface WorkerContext {
   int commandExecutionClaims(Command command);
 
   ResourceLimits commandExecutionSettings(Command command);
+
+  /**
+   * Move a process to an appropriate cgroup for resource limits. This is called from the parent
+   * process to move a child process to a cgroup. This Java-based approach provides better sandbox
+   * compatibility.
+   *
+   * @param operationName The operation name for the cgroup
+   * @param pid The process ID to move to the cgroup
+   * @param limits The resource limits for the process
+   */
+  default void moveProcessToCgroup(String operationName, long pid, ResourceLimits limits) {
+    // Default implementation does nothing - only ShardWorkerContext implements this
+  }
 }
