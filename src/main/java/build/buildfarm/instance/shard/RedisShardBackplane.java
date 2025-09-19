@@ -48,9 +48,6 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.GetClientStartTime;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueEntry;
@@ -86,7 +83,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -561,10 +557,6 @@ public class RedisShardBackplane implements Backplane {
       startFailsafeOperationThread();
     }
     pipelineExecutor = BuildfarmExecutors.getPipelinePool();
-
-    // Record client start time
-    client.call(
-        jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -795,6 +787,43 @@ public class RedisShardBackplane implements Backplane {
       }
       storageWorkersDeadline = Deadline.after(workerSetMaxAge, SECONDS);
     }
+  }
+
+  @Override
+  public void addServer(String serverName, String serverType) throws IOException {
+    // Skip server registration if servers map is not initialized (e.g., in tests)
+    if (state.servers == null) {
+      return;
+    }
+
+    long currentTimeMillis = System.currentTimeMillis();
+    String serverJson =
+        String.format(
+            "{\"name\":\"%s\",\"type\":\"%s\",\"firstRegisteredAt\":%d,\"lastRegisteredAt\":%d}",
+            serverName, serverType, currentTimeMillis, currentTimeMillis);
+
+    client.run(jedis -> state.servers.insert(jedis, serverName, serverJson));
+  }
+
+  @Override
+  public boolean removeServer(String serverName, String reason) throws IOException {
+    if (state.servers == null) {
+      return false;
+    }
+    return client.call(jedis -> state.servers.remove(jedis, serverName));
+  }
+
+  @Override
+  public void deregisterServer(String serverName) throws IOException {
+    removeServer(serverName, "Requested shutdown");
+  }
+
+  @Override
+  public Set<String> getServers() throws IOException {
+    if (state.servers == null) {
+      return Set.of();
+    }
+    return client.call(jedis -> state.servers.keys(jedis));
   }
 
   private CasWorkerMap createCasWorkerMap(UnifiedJedis jedis) {
@@ -1545,27 +1574,6 @@ public class RedisShardBackplane implements Backplane {
           .setDispatchedSize(dispatchedSize.get())
           .build();
     }
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request)
-      throws IOException {
-    List<GetClientStartTime> startTimes = new ArrayList<>();
-    for (String key : request.getHostNameList()) {
-      try {
-        startTimes.add(
-            client.call(
-                jedis ->
-                    GetClientStartTime.newBuilder()
-                        .setInstanceName(key)
-                        .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
-                        .build()));
-      } catch (NumberFormatException nfe) {
-        log.warning("Could not obtain start time for " + key);
-      }
-    }
-    return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
   }
 
   @Override
