@@ -46,6 +46,8 @@ public class ExecutionPropertiesParser {
     // Build parser for all exec properties
     Map<String, BiConsumer<ResourceLimits, Property>> parser = new HashMap<>();
     parser.put(ExecutionProperties.LINUX_SANDBOX, ExecutionPropertiesParser::storeLinuxSandbox);
+    parser.put(ExecutionProperties.HERMETIC_LINUX_SANDBOX, ExecutionPropertiesParser::storeHermeticLinuxSandbox);
+    parser.put(ExecutionProperties.HERMETIC_SANDBOX_MOUNT_DIR, ExecutionPropertiesParser::storeHermeticLinuxSandboxMountPair);
     parser.put(ExecutionProperties.AS_NOBODY, ExecutionPropertiesParser::storeAsNobody);
     parser.put(ExecutionProperties.BLOCK_NETWORK, ExecutionPropertiesParser::storeBlockNetwork);
     parser.put(ExecutionProperties.FAKE_HOSTNAME, ExecutionPropertiesParser::storeFakeHostname);
@@ -132,6 +134,34 @@ public class ExecutionPropertiesParser {
   private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
     limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
     describeChange(limits.description, "use linux sandbox", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for using bazel's hermetic linux sandbox.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeHermeticLinuxSandbox(ResourceLimits limits, Property property) {
+    limits.useHermeticLinuxSandbox = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.description, "use hermetic linux sandbox", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for using bazel's hermetic linux sandbox.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeHermeticLinuxSandboxMountPair(ResourceLimits limits, Property property) {
+    String[] parts = property.getValue().split(":");
+    if (parts.length == 2) {
+      limits.hermeticSandboxMountPair.put(parts[0], parts[1]);
+      describeChange(limits.description, "hermetic linux sandbox mount pair", property.getValue(), property);
+    } else {
+      limits.hermeticSandboxMountPair.put(parts[0], parts[0]);
+      describeChange(limits.description, "hermetic linux sandbox mount pair", property.getValue(), property);
+    }
   }
 
   /**

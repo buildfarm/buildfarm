@@ -173,6 +173,23 @@ public class ExecutionProperties {
   public static final String LINUX_SANDBOX = "linux-sandbox";
 
   /**
+   * @field HERMETIC_LINUX_SANDBOX
+   * @brief The exec_property to inform the executor to use bazel's hermetic linux sandbox for actions.
+   * @details This similar to bazel's hermetic linux sandbox, which is more restrictive. See more details
+   *     at bazel docs about --experimental_use_hermetic_linux_sandbox.
+   */
+  public static final String HERMETIC_LINUX_SANDBOX = "hermetic-linux-sandbox";
+
+  /**
+   * @field HERMETIC_SANDBOX_MOUNT_DIR
+   * @brief The exec_property to inform the executor to mount dirs to hermetic sandbox.
+   * @details This is used with HERMETIC_LINUX_SANDBOX to specify additional directories to mount
+   *     into the hermetic sandbox. The value is a single path or a 'source:target' pair and multiple
+   *     uses of this property are allowed and value will be accumulated.
+   */
+  public static final String HERMETIC_SANDBOX_MOUNT_DIR = "hermetic-sandbox-mount-dir";
+
+  /**
    * @field AS_NOBODY
    * @brief The exec_property to inform the executor to run the action as a 'nobody' user.
    * @details The "as nobody" functionality is supported by the bazel sandbox. This execution
