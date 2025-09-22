@@ -181,15 +181,6 @@ public class ExecutionProperties {
   public static final String HERMETIC_LINUX_SANDBOX = "hermetic-linux-sandbox";
 
   /**
-   * @field HERMETIC_SANDBOX_MOUNT_DIR
-   * @brief The exec_property to inform the executor to mount dirs to hermetic sandbox.
-   * @details This is used with HERMETIC_LINUX_SANDBOX to specify additional directories to mount
-   *     into the hermetic sandbox. The value is a single path or a 'source:target' pair and multiple
-   *     uses of this property are allowed and value will be accumulated.
-   */
-  public static final String HERMETIC_SANDBOX_MOUNT_DIR = "hermetic-sandbox-mount-dir";
-
-  /**
    * @field SANDBOX_ADD_MOUNT_PAIR
    * @brief The exec_property to inform the executor to add mount pairs to hermetic sandbox.
    * @details This is equivalent to bazel's --sandbox_add_mount_pair flag. The value should be

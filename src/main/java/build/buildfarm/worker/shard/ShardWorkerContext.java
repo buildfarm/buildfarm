@@ -1039,7 +1039,7 @@ class ShardWorkerContext implements WorkerContext {
     options.writableFiles.add(workingDirectory.toString());
 
     // Add mount pairs for hermetic sandbox
-    for (Map.Entry<String, String> mountPair : limits.hermeticSandboxMountPair.entrySet()) {
+    for (Map.Entry<String, String> mountPair : limits.sandboxMountPair.entrySet()) {
       String source = mountPair.getKey();
       String target = mountPair.getValue();
       if (source.equals(target)) {

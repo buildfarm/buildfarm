@@ -47,7 +47,6 @@ public class ExecutionPropertiesParser {
     Map<String, BiConsumer<ResourceLimits, Property>> parser = new HashMap<>();
     parser.put(ExecutionProperties.LINUX_SANDBOX, ExecutionPropertiesParser::storeLinuxSandbox);
     parser.put(ExecutionProperties.HERMETIC_LINUX_SANDBOX, ExecutionPropertiesParser::storeHermeticLinuxSandbox);
-    parser.put(ExecutionProperties.HERMETIC_SANDBOX_MOUNT_DIR, ExecutionPropertiesParser::storeHermeticLinuxSandboxMountPair);
     parser.put(ExecutionProperties.SANDBOX_ADD_MOUNT_PAIR, ExecutionPropertiesParser::storeSandboxAddMountPair);
     parser.put(ExecutionProperties.AS_NOBODY, ExecutionPropertiesParser::storeAsNobody);
     parser.put(ExecutionProperties.BLOCK_NETWORK, ExecutionPropertiesParser::storeBlockNetwork);
@@ -149,23 +148,6 @@ public class ExecutionPropertiesParser {
   }
 
   /**
-   * @brief Store the property for using bazel's hermetic linux sandbox.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeHermeticLinuxSandboxMountPair(ResourceLimits limits, Property property) {
-    String[] parts = property.getValue().split(":");
-    if (parts.length == 2) {
-      limits.hermeticSandboxMountPair.put(parts[0], parts[1]);
-      describeChange(limits.description, "hermetic linux sandbox mount pair", property.getValue(), property);
-    } else {
-      limits.hermeticSandboxMountPair.put(parts[0], parts[0]);
-      describeChange(limits.description, "hermetic linux sandbox mount pair", property.getValue(), property);
-    }
-  }
-
-  /**
    * @brief Store the property for bazel's sandbox_add_mount_pair.
    * @details Parses and stores mount pairs. Can handle both single mount pairs and JSON arrays.
    * @param limits Current limits to apply changes to.
@@ -203,9 +185,9 @@ public class ExecutionPropertiesParser {
   private static void addMountPairToLimits(ResourceLimits limits, String mountPair) {
     String[] parts = mountPair.split(":");
     if (parts.length == 2) {
-      limits.hermeticSandboxMountPair.put(parts[0], parts[1]);
+      limits.sandboxMountPair.put(parts[0], parts[1]);
     } else {
-      limits.hermeticSandboxMountPair.put(parts[0], parts[0]);
+      limits.sandboxMountPair.put(parts[0], parts[0]);
     }
   }
 

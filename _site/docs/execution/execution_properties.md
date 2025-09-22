@@ -75,9 +75,6 @@ $ bazel test --remote_default_exec_properties='{"hermetic-linux-sandbox": "true"
 --remote_executor=grpc://127.0.0.1:8980 //my:target
 ```
 
-### `hermetic-sandbox-mount-dir`
-**description:** Alternative property name for mounting directories in hermetic sandbox. Functionally equivalent to `sandbox_add_mount_pair`.
-
 ### `fake-hostname`
 **description:** Uses `localhost` as the hostname during execution.  Assumes the usage of the linux sandbox.
 
