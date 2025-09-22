@@ -54,13 +54,13 @@ public class ResourceLimits {
   public boolean useHermeticLinuxSandbox = false;
 
   /**
-   * @field hermeticSandboxMountPair
-   * @brief Directories to mount into the hermetic sandbox.
+   * @field sandboxMountPair
+   * @brief Directories to mount into the sandbox.
    * @details This is used with useHermeticLinuxSandbox to specify additional directories to mount
    *     into the hermetic sandbox. The key is the source path on the host and the value is the target
    *     path in the sandbox. This is similar to bazel's --sandbox_add_mount_pair.
    */
-  public HashMap<String, String> hermeticSandboxMountPair = new HashMap<>();
+  public HashMap<String, String> sandboxMountPair = new HashMap<>();
 
   /**
    * @field useExecutionPolicies

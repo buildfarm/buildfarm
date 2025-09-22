@@ -947,7 +947,7 @@ public class ResourceDeciderTest {
 
     // ASSERT
     assertThat(limits.useHermeticLinuxSandbox).isTrue();
-    assertThat(limits.hermeticSandboxMountPair).containsEntry("/usr/bin/cp", "/usr/bin/cp");
+    assertThat(limits.sandboxMountPair).containsEntry("/usr/bin/cp", "/usr/bin/cp");
   }
 
   // Function under test: decideResourceLimitations
@@ -984,7 +984,7 @@ public class ResourceDeciderTest {
 
     // ASSERT
     assertThat(limits.useHermeticLinuxSandbox).isTrue();
-    assertThat(limits.hermeticSandboxMountPair).containsEntry("/host/bin/cp", "/usr/bin/cp");
+    assertThat(limits.sandboxMountPair).containsEntry("/host/bin/cp", "/usr/bin/cp");
   }
 
   // Function under test: decideResourceLimitations
@@ -1021,8 +1021,8 @@ public class ResourceDeciderTest {
 
     // ASSERT
     assertThat(limits.useHermeticLinuxSandbox).isTrue();
-    assertThat(limits.hermeticSandboxMountPair).containsEntry("/usr/bin/cp", "/usr/bin/cp");
-    assertThat(limits.hermeticSandboxMountPair).containsEntry("/usr/bin/grep", "/usr/bin/grep");
-    assertThat(limits.hermeticSandboxMountPair).containsEntry("/host/sed", "/usr/bin/sed");
+    assertThat(limits.sandboxMountPair).containsEntry("/usr/bin/cp", "/usr/bin/cp");
+    assertThat(limits.sandboxMountPair).containsEntry("/usr/bin/grep", "/usr/bin/grep");
+    assertThat(limits.sandboxMountPair).containsEntry("/host/sed", "/usr/bin/sed");
   }
 }
