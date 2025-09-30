@@ -3,9 +3,7 @@ package build.buildfarm.common.config;
 import com.google.common.base.Strings;
 import java.net.URI;
 import javax.annotation.Nullable;
-import lombok.AccessLevel;
 import lombok.Data;
-import lombok.Getter;
 import lombok.ToString;
 import oshi.util.FileUtil;
 import redis.clients.jedis.util.JedisURIHelper;
@@ -51,12 +49,6 @@ public class Backplane {
   private int maxCorrelatedInvocationsTimeout = 7 * 24 * 60 * 60; // 1 Week
   private String toolInvocationsPrefix = "ToolInvocation";
   private int maxToolInvocationTimeout = 604800;
-
-  @Getter(AccessLevel.NONE)
-  private boolean subscribeToBackplane = true; // deprecated
-
-  @Getter(AccessLevel.NONE)
-  private boolean runFailsafeOperation = true; // deprecated
 
   private int maxQueueDepth = 100000;
   private int maxPreQueueDepth = 1000000;
