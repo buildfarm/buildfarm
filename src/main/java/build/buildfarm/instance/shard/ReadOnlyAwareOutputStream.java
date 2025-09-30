@@ -40,7 +40,6 @@ class ReadOnlyAwareOutputStream extends FeedbackOutputStream {
         onStream.accept(getOutput());
         return;
       } catch (IOException e) {
-        e.printStackTrace();
         if (Status.fromThrowable(e).getCode() != Code.FAILED_PRECONDITION) {
           throw e;
         }
