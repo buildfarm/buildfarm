@@ -18,6 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import build.buildfarm.cas.cfc.LRUDB.SizeEntry;
+import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Jimfs;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -39,11 +40,13 @@ import org.junit.runners.JUnit4;
 public class TextLRUDBTest {
   private TextLRUDB textLRUDB;
   private FileSystem fileSystem;
+  private Path rootDir;
 
   @Before
   public void setUp() {
     textLRUDB = new TextLRUDB();
     fileSystem = Jimfs.newFileSystem();
+    rootDir = Iterables.getFirst(fileSystem.getRootDirectories(), null);
   }
 
   @After
@@ -257,7 +260,7 @@ public class TextLRUDBTest {
   @Test
   public void save_withValidEntries_writesCorrectFormat() throws IOException {
     // Arrange
-    Path tempFile = fileSystem.getPath("/test.txt");
+    Path tempFile = rootDir.resolve("test.txt");
     List<SizeEntry> entries =
         List.of(
             new SizeEntry("key1", 100L), new SizeEntry("key2", 200L), new SizeEntry("key3", 300L));
@@ -274,7 +277,7 @@ public class TextLRUDBTest {
   @Test
   public void save_withEmptyIterator_createsEmptyFile() throws IOException {
     // Arrange
-    Path tempFile = fileSystem.getPath("/empty.txt");
+    Path tempFile = rootDir.resolve("empty.txt");
     List<SizeEntry> entries = List.of();
     Iterator<SizeEntry> iterator = entries.iterator();
 
@@ -289,7 +292,7 @@ public class TextLRUDBTest {
   @Test
   public void save_withSingleEntry_writesCorrectly() throws IOException {
     // Arrange
-    Path tempFile = fileSystem.getPath("/single.txt");
+    Path tempFile = rootDir.resolve("single.txt");
     List<SizeEntry> entries = List.of(new SizeEntry("onlyKey", 42L));
     Iterator<SizeEntry> iterator = entries.iterator();
 
@@ -304,7 +307,7 @@ public class TextLRUDBTest {
   @Test
   public void save_withZeroSizeEntry_writesCorrectly() throws IOException {
     // Arrange
-    Path tempFile = fileSystem.getPath("/zero.txt");
+    Path tempFile = rootDir.resolve("zero.txt");
     List<SizeEntry> entries = List.of(new SizeEntry("zeroKey", 0L));
     Iterator<SizeEntry> iterator = entries.iterator();
 
@@ -319,7 +322,7 @@ public class TextLRUDBTest {
   @Test
   public void save_withLargeSizeEntry_writesCorrectly() throws IOException {
     // Arrange
-    Path tempFile = fileSystem.getPath("/large.txt");
+    Path tempFile = rootDir.resolve("large.txt");
     List<SizeEntry> entries = List.of(new SizeEntry("largeKey", Long.MAX_VALUE));
     Iterator<SizeEntry> iterator = entries.iterator();
 
@@ -334,7 +337,7 @@ public class TextLRUDBTest {
   @Test
   public void save_withSpecialCharactersInKey_writesCorrectly() throws IOException {
     // Arrange
-    Path tempFile = fileSystem.getPath("/special.txt");
+    Path tempFile = rootDir.resolve("special.txt");
     List<SizeEntry> entries = List.of(new SizeEntry("key-with_special.chars/path", 123L));
     Iterator<SizeEntry> iterator = entries.iterator();
 
@@ -349,7 +352,7 @@ public class TextLRUDBTest {
   @Test
   public void roundTrip_saveAndLoad_preservesData() throws IOException {
     // Arrange
-    Path tempFile = fileSystem.getPath("/roundtrip.txt");
+    Path tempFile = rootDir.resolve("roundtrip.txt");
     List<SizeEntry> originalEntries =
         List.of(
             new SizeEntry("key1", 100L), new SizeEntry("key2", 200L), new SizeEntry("key3", 300L));
@@ -372,7 +375,7 @@ public class TextLRUDBTest {
   @Test
   public void save_overwritesExistingFile() throws IOException {
     // Arrange
-    Path tempFile = fileSystem.getPath("/overwrite.txt");
+    Path tempFile = rootDir.resolve("overwrite.txt");
     Files.writeString(tempFile, "existing content");
 
     List<SizeEntry> entries = List.of(new SizeEntry("newKey", 999L));
