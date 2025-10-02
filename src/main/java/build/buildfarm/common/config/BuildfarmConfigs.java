@@ -223,6 +223,7 @@ public final class BuildfarmConfigs {
 
     adjustExecuteStageWidth(configs);
     adjustInputFetchStageWidth(configs);
+    adjustReportResultStageWidth(configs);
 
     checkExecutionWrapperAvailability(configs);
   }
@@ -259,6 +260,18 @@ public final class BuildfarmConfigs {
           String.format(
               "executeInputFetchWidth modified to %d",
               configs.getWorker().getInputFetchStageWidth()));
+    }
+  }
+
+  private static void adjustReportResultStageWidth(BuildfarmConfigs configs) {
+    if (configs.getWorker().getReportResultStageWidth() == 0) {
+      configs
+          .getWorker()
+          .setReportResultStageWidth(Math.max(1, configs.getWorker().getExecuteStageWidth() / 5));
+      log.info(
+          String.format(
+              "executeReportResultWidth modified to %d",
+              configs.getWorker().getReportResultStageWidth()));
     }
   }
 
