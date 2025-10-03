@@ -16,6 +16,36 @@ package build.buildfarm.common;
 
 import java.io.IOException;
 
+/**
+ * Exception thrown when a blob cannot be found in the Content Addressable Storage (CAS).
+ *
+ * <p>This exception is specifically used in Buildfarm's distributed build system to indicate that a
+ * requested blob (identified by its digest) is not available in the CAS. Blobs in the CAS represent
+ * various build artifacts including source files, intermediate build outputs, and final build
+ * results that are stored and retrieved by their cryptographic hash.
+ *
+ * <p>Common scenarios where this exception is thrown include:
+ *
+ * <ul>
+ *   <li>When a ByteStream gRPC read operation fails due to execution service rejection, indicating
+ *       the blob cannot be retrieved from remote storage
+ *   <li>During execution directory setup when required input files or dependencies referenced by
+ *       digest are missing from the CAS
+ *   <li>When build artifacts that should be available based on previous operations are no longer
+ *       accessible due to storage cleanup or network issues
+ * </ul>
+ *
+ * <p>This exception extends {@link IOException} as blob retrieval failures are fundamentally I/O
+ * related operations. It is typically caught and handled by converting it into appropriate build
+ * violation types (e.g., VIOLATION_TYPE_MISSING) for reporting to build clients.
+ *
+ * <p>The exception message typically contains the resource name or digest of the missing blob, and
+ * the cause contains the underlying reason for the failure (e.g., network timeout, storage service
+ * unavailability, or execution service rejection).
+ *
+ * @see build.buildfarm.common.grpc.ByteStreamHelper
+ * @see build.buildfarm.worker.ExecDirException
+ */
 public class BlobNotFoundException extends IOException {
   public BlobNotFoundException(String name, Throwable cause) {
     super(name, cause);
