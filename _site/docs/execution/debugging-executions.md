@@ -60,7 +60,7 @@ If you see an error like this:
 properties are not valid for queue eligibility: [name: "debug-before-execution" value: "true"]
 ```
 you will need to configure the queue's `allow_unmatched` to true so that the server can still put the action on the queue.
-Additionally you may want to configure the the worker's `DequeueMatchSettings` to also have `allow_unmatched` to true.  That will ensure the action does not fail reaching one of the worker due to the additional exec_property.
+Additionally you may want to configure the worker's `DequeueMatchSettings` to also have `allow_unmatched` to true.  That will ensure the action does not fail reaching one of the worker due to the additional exec_property.
 
 ### Debugging Tests
 By default, `debug-before-execution` and `debug-after-execution` only apply to test actions.  The reason being, is that if you wanted to debug a test, but passed a global property like `--remote_default_exec_properties='debug-before-execution=true'`, it would invalidate all the actions, and the test would need rebuilt, but the rebuild of the test would fail, because you would actually be debugging the first build action, and you would never see the debug results of the test action.  Debugging tests is more typical, but you can also debug build actions by using `--remote_default_exec_properties='debug-tests-only=false'`.
