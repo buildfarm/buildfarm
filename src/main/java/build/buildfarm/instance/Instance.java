@@ -164,7 +164,7 @@ public interface Instance {
 
   ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names);
 
-  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
+  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String name);
 
   GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
