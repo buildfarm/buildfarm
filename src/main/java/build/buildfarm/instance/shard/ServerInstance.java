@@ -101,12 +101,15 @@ import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.PipelineChange;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerPipelineChangeResponse;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -3398,10 +3401,10 @@ public class ServerInstance extends NodeInstance {
     return workerStub(name).getWorkerProfile(name);
   }
 
-    @Override
-    public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String name) {
-        return workerStub(name).shutDownWorkerGracefully(name);
-    }
+  @Override
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String name) {
+    return workerStub(name).shutDownWorkerGracefully(name);
+  }
 
   @Override
   public ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names) {
@@ -3506,5 +3509,11 @@ public class ServerInstance extends NodeInstance {
       throws IOException {
     // TODO maybe track per server instance as well
     backplane.incrementRequestCounters(actionId, toolInvocationId, actionMnemonic, targetId);
+  }
+
+  @Override
+  public ListenableFuture<WorkerPipelineChangeResponse> pipelineChange(
+      String name, List<PipelineChange> changes) {
+    return workerStub(name).pipelineChange(name, changes);
   }
 }
