@@ -87,10 +87,12 @@ import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.PipelineChange;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerPipelineChangeResponse;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -1856,6 +1858,13 @@ public abstract class NodeInstance extends InstanceBase {
   public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String name) {
     throw new UnsupportedOperationException(
         "NodeInstance doesn't support shutDownWorkerGracefully(String) method.");
+  }
+
+  @Override
+  public ListenableFuture<WorkerPipelineChangeResponse> pipelineChange(
+      String name, List<PipelineChange> changes) {
+    throw new UnsupportedOperationException(
+        "NodeInstance doesn't support pipelineChange(...) method.");
   }
 
   @Override

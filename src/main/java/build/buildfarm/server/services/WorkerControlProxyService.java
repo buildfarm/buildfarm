@@ -1,7 +1,11 @@
 package build.buildfarm.server.services;
 
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.*;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
+import build.buildfarm.v1test.WorkerControlGrpc;
+import build.buildfarm.v1test.WorkerPipelineChangeRequest;
+import build.buildfarm.v1test.WorkerPipelineChangeResponse;
 import io.grpc.stub.StreamObserver;
 import lombok.extern.java.Log;
 
@@ -17,7 +21,18 @@ public class WorkerControlProxyService extends WorkerControlGrpc.WorkerControlIm
   public void pipelineChange(
       WorkerPipelineChangeRequest request,
       StreamObserver<WorkerPipelineChangeResponse> responseObserver) {
-    throw new UnsupportedOperationException();
+    if (request.getChangesCount() > 0) {
+      try {
+        responseObserver.onNext(
+            instance.pipelineChange(request.getWorkerName(), request.getChangesList()).get());
+        responseObserver.onCompleted();
+      } catch (Exception e) {
+        responseObserver.onError(e);
+      }
+    } else {
+      responseObserver.onNext(WorkerPipelineChangeResponse.newBuilder().build());
+      responseObserver.onCompleted();
+    }
   }
 
   @Override
