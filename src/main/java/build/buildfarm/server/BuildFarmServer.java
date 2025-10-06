@@ -133,7 +133,9 @@ public class BuildFarmServer extends LoggingMain {
         new Thread(
             () -> {
               int registrationIntervalMillis = 60000;
+              int cleanupIntervalMillis = 300000; // Clean up every 5 minutes
               long serverRegistrationExpiresAt = 0;
+              long serverCleanupExpiresAt = 0;
               Backplane backplane = ((ServerInstance) instance).getBackplane();
 
               while (!shutdownInitiated.get() && !serverRegistrationStopped) {
@@ -146,6 +148,18 @@ public class BuildFarmServer extends LoggingMain {
                     // Update every 60 seconds
                     serverRegistrationExpiresAt = now + registrationIntervalMillis;
                   }
+
+                  if (now >= serverCleanupExpiresAt) {
+                    // Clean up expired servers
+                    try {
+                      backplane.cleanupExpiredServers();
+                      log.info("Server cleanup completed");
+                    } catch (Exception e) {
+                      log.log(WARNING, "error during server cleanup", e);
+                    }
+                    serverCleanupExpiresAt = now + cleanupIntervalMillis;
+                  }
+
                   SECONDS.sleep(1);
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
