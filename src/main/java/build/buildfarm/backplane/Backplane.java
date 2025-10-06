@@ -100,6 +100,9 @@ public interface Backplane {
   /** Gets all active servers. */
   Set<String> getServers() throws IOException;
 
+  /** Cleans up expired servers. */
+  void cleanupExpiredServers() throws IOException;
+
   /** Page all operations */
   ScanResult<Operation> scanExecutions(String cursor, int count) throws IOException;
 

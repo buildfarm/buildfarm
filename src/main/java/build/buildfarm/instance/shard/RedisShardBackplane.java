@@ -797,10 +797,11 @@ public class RedisShardBackplane implements Backplane {
     }
 
     long currentTimeMillis = System.currentTimeMillis();
+    long expireAt = currentTimeMillis + (configs.getBackplane().getServerExpire() * 1000L);
     String serverJson =
         String.format(
-            "{\"name\":\"%s\",\"type\":\"%s\",\"firstRegisteredAt\":%d,\"lastRegisteredAt\":%d}",
-            serverName, serverType, currentTimeMillis, currentTimeMillis);
+            "{\"name\":\"%s\",\"type\":\"%s\",\"firstRegisteredAt\":%d,\"lastRegisteredAt\":%d,\"expireAt\":%d}",
+            serverName, serverType, currentTimeMillis, currentTimeMillis, expireAt);
 
     client.run(jedis -> state.servers.insert(jedis, serverName, serverJson));
   }
@@ -824,6 +825,14 @@ public class RedisShardBackplane implements Backplane {
       return Set.of();
     }
     return client.call(jedis -> state.servers.keys(jedis));
+  }
+
+  @Override
+  public void cleanupExpiredServers() throws IOException {
+    if (state.servers == null) {
+      return;
+    }
+    client.run(this::fetchAndExpireServers);
   }
 
   private CasWorkerMap createCasWorkerMap(UnifiedJedis jedis) {
@@ -930,6 +939,65 @@ public class RedisShardBackplane implements Backplane {
     }
     removeInvalidWorkers(jedis, now, invalidWorkers.build(), publish);
     return returnWorkers;
+  }
+
+  private Set<String> fetchAndExpireServers(UnifiedJedis jedis) {
+    if (state.servers == null) {
+      return Set.of();
+    }
+
+    Map<String, String> servers = state.servers.asMap(jedis);
+    long now = System.currentTimeMillis();
+    Set<String> validServers = Sets.newHashSet();
+    ImmutableList.Builder<String> expiredServers = ImmutableList.builder();
+
+    for (Map.Entry<String, String> entry : servers.entrySet()) {
+      String serverName = entry.getKey();
+      String json = entry.getValue();
+      try {
+        if (json == null) {
+          expiredServers.add(serverName);
+        } else {
+          // Parse server JSON to check expiration
+          if (json.contains("\"expireAt\":")) {
+            // Extract expireAt value from JSON
+            String[] parts = json.split("\"expireAt\":");
+            if (parts.length > 1) {
+              String expireAtStr = parts[1].split("[,}]")[0];
+              long expireAt = Long.parseLong(expireAtStr);
+              if (expireAt <= now) {
+                expiredServers.add(serverName);
+              } else {
+                validServers.add(serverName);
+              }
+            } else {
+              // No expireAt found, consider it expired
+              expiredServers.add(serverName);
+            }
+          } else {
+            // Legacy server format without expireAt, consider it expired
+            expiredServers.add(serverName);
+          }
+        }
+      } catch (NumberFormatException e) {
+        // Invalid expireAt format, consider it expired
+        expiredServers.add(serverName);
+      }
+    }
+
+    removeExpiredServers(jedis, expiredServers.build());
+    return validServers;
+  }
+
+  private void removeExpiredServers(UnifiedJedis jedis, List<String> expiredServers) {
+    for (String serverName : expiredServers) {
+      try {
+        state.servers.remove(jedis, serverName);
+        log.info("Removed expired server: " + serverName);
+      } catch (Exception e) {
+        log.log(Level.WARNING, "Failed to remove expired server: " + serverName, e);
+      }
+    }
   }
 
   public static ActionResult parseActionResult(String json) {
