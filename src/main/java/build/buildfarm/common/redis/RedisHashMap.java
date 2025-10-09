@@ -106,7 +106,7 @@ public class RedisHashMap {
    * @brief Remove all given keys from the map.
    * @details Deletes the key/value pairs.
    * @param jedis Jedis cluster client.
-   * @param key The names of the keys.
+   * @param keys The names of the keys.
    */
   public void remove(UnifiedJedis jedis, Iterable<String> keys) {
     try (AbstractPipeline p = jedis.pipelined()) {
