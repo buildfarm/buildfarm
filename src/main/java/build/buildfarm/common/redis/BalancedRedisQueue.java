@@ -185,7 +185,7 @@ public class BalancedRedisQueue {
   /**
    * @brief Remove element from dequeue.
    * @details Removes an element from the dequeue and specifies whether it was removed.
-   * @param val The value to remove.
+   * @param balancedQueueEntry The value to remove.
    * @return Whether or not the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
