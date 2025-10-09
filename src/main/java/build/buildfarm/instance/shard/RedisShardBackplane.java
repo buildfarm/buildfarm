@@ -69,6 +69,8 @@ import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -131,6 +133,8 @@ public class RedisShardBackplane implements Backplane {
               JsonFormat.TypeRegistry.newBuilder()
                   .add(WorkerExecutedMetadata.getDescriptor())
                   .build());
+
+  private static final Gson gson = new Gson();
 
   private final String source; // used in operation change publication
   private final boolean subscribeToBackplane;
@@ -958,35 +962,40 @@ public class RedisShardBackplane implements Backplane {
         if (json == null) {
           expiredServers.add(serverName);
         } else {
-          // Parse server JSON to check expiration
-          if (json.contains("\"expireAt\":")) {
-            // Extract expireAt value from JSON
-            String[] parts = json.split("\"expireAt\":");
-            if (parts.length > 1) {
-              String expireAtStr = parts[1].split("[,}]")[0];
-              long expireAt = Long.parseLong(expireAtStr);
-              if (expireAt <= now) {
-                expiredServers.add(serverName);
-              } else {
-                validServers.add(serverName);
-              }
-            } else {
-              // No expireAt found, consider it expired
-              expiredServers.add(serverName);
-            }
-          } else {
-            // Legacy server format without expireAt, consider it expired
+          // Parse JSON string as JsonObject and extract expireAt
+          JsonObject jsonObject = gson.fromJson(json, JsonObject.class);
+          Long expireAt = getExpireAtFromJsonObject(jsonObject);
+          if (expireAt == null || expireAt <= now) {
             expiredServers.add(serverName);
+          } else {
+            validServers.add(serverName);
           }
         }
-      } catch (NumberFormatException e) {
-        // Invalid expireAt format, consider it expired
+      } catch (Exception e) {
+        // Any parsing error, consider it expired
+        log.log(Level.WARNING, "Failed to parse server JSON for " + serverName, e);
         expiredServers.add(serverName);
       }
     }
 
     removeExpiredServers(jedis, expiredServers.build());
     return validServers;
+  }
+
+  /**
+   * Extracts the expireAt value from a JsonObject. Returns null if the expireAt field is not found
+   * or invalid.
+   */
+  private Long getExpireAtFromJsonObject(JsonObject jsonObject) {
+    if (jsonObject == null || !jsonObject.has("expireAt")) {
+      return null;
+    }
+
+    try {
+      return jsonObject.get("expireAt").getAsLong();
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   private void removeExpiredServers(UnifiedJedis jedis, List<String> expiredServers) {
