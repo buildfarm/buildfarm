@@ -256,7 +256,12 @@ public class CFCExecFileSystem implements ExecFileSystem {
 
   class ExecFileVisitor implements FileVisitor<Path> {
     protected final List<ListenableFuture<Void>> futures = new ArrayList<>();
+    protected final DigestFunction.Value digestFunction;
     protected Path root = null;
+
+    ExecFileVisitor(DigestFunction.Value digestFunction) {
+      this.digestFunction = digestFunction;
+    }
 
     Iterable<ListenableFuture<Void>> futures() {
       return futures;
@@ -286,9 +291,10 @@ public class CFCExecFileSystem implements ExecFileSystem {
         ExecSymlinkAttributes symlinkAttrs = (ExecSymlinkAttributes) attrs;
         populate = putSymlink(file, symlinkAttrs.target());
       } else if (attrs.isRegularFile()) {
-        Digest digest = (Digest) attrs.fileKey();
+        build.bazel.remote.execution.v2.Digest digest =
+            (build.bazel.remote.execution.v2.Digest) attrs.fileKey();
         ExecFileAttributes fileAttrs = (ExecFileAttributes) attrs;
-        populate = catchingPut(digest, root, file, fileAttrs.isExecutable());
+        populate = catchingPut(DigestUtil.fromDigest(digest, digestFunction), root, file, fileAttrs.isExecutable());
       } else {
         populate = immediateFailedFuture(new IOException("unknown file type for " + file));
         terminate = true;
@@ -319,7 +325,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
 
     log.log(Level.FINER, operationName + " walking execTree");
     ExecTree execTree = new ExecTree(directoriesIndex);
-    ExecFileVisitor visitor = new ExecFileVisitor();
+    ExecFileVisitor visitor = new ExecFileVisitor(digestFunction);
     execTree.walk(
         execDir, DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction), visitor);
 

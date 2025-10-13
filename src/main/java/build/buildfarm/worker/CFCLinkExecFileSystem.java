@@ -241,7 +241,6 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     private final Set<Path> linkedDirectories; // only need contains
     private final Map<build.bazel.remote.execution.v2.Digest, Directory>
         index; // only need retrieve
-    private final DigestFunction.Value digestFunction;
     private final OutputDirectory outputDirectoryRoot;
     private final Stack<OutputDirectory> outputDirectories = new Stack<>();
     private final List<String> inputFiles = synchronizedList(new ArrayList<>());
@@ -253,9 +252,9 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         Map<build.bazel.remote.execution.v2.Digest, Directory> index,
         DigestFunction.Value digestFunction,
         OutputDirectory outputDirectoryRoot) {
+      super(digestFunction);
       this.linkedDirectories = linkedDirectories;
       this.index = index;
-      this.digestFunction = digestFunction;
       this.outputDirectoryRoot = outputDirectoryRoot;
     }
 
