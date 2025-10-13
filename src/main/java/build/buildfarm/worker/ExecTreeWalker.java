@@ -93,7 +93,9 @@ class ExecTreeWalker implements Closeable {
       throw new IllegalStateException("Closed");
     }
 
-    return checkNotNull(visit(new Entry(file, new ExecDirectoryAttributes(digest))));
+    Entry rootEntry =
+        new Entry(file, new ExecDirectoryAttributes(DigestUtil.fromDigest(digest, digestFunction)));
+    return checkNotNull(visit(rootEntry));
   }
 
   private Event visit(Entry entry) {
@@ -102,17 +104,18 @@ class ExecTreeWalker implements Closeable {
     }
 
     // file is a directory, stream it
-    Digest digest = (Digest) entry.getAttributes().fileKey();
-    Directory directory = index.get(digest);
+    build.buildfarm.v1test.Digest digest =
+        (build.buildfarm.v1test.Digest) entry.getAttributes().fileKey();
+    Directory directory = index.get(DigestUtil.toDigest(digest));
     if (directory == null) {
       return new Event(
           EventType.ENTRY,
           entry.getPath(),
           entry.getAttributes(),
-          new NoSuchFileException(
-              DigestUtil.toString(DigestUtil.fromDigest(digest, digestFunction))));
+          new NoSuchFileException(DigestUtil.toString(digest)));
     }
-    DirectoryStream<Entry> stream = new ExecDirectoryStream(directory, entry.getPath());
+    DirectoryStream<Entry> stream =
+        new ExecDirectoryStream(directory, entry.getPath(), digest.getDigestFunction());
 
     // push a directory node to the stack and return an event
     stack.push(new DirectoryNode(entry, stream));

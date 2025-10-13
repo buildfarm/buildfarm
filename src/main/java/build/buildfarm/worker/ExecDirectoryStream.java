@@ -3,10 +3,12 @@ package build.buildfarm.worker;
 import static com.google.common.collect.Iterators.concat;
 import static com.google.common.collect.Iterators.transform;
 
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.SymlinkNode;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.worker.ExecFileSystem.ExecDirectoryAttributes;
 import build.buildfarm.worker.ExecFileSystem.ExecFileAttributes;
 import build.buildfarm.worker.ExecFileSystem.ExecSymlinkAttributes;
@@ -18,16 +20,20 @@ import java.util.Iterator;
 class ExecDirectoryStream implements DirectoryStream<Entry> {
   private final Directory directory;
   private final Path path;
+  private final DigestFunction.Value digestFunction;
 
-  ExecDirectoryStream(Directory directory, Path path) {
+  ExecDirectoryStream(Directory directory, Path path, DigestFunction.Value digestFunction) {
     this.directory = directory;
     this.path = path;
+    this.digestFunction = digestFunction;
   }
 
   private Entry fileToEntry(FileNode fileNode) {
     return new Entry(
         path.resolve(fileNode.getName()),
-        new ExecFileAttributes(fileNode.getDigest(), fileNode.getIsExecutable()));
+        new ExecFileAttributes(
+            DigestUtil.fromDigest(fileNode.getDigest(), digestFunction),
+            fileNode.getIsExecutable()));
   }
 
   private Entry symlinkToEntry(SymlinkNode symlinkNode) {
@@ -38,7 +44,8 @@ class ExecDirectoryStream implements DirectoryStream<Entry> {
   private Entry directoryToEntry(DirectoryNode directoryNode) {
     return new Entry(
         path.resolve(directoryNode.getName()),
-        new ExecDirectoryAttributes(directoryNode.getDigest()));
+        new ExecDirectoryAttributes(
+            DigestUtil.fromDigest(directoryNode.getDigest(), digestFunction)));
   }
 
   private Iterator<Entry> filesIterator() {

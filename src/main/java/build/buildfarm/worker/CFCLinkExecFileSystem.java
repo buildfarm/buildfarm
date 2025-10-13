@@ -245,7 +245,6 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     private final Set<Path> linkedDirectories; // only need contains
     private final Map<build.bazel.remote.execution.v2.Digest, Directory>
         index; // only need retrieve
-    private final DigestFunction.Value digestFunction;
     private final OutputDirectory outputDirectoryRoot;
     private final Stack<OutputDirectory> outputDirectories = new Stack<>();
     private final List<String> inputFiles = synchronizedList(new ArrayList<>());
@@ -257,13 +256,11 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         Path root,
         Set<Path> linkedDirectories,
         Map<build.bazel.remote.execution.v2.Digest, Directory> index,
-        DigestFunction.Value digestFunction,
         OutputDirectory outputDirectoryRoot) {
       super(workerExecutedMetadata);
       this.root = root;
       this.linkedDirectories = linkedDirectories;
       this.index = index;
-      this.digestFunction = digestFunction;
       this.outputDirectoryRoot = outputDirectoryRoot;
     }
 
@@ -304,17 +301,16 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
             parentOutputDirectory != null ? parentOutputDirectory.getChild(name) : null;
       }
       if (outputDirectory == null && linkedDirectories.contains(dir)) {
-        // this is scary, given the switch
-        build.bazel.remote.execution.v2.Digest digest =
-            (build.bazel.remote.execution.v2.Digest) attrs.fileKey();
+        Digest digest = (Digest) attrs.fileKey();
+        build.bazel.remote.execution.v2.Digest reapiDigest = DigestUtil.toDigest(digest);
         workerExecutedMetadata.addLinkedInputDirectories(root.relativize(dir).toString());
         futures.add(
             transform(
-                linkDirectory(dir, DigestUtil.fromDigest(digest, digestFunction), index),
+                linkDirectory(dir, digest, index),
                 pathResult -> {
-                  inputDirectories.add(digest);
+                  inputDirectories.add(reapiDigest);
                   if (pathResult.isMissed()) {
-                    fetchedBytes(sumDirectorySize(digest));
+                    fetchedBytes(sumDirectorySize(reapiDigest));
                   }
                   return null;
                 },
@@ -344,18 +340,10 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         ExecSymlinkAttributes symlinkAttrs = (ExecSymlinkAttributes) attrs;
         populate = putSymlink(file, symlinkAttrs.target());
       } else if (attrs.isRegularFile()) {
-        // more scary
-        build.bazel.remote.execution.v2.Digest digest =
-            (build.bazel.remote.execution.v2.Digest) attrs.fileKey();
+        Digest digest = (Digest) attrs.fileKey();
         ExecFileAttributes fileAttrs = (ExecFileAttributes) attrs;
         // mild risk here with inputFiles missing a key that was referenced...
-        populate =
-            catchingPut(
-                DigestUtil.fromDigest(digest, digestFunction),
-                root,
-                file,
-                fileAttrs.isExecutable(),
-                inputFiles::add);
+        populate = catchingPut(digest, root, file, fileAttrs.isExecutable(), inputFiles::add);
       } else {
         populate = immediateFailedFuture(new IOException("unknown file type for " + file));
         terminate = true;
@@ -400,7 +388,6 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
             execDir,
             linkedInputDirectories,
             directoriesIndex,
-            digestFunction,
             outputDirectory);
     execTree.walk(execDir, inputRootDigest, visitor);
     Iterable<ListenableFuture<Void>> fetchedFutures = visitor.futures();
