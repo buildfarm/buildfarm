@@ -10,6 +10,7 @@ java_test(
         "//src/main/java/build/buildfarm/backplane",
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/base",
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/worker",
