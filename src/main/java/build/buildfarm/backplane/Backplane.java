@@ -27,8 +27,6 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.worker.resources.LocalResourceSet;
@@ -89,6 +87,21 @@ public interface Backplane {
   CasIndexResults reindexCas() throws IOException;
 
   void deregisterWorker(String hostName) throws IOException;
+
+  /** Registers a server to the set of active servers. */
+  void addServer(String serverName, String serverType) throws IOException;
+
+  /** Removes a server from the set of active servers. */
+  boolean removeServer(String serverName, String reason) throws IOException;
+
+  /** Deregisters a server. */
+  void deregisterServer(String serverName) throws IOException;
+
+  /** Gets all active servers. */
+  Set<String> getServers() throws IOException;
+
+  /** Cleans up expired servers. */
+  void cleanupExpiredServers() throws IOException;
 
   /** Page all operations */
   ScanResult<Operation> scanExecutions(String cursor, int count) throws IOException;
@@ -323,8 +336,6 @@ public interface Backplane {
   BackplaneStatus backplaneStatus() throws IOException;
 
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
-
-  GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) throws IOException;
 
   /** Set expiry time for digests */
   void updateDigestsExpiry(Iterable<Digest> digests) throws IOException;
