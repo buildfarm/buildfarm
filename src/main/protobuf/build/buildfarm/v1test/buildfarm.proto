@@ -450,24 +450,21 @@ message BackplaneStatus {
 
   DispatchedOperationsStatus dispatched_operations = 9;
 
-  // Maintained for backward compatibility.
-  repeated string active_workers = 4;
+  // Maintained for backward compatibility. Union of active_storage_workers and active_execute_workers
+  repeated string active_workers = 4 [deprecated = true];
+
+  reserved 5;
+  reserved 6;
+  reserved 7;
+  reserved 8;
+  reserved 10;
+
+  // Count of dispatched operations (non-negative)
+  int64 dispatched_size = 11;
 
   repeated string active_storage_workers = 12;
 
   repeated string active_execute_workers = 13;
-
-  int64 cas_lookup_size = 5;
-
-  int64 action_cache_size = 6;
-
-  int64 blocked_actions_size = 7;
-
-  int64 blocked_invocations_size = 8;
-
-  int64 fetch_time_ms = 10;
-
-  int64 dispatched_size = 11;
 }
 
 message QueuedOperationMetadata {
