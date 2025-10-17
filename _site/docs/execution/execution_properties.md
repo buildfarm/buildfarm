@@ -42,6 +42,39 @@ Tests that exceed their memory requirements will be killed.
 ### `linux-sandbox`
 **description:** Use bazel's linux sandbox as an execution wrapper.
 
+### `hermetic-linux-sandbox`
+**description:** Use bazel's hermetic linux sandbox for enhanced isolation. This is equivalent to bazel's `--experimental_use_hermetic_linux_sandbox` flag.
+
+**use case:** Provides stronger hermetic isolation by using chroot and only mounting explicitly specified directories. This is more restrictive than the regular linux sandbox and helps ensure reproducible builds by limiting access to the host filesystem.
+
+**example:**
+```shell
+$ bazel test --remote_default_exec_properties='{"hermetic-linux-sandbox": "true"}' \
+--remote_executor=grpc://127.0.0.1:8980 //my:target
+```
+
+### `sandbox_add_mount_pair`
+**description:** Add mount pairs to the hermetic sandbox. This is equivalent to bazel's `--sandbox_add_mount_pair` flag. Can be used with `hermetic-linux-sandbox` to mount additional directories or files into the sandbox.
+
+**use case:** When using hermetic sandbox, you may need access to specific system tools or libraries that are not included in the minimal environment. This property allows you to explicitly mount them.
+
+**format:** Can be a single path (mounted to the same location) or `source:target` pair. Also supports JSON arrays for multiple mount pairs.
+
+**examples:**
+```shell
+# Single path - mounts /usr/bin/cp to /usr/bin/cp in sandbox
+$ bazel test --remote_default_exec_properties='{"hermetic-linux-sandbox": "true", "sandbox_add_mount_pair": "/usr/bin/cp"}' \
+--remote_executor=grpc://127.0.0.1:8980 //my:target
+
+# Source:target pair - mounts /host/bin/tool to /usr/bin/tool in sandbox
+$ bazel test --remote_default_exec_properties='{"hermetic-linux-sandbox": "true", "sandbox_add_mount_pair": "/host/bin/tool:/usr/bin/tool"}' \
+--remote_executor=grpc://127.0.0.1:8980 //my:target
+
+# Multiple mount pairs using JSON array
+$ bazel test --remote_default_exec_properties='{"hermetic-linux-sandbox": "true", "sandbox_add_mount_pair": "[\"\/usr\/bin\/cp\", \"\/usr\/bin\/grep\", \"\/usr\/bin\/sed\"]"}' \
+--remote_executor=grpc://127.0.0.1:8980 //my:target
+```
+
 ### `fake-hostname`
 **description:** Uses `localhost` as the hostname during execution.  Assumes the usage of the linux sandbox.
 
