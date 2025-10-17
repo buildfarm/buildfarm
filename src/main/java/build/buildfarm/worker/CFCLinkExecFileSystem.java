@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -402,6 +403,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         } else {
           try {
             fetchedFuture.get();
+          } catch (CancellationException e) {
+            exceptions.add(e);
           } catch (ExecutionException e) {
             // just to ensure that no other code can react to interrupt status
             exceptions.add(e.getCause());
