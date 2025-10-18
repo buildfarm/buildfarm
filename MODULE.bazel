@@ -45,18 +45,6 @@ archive_override(
     ],
 )
 
-# Remove once the following PRs are available in a grpc-java release.
-#   https://github.com/grpc/grpc-java/pull/12207
-#   https://github.com/grpc/grpc-java/pull/12222
-single_version_override(
-    module_name = "grpc-java",
-    patch_strip = 1,
-    patches = [
-        "//third_party:grpc-java-12207.patch",
-        "//third_party:grpc-java-12222.patch",
-    ],
-)
-
 toolchains = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains")
 use_repo(toolchains, "zig_sdk", "zig_sdk-linux-amd64", "zig_sdk-linux-arm64", "zig_sdk-macos-amd64", "zig_sdk-macos-arm64", "zig_sdk-windows-amd64")
 
