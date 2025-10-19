@@ -46,8 +46,12 @@ public class ExecutionPropertiesParser {
     // Build parser for all exec properties
     Map<String, BiConsumer<ResourceLimits, Property>> parser = new HashMap<>();
     parser.put(ExecutionProperties.LINUX_SANDBOX, ExecutionPropertiesParser::storeLinuxSandbox);
-    parser.put(ExecutionProperties.HERMETIC_LINUX_SANDBOX, ExecutionPropertiesParser::storeHermeticLinuxSandbox);
-    parser.put(ExecutionProperties.SANDBOX_ADD_MOUNT_PAIR, ExecutionPropertiesParser::storeSandboxAddMountPair);
+    parser.put(
+        ExecutionProperties.HERMETIC_LINUX_SANDBOX,
+        ExecutionPropertiesParser::storeHermeticLinuxSandbox);
+    parser.put(
+        ExecutionProperties.SANDBOX_ADD_MOUNT_PAIR,
+        ExecutionPropertiesParser::storeSandboxAddMountPair);
     parser.put(ExecutionProperties.AS_NOBODY, ExecutionPropertiesParser::storeAsNobody);
     parser.put(ExecutionProperties.BLOCK_NETWORK, ExecutionPropertiesParser::storeBlockNetwork);
     parser.put(ExecutionProperties.FAKE_HOSTNAME, ExecutionPropertiesParser::storeFakeHostname);

@@ -46,8 +46,8 @@ public class ResourceLimits {
 
   /**
    * @field useHermeticLinuxSandbox
-   * @brief Whether to use bazel's hermetic linux sandbox (--experimental_use_hermetic_linux_sandbox)
-   *     as an execution wrapper.
+   * @brief Whether to use same feature as bazel's hermetic linux sandbox
+   *     (--experimental_use_hermetic_linux_sandbox) for action from the target.
    * @details Other resource limits will be translated into the appropriate CLI arguments for the
    *     sandbox.
    */
@@ -57,8 +57,8 @@ public class ResourceLimits {
    * @field sandboxMountPair
    * @brief Directories to mount into the sandbox.
    * @details This is used with useHermeticLinuxSandbox to specify additional directories to mount
-   *     into the hermetic sandbox. The key is the source path on the host and the value is the target
-   *     path in the sandbox. This is similar to bazel's --sandbox_add_mount_pair.
+   *     into the hermetic sandbox. The key is the source path on the host and the value is the
+   *     target path in the sandbox. This is similar to bazel's --sandbox_add_mount_pair.
    */
   public HashMap<String, String> sandboxMountPair = new HashMap<>();
 

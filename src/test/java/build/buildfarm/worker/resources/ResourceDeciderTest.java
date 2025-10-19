@@ -1004,7 +1004,9 @@ public class ResourceDeciderTest {
                     .addProperties(
                         Platform.Property.newBuilder()
                             .setName(ExecutionProperties.SANDBOX_ADD_MOUNT_PAIR)
-                            .setValue("[\"/usr/bin/cp\", \"/usr/bin/grep\", \"/host/sed:/usr/bin/sed\"]")))
+                            .setValue(
+                                "[\"/usr/bin/cp\", \"/usr/bin/grep\","
+                                    + " \"/host/sed:/usr/bin/sed\"]")))
             .build();
 
     // ACT
