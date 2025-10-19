@@ -32,7 +32,7 @@ jobs:
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8   # v5.0.0
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@192325c86100d080feab897ff886c34abd4c83a3   # v3.30.3
+      uses: github/codeql-action/init@42213152a85ae7569bdb6bec7bcd74cd691bfe41   # v3.30.9
       with:
         languages: ${{ matrix.language }}
         build-mode: manual
@@ -53,6 +53,6 @@ jobs:
           //src/main/java/build/buildfarm:buildfarm-shard-worker
         bazel shutdown
 
-    - uses: github/codeql-action/analyze@192325c86100d080feab897ff886c34abd4c83a3   # v3.30.3
+    - uses: github/codeql-action/analyze@42213152a85ae7569bdb6bec7bcd74cd691bfe41   # v3.30.9
       with:
         category: /language:${{ matrix.language }}
