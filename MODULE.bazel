@@ -12,7 +12,7 @@ bazel_dep(name = "bazel_skylib", version = "1.8.2")
 bazel_dep(name = "blake3", version = "1.8.2")
 bazel_dep(name = "buildifier_prebuilt", version = "8.2.0.2")
 bazel_dep(name = "gazelle", version = "0.45.0")
-bazel_dep(name = "grpc-java", version = "1.72.0")
+bazel_dep(name = "grpc-java", version = "1.75.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20240819-fe8ba054a")
 bazel_dep(name = "grpc-proto", version = "0.0.0-20240627-ec30f58", repo_name = "io_grpc_grpc_proto")
 bazel_dep(name = "hermetic_cc_toolchain", version = "3.2.0")
@@ -42,18 +42,6 @@ archive_override(
     strip_prefix = "remote-apis-e94a7ece2a1e8da1dcf278a0baf2edfe7baafb94",
     urls = [
         "https://github.com/bazelbuild/remote-apis/archive/e94a7ece2a1e8da1dcf278a0baf2edfe7baafb94.zip",
-    ],
-)
-
-# Remove once the following PRs are available in a grpc-java release.
-#   https://github.com/grpc/grpc-java/pull/12207
-#   https://github.com/grpc/grpc-java/pull/12222
-single_version_override(
-    module_name = "grpc-java",
-    patch_strip = 1,
-    patches = [
-        "//third_party:grpc-java-12207.patch",
-        "//third_party:grpc-java-12222.patch",
     ],
 )
 
