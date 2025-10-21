@@ -176,9 +176,8 @@ public class ExecutionProperties {
    * @field HERMETIC_LINUX_SANDBOX
    * @brief The exec_property to inform the executor to use bazel's hermetic linux sandbox for
    *     actions.
-   * @details This similar to bazel's hermetic linux sandbox, which is more restrictive than
-   *     regular sandbox. See more details at bazel docs about
-   *     --experimental_use_hermetic_linux_sandbox.
+   * @details This similar to bazel's hermetic linux sandbox, which is more restrictive than regular
+   *     sandbox. See more details at bazel docs about --experimental_use_hermetic_linux_sandbox.
    */
   public static final String HERMETIC_LINUX_SANDBOX = "hermetic-linux-sandbox";
 
