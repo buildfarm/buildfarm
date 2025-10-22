@@ -36,8 +36,6 @@ import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.Digest;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -261,15 +259,6 @@ public class WorkerInstance extends NodeInstance {
   @Override
   protected Logger getLogger() {
     return log;
-  }
-
-  @Override
-  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
-    try {
-      return backplane.getClientStartTime(request);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
   }
 
   @Override
