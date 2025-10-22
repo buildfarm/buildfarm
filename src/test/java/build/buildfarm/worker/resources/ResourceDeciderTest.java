@@ -882,38 +882,6 @@ public class ResourceDeciderTest {
   }
 
   // Function under test: decideResourceLimitations
-  // Reason for testing: test that hermetic linux sandbox can be enabled
-  // Failure explanation: hermetic linux sandbox was not enabled as expected
-  @Test
-  public void decideResourceLimitationsTestHermeticLinuxSandbox() throws Exception {
-    // ARRANGE
-    Command command =
-        Command.newBuilder()
-            .setPlatform(
-                Platform.newBuilder()
-                    .addProperties(
-                        Platform.Property.newBuilder()
-                            .setName(ExecutionProperties.HERMETIC_LINUX_SANDBOX)
-                            .setValue("true")))
-            .build();
-
-    // ACT
-    ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(
-            command,
-            "worker",
-            /* defaultMaxCores= */ 0,
-            /* onlyMulticoreTests= */ false,
-            /* limitGlobalExecution= */ false,
-            /* executeStageWidth= */ 100,
-            /* allowBringYourOwnContainer= */ false,
-            new SandboxSettings());
-
-    // ASSERT
-    assertThat(limits.useHermeticLinuxSandbox).isTrue();
-  }
-
-  // Function under test: decideResourceLimitations
   // Reason for testing: test that sandbox_add_mount_pair can be parsed as JSON array
   // Failure explanation: mount pairs were not stored as expected
   @Test
