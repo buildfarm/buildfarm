@@ -85,8 +85,6 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.InstanceBase;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.Digest;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -1791,9 +1789,6 @@ public abstract class NodeInstance extends InstanceBase {
     throw new UnsupportedOperationException(
         "NodeInstance doesn't support shutDownWorkerGracefully() method.");
   }
-
-  @Override
-  public abstract GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
   @Override
   public abstract CasIndexResults reindexCas();
