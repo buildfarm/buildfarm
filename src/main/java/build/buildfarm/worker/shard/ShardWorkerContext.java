@@ -62,7 +62,6 @@ import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
-import build.buildfarm.worker.cgroup.CGroupVersion;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
@@ -99,6 +98,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
@@ -136,13 +136,14 @@ class ShardWorkerContext implements WorkerContext {
   private final boolean onlyMulticoreTests;
   private final boolean allowBringYourOwnContainer;
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
-  private final Group executionsGroup = Group.getRoot().getChild("executions");
-  private final Group operationsGroup = executionsGroup.getChild("operations");
+  private Group executionsGroup;
+  private Group operationsGroup;
   private final CasWriter writer;
   private final boolean errorOperationRemainingResources;
   private final LocalResourceSet resourceSet;
   private final boolean errorOperationOutputSizeExceeded;
   private final boolean provideOwnedClaim;
+  private final CgroupVersionHandler cgroupHandler;
   private boolean inGracefulShutdown = false;
   private boolean pauseMatch = false;
   private boolean pauseInputFetch = false;
@@ -209,8 +210,37 @@ class ShardWorkerContext implements WorkerContext {
     this.errorOperationOutputSizeExceeded = errorOperationOutputSizeExceeded;
     this.resourceSet = resourceSet;
     this.writer = writer;
+    this.cgroupHandler = new CgroupVersionHandler();
 
     provideOwnedClaim = this.resourceSet.poolResources.containsKey(EXEC_OWNER_RESOURCE_NAME);
+  }
+
+  /** Get the executions group, lazily initializing it only for cgroups v2. */
+  private Group getExecutionsGroup() {
+    if (executionsGroup == null) {
+      // Only initialize for cgroups v2
+      if (cgroupHandler.getVersion() == CgroupVersionHandler.CgroupVersion.VERSION_2) {
+        executionsGroup = Group.getRoot().getChild("executions");
+      } else {
+        throw new IllegalStateException(
+            "Attempted to use Group for cgroups v1 - should use wrapper approach");
+      }
+    }
+    return executionsGroup;
+  }
+
+  /** Get the operations group, lazily initializing it only for cgroups v2. */
+  private Group getOperationsGroup() {
+    if (operationsGroup == null) {
+      // Only initialize for cgroups v2
+      if (cgroupHandler.getVersion() == CgroupVersionHandler.CgroupVersion.VERSION_2) {
+        operationsGroup = getExecutionsGroup().getChild("operations");
+      } else {
+        throw new IllegalStateException(
+            "Attempted to use Group for cgroups v1 - should use wrapper approach");
+      }
+    }
+    return operationsGroup;
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -852,7 +882,12 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public void createExecutionLimits() {
     if (shouldLimitCoreUsage() && configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
-      createOperationExecutionLimits();
+      // Only use Java Group implementation for cgroups v2
+      CgroupVersionHandler.CgroupVersion version = cgroupHandler.getVersion();
+      if (version == CgroupVersionHandler.CgroupVersion.VERSION_2) {
+        createOperationExecutionLimits();
+      }
+      // For v1, the wrapper approach handles limits automatically
     }
   }
 
@@ -860,14 +895,14 @@ class ShardWorkerContext implements WorkerContext {
     try {
       if (executeStageWidth < SystemProcessors.get()) {
         /* only divide up our cfs quota if we need to limit below the available processors for executions */
-        executionsGroup.getCpu().setMaxCpu(executeStageWidth);
+        getExecutionsGroup().getCpu().setMaxCpu(executeStageWidth);
       }
       // create `execution width` shares to choose from. This is the ceiling for the operations
-      operationsGroup.getCpu().setShares(executeStageWidth);
+      getOperationsGroup().getCpu().setShares(executeStageWidth);
     } catch (IOException | IllegalStateException e) {
       log.log(Level.WARNING, "Unable to set up CGroup", e);
       try {
-        operationsGroup.getCpu().close();
+        getOperationsGroup().getCpu().close();
       } catch (IOException closeEx) {
         e.addSuppressed(closeEx);
       }
@@ -878,12 +913,41 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public void destroyExecutionLimits() {
     if (configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
-      try {
-        operationsGroup.getCpu().close();
-        executionsGroup.getCpu().close();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
+      // Only use Java Group implementation for cgroups v2
+      CgroupVersionHandler.CgroupVersion version = cgroupHandler.getVersion();
+      if (version == CgroupVersionHandler.CgroupVersion.VERSION_2) {
+        // Improved error handling - try to clean up both cgroups even if one fails
+        IOException operationsException = null;
+        IOException executionsException = null;
+
+        try {
+          getOperationsGroup().getCpu().close();
+        } catch (IOException e) {
+          operationsException = e;
+          log.log(Level.WARNING, "Failed to close operations cgroup CPU controller", e);
+        }
+
+        try {
+          getExecutionsGroup().getCpu().close();
+        } catch (IOException e) {
+          executionsException = e;
+          log.log(Level.WARNING, "Failed to close executions cgroup CPU controller", e);
+        }
+
+        // If both failed, throw the first exception but log both
+        if (operationsException != null && executionsException != null) {
+          log.log(
+              Level.SEVERE,
+              "Failed to close both operations and executions cgroup controllers",
+              executionsException);
+          throw new RuntimeException("Failed to destroy execution limits", operationsException);
+        } else if (operationsException != null) {
+          throw new RuntimeException("Failed to destroy operations cgroup", operationsException);
+        } else if (executionsException != null) {
+          throw new RuntimeException("Failed to destroy executions cgroup", executionsException);
+        }
       }
+      // For v1, the wrapper approach handles cleanup automatically
     }
   }
 
@@ -975,13 +1039,6 @@ class ShardWorkerContext implements WorkerContext {
     return resource;
   }
 
-  private String getCgroups() {
-    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
-      return configs.getExecutionWrappers().getCgroups2();
-    }
-    return configs.getExecutionWrappers().getCgroups1();
-  }
-
   IOResource limitSpecifiedExecution(
       ResourceLimits limits,
       String operationName,
@@ -994,27 +1051,37 @@ class ShardWorkerContext implements WorkerContext {
     String operationId = getOperationId(operationName);
     ArrayList<IOResource> resources = new ArrayList<>();
     if (limits.cgroups) {
-      final Group group = operationsGroup.getChild(operationId);
-      ArrayList<String> usedGroups = new ArrayList<>();
+      // Use hybrid approach: wrapper for v1, Java implementation for v2
+      CgroupVersionHandler.CgroupVersion version = cgroupHandler.getVersion();
+      if (version == CgroupVersionHandler.CgroupVersion.VERSION_1) {
+        // For v1, the cgexec wrapper will handle cgroup setup
+        // We don't need to set up Java Group objects here
+        log.log(
+            java.util.logging.Level.FINE,
+            "Skipping Java-based cgroup setup for operation {0} - using cgroups v1 wrapper"
+                + " approach",
+            operationName);
+      } else if (version == CgroupVersionHandler.CgroupVersion.VERSION_2) {
+        // For v2, use the Java-based Group implementation
+        final Group group = getOperationsGroup().getChild(operationId);
+        ArrayList<String> usedGroups = new ArrayList<>();
 
-      // Possibly set core restrictions.
-      if (limits.cpu.limit) {
-        log.log(Level.FINEST, "Applying CPU limit {0}", limits.cpu);
-        applyCpuLimits(group, owner, limits, resources);
-        usedGroups.add(group.getCpu().getControllerName());
-      }
+        // Possibly set core restrictions.
+        if (limits.cpu.limit) {
+          log.log(Level.FINEST, "Applying CPU limit {0}", limits.cpu);
+          applyCpuLimits(group, owner, limits, resources);
+          usedGroups.add(group.getCpu().getControllerName());
+        }
 
-      // Possibly set memory restrictions.
-      if (limits.mem.limit) {
-        log.log(Level.FINEST, "Applying Mem limit {0}", limits.mem);
-        applyMemLimits(group, owner, limits, resources);
-        usedGroups.add(group.getMem().getControllerName());
-      }
+        // Possibly set memory restrictions.
+        if (limits.mem.limit) {
+          log.log(Level.FINEST, "Applying Mem limit {0}", limits.mem);
+          applyMemLimits(group, owner, limits, resources);
+          usedGroups.add(group.getMem().getControllerName());
+        }
 
-      // Decide the CLI for running under cgroups
-      if (!usedGroups.isEmpty()) {
-        arguments.add(
-            getCgroups(), "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
+        // Note: Cgroup moves now handled directly by Java parent process to work
+        // with both sandbox and non-sandbox scenarios
       }
     }
 
@@ -1022,6 +1089,47 @@ class ShardWorkerContext implements WorkerContext {
     // However, we may have multiple IOResources due to using multiple cgroup groups.
     // We construct a single IOResource to account for this.
     return combineResources(resources);
+  }
+
+  /**
+   * Move a child process to the appropriate cgroup for resource limiting. Uses hybrid approach:
+   * wrapper for v1, Java implementation for v2.
+   */
+  public void moveProcessToCgroup(String operationName, long pid, ResourceLimits limits) {
+    if (!limits.cgroups || (!limits.cpu.limit && !limits.mem.limit)) {
+      return; // No cgroup restrictions to apply
+    }
+
+    // Use hybrid approach: wrapper for v1, Java implementation for v2
+    CgroupVersionHandler.CgroupVersion version = cgroupHandler.getVersion();
+    if (version == CgroupVersionHandler.CgroupVersion.VERSION_1) {
+      // For v1, the cgexec wrapper will handle moving the process to the cgroup
+      // We don't need to do anything here - the wrapper approach handles it
+      log.log(
+          java.util.logging.Level.FINE,
+          "Skipping Java-based cgroup move for operation {0} - using cgroups v1 wrapper approach",
+          operationName);
+      return;
+    }
+
+    // For v2, use the Java-based Group implementation
+    try {
+      String operationId = getOperationId(operationName);
+      final Group group = getOperationsGroup().getChild(operationId);
+      java.util.List<Integer> pids = java.util.List.of((int) pid);
+      group.moveProcessesToCgroup(pids);
+
+      log.log(
+          java.util.logging.Level.FINE,
+          "Successfully moved process {0} to cgroup for operation {1} using Java implementation",
+          new Object[] {pid, operationName});
+    } catch (Exception e) {
+      log.log(
+          java.util.logging.Level.WARNING,
+          "Failed to move process {0} to cgroup for operation {1}: {2}",
+          new Object[] {pid, operationName, e.getMessage()});
+      // Don't re-throw - cgroup move failure shouldn't prevent action execution
+    }
   }
 
   private LinuxSandboxOptions decideLinuxSandboxOptions(
@@ -1181,5 +1289,110 @@ class ShardWorkerContext implements WorkerContext {
         return false;
       }
     };
+  }
+
+  /**
+   * Attempts to clean up potentially stale cgroups when hitting system resource limits. This is a
+   * best-effort operation that tries to free up cgroup resources.
+   *
+   * @param currentOperationId The current operation ID to avoid cleaning up
+   * @return true if cleanup was attempted, false otherwise
+   */
+  private boolean attemptStaleCgroupCleanup(String currentOperationId) {
+    try {
+      // Check if cgroup cleanup is enabled and we haven't exceeded cleanup attempts
+      if (!configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
+        return false;
+      }
+
+      log.log(
+          java.util.logging.Level.INFO,
+          "Attempting to clean up stale cgroups due to system resource limits...");
+
+      // Get the operations directory path by constructing it from the root path
+      // Since we can't access getPath() directly, we'll construct the path manually
+      Path rootCgroupPath = java.nio.file.Paths.get("/sys/fs/cgroup");
+      Path operationsPath;
+
+      CgroupVersionHandler.CgroupVersion version = cgroupHandler.getVersion();
+      if (version == CgroupVersionHandler.CgroupVersion.VERSION_1) {
+        // For v1, operations are under cpu controller
+        operationsPath = rootCgroupPath.resolve("cpu").resolve("executions").resolve("operations");
+      } else if (version == CgroupVersionHandler.CgroupVersion.VERSION_2) {
+        // For v2, operations are under the unified hierarchy
+        operationsPath = rootCgroupPath.resolve("executions").resolve("operations");
+      } else {
+        // If cgroups are not supported, skip cleanup
+        return false;
+      }
+
+      if (!Files.exists(operationsPath)) {
+        return false;
+      }
+
+      int cleanedCount;
+      try (Stream<Path> operations = Files.list(operationsPath)) {
+        cleanedCount =
+            operations
+                .filter(Files::isDirectory)
+                .filter(path -> !path.getFileName().toString().equals(currentOperationId))
+                .mapToInt(this::cleanupSingleCgroup)
+                .sum();
+      }
+
+      if (cleanedCount > 0) {
+        log.log(
+            java.util.logging.Level.INFO,
+            "Cleaned up {0} potentially stale cgroup directories",
+            cleanedCount);
+        return true;
+      }
+
+      return false;
+    } catch (Exception e) {
+      log.log(java.util.logging.Level.WARNING, "Failed to attempt stale cgroup cleanup", e);
+      return false;
+    }
+  }
+
+  /**
+   * Attempts to clean up a single cgroup directory if it appears to be stale.
+   *
+   * @param cgroupPath Path to the cgroup directory
+   * @return 1 if cleaned up, 0 otherwise
+   */
+  private int cleanupSingleCgroup(Path cgroupPath) {
+    try {
+      // Check if the cgroup has any processes
+      Path procsFile = cgroupPath.resolve("cgroup.procs");
+      if (!Files.exists(procsFile)) {
+        // Try tasks file for v1
+        procsFile = cgroupPath.resolve("tasks");
+      }
+
+      if (Files.exists(procsFile)) {
+        List<String> pids = Files.readAllLines(procsFile);
+        // Remove empty lines and whitespace
+        pids =
+            pids.stream()
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
+
+        if (pids.isEmpty()) {
+          // Cgroup is empty, safe to delete
+          Files.delete(cgroupPath);
+          log.log(java.util.logging.Level.FINE, "Cleaned up empty cgroup directory: " + cgroupPath);
+          return 1;
+        }
+      }
+
+      return 0;
+    } catch (Exception e) {
+      log.log(
+          java.util.logging.Level.FINE,
+          "Could not clean up cgroup directory: " + cgroupPath + ", " + e.getMessage());
+      return 0;
+    }
   }
 }

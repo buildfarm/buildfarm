@@ -298,20 +298,53 @@ public final class Group {
     adoptPids(getPath(), pids);
   }
 
+  /**
+   * Public method to move processes to this cgroup. Supports both cgroups v1 and v2.
+   *
+   * @param pids The process IDs to move to this cgroup
+   */
+  public void moveProcessesToCgroup(Iterable<Integer> pids) {
+    if (VERSION == CGroupVersion.CGROUPS_V2) {
+      adoptPids(pids);
+    } else if (VERSION == CGroupVersion.CGROUPS_V1) {
+      // For cgroups v1, we need to write to each controller's cgroup.procs file
+      if (getCpu() != null) {
+        adoptPids(getPath(getCpu().getControllerName()), pids);
+      }
+      if (getMem() != null) {
+        adoptPids(getPath(getMem().getControllerName()), pids);
+      }
+    }
+  }
+
   static void adoptPids(Path cgroupPath, Iterable<Integer> pids) {
     Path path = cgroupPath.resolve("cgroup.procs");
     verify(Files.exists(path), "cgroup.procs doesn't exist");
     // Only one process can be migrated on a single write(2) call.
     for (Integer pid : pids) {
       try {
+        // Check if the process still exists before trying to move it
+        Path procPath = Paths.get("/proc/" + pid);
+        if (!Files.exists(procPath)) {
+          log.log(Level.FINE, "process ID " + pid + " no longer exists, skipping cgroup move");
+          continue;
+        }
+
         try (Writer out = new OutputStreamWriter(Files.newOutputStream(path))) {
           out.write(String.format("%d\n", pid));
         }
       } catch (IOException e) {
-        log.log(
-            Level.WARNING,
-            "process ID " + pid + " could not be moved to CGroup " + cgroupPath + "; continuing",
-            e);
+        // Handle the specific case where process disappeared during the operation
+        if (e.getMessage() != null && e.getMessage().contains("No such process")) {
+          log.log(
+              Level.FINE,
+              "process ID " + pid + " exited during cgroup move to " + cgroupPath + "; skipping");
+        } else {
+          log.log(
+              Level.WARNING,
+              "process ID " + pid + " could not be moved to CGroup " + cgroupPath + "; continuing",
+              e);
+        }
       }
     }
   }
