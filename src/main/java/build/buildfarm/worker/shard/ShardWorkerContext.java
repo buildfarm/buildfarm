@@ -1230,8 +1230,15 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     for (String bindMount : options.bindMountTargets) {
+      String[] paths = bindMount.split(":");
+      if (paths.length == 2) {
+        log.log(Level.WARNING, "Invalid mount pair: " + bindMount);
+        continue;
+      }
+      arguments.add("-M");
+      arguments.add(paths[0]);
       arguments.add("-m");
-      arguments.add(bindMount);
+      arguments.add(paths[1]);
     }
 
     arguments.add("--");
