@@ -46,6 +46,12 @@ public class ExecutionPropertiesParser {
     // Build parser for all exec properties
     Map<String, BiConsumer<ResourceLimits, Property>> parser = new HashMap<>();
     parser.put(ExecutionProperties.LINUX_SANDBOX, ExecutionPropertiesParser::storeLinuxSandbox);
+    parser.put(
+        ExecutionProperties.HERMETIC_LINUX_SANDBOX,
+        ExecutionPropertiesParser::storeHermeticLinuxSandbox);
+    parser.put(
+        ExecutionProperties.SANDBOX_ADD_MOUNT_PAIR,
+        ExecutionPropertiesParser::storeSandboxAddMountPair);
     parser.put(ExecutionProperties.AS_NOBODY, ExecutionPropertiesParser::storeAsNobody);
     parser.put(ExecutionProperties.BLOCK_NETWORK, ExecutionPropertiesParser::storeBlockNetwork);
     parser.put(ExecutionProperties.FAKE_HOSTNAME, ExecutionPropertiesParser::storeFakeHostname);
@@ -132,6 +138,61 @@ public class ExecutionPropertiesParser {
   private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
     limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
     describeChange(limits.description, "use linux sandbox", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for using bazel's hermetic linux sandbox.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeHermeticLinuxSandbox(ResourceLimits limits, Property property) {
+    limits.useHermeticLinuxSandbox = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.description, "use hermetic linux sandbox", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for bazel's sandbox_add_mount_pair.
+   * @details Parses and stores mount pairs. Can handle both single mount pairs and JSON arrays.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeSandboxAddMountPair(ResourceLimits limits, Property property) {
+    String value = property.getValue().trim();
+
+    // Check if the value is a JSON array
+    if (value.startsWith("[") && value.endsWith("]")) {
+      try {
+        Gson gson = new Gson();
+        String[] mountPairs = gson.fromJson(value, String[].class);
+        for (String mountPair : mountPairs) {
+          addMountPairToLimits(limits, mountPair);
+        }
+        describeChange(limits.description, "sandbox add mount pair (array)", value, property);
+      } catch (JsonSyntaxException e) {
+        // If JSON parsing fails, treat as single value
+        addMountPairToLimits(limits, value);
+        describeChange(limits.description, "sandbox add mount pair", value, property);
+      }
+    } else {
+      // Single mount pair
+      addMountPairToLimits(limits, value);
+      describeChange(limits.description, "sandbox add mount pair", value, property);
+    }
+  }
+
+  /**
+   * @brief Helper method to add a mount pair to resource limits.
+   * @param limits Current limits to apply changes to.
+   * @param mountPair The mount pair string (either single path or source:target).
+   */
+  private static void addMountPairToLimits(ResourceLimits limits, String mountPair) {
+    String[] parts = mountPair.split(":");
+    if (parts.length == 2) {
+      limits.sandboxMountPair.put(parts[0], parts[1]);
+    } else {
+      limits.sandboxMountPair.put(parts[0], parts[0]);
+    }
   }
 
   /**
