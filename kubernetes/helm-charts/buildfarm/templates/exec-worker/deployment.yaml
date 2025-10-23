@@ -48,7 +48,7 @@ spec:
             - name: CONFIG_PATH
               value: /config/config.yml
             - name: JAVA_TOOL_OPTIONS
-              value: -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+HeapDumpOnOutOfMemoryError -Djava.util.logging.config.file=/exec-worker-log-props/logging.properties
+              value: {{ .Values.execWorker.javaToolOptions }}
             - name: POD_IP
               valueFrom:
                 fieldRef:
