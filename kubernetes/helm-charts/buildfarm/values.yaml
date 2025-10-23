@@ -34,6 +34,14 @@ server:
     tag: ""
   replicaCount: 1
 
+  javaToolOptions: >-
+    -XX:+UseContainerSupport
+    -XX:MaxRAMPercentage=80.0
+    -XX:+UseStringDeduplication
+    -XX:+UseCompressedOops
+    -XX:+HeapDumpOnOutOfMemoryError
+    -Djava.util.logging.config.file=/server-log-props/logging.properties
+
   livenessProbe:
     grpc:
       port: 8980
