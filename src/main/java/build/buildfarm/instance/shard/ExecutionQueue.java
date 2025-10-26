@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
+import lombok.Getter;
 import lombok.extern.java.Log;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.UnifiedJedis;
@@ -67,7 +68,7 @@ public class ExecutionQueue {
    * @details This is used to avoid placing too many elements onto the queue at any given time. For
    *     infinitely sized queues, use -1.
    */
-  private final int maxQueueSize;
+  @Getter private final int maxQueueSize;
 
   /**
    * @field queues
