@@ -317,18 +317,10 @@ public final class BuildfarmConfigs {
       BuildfarmConfigs configs) {
     // Create a mapping from the execution wrappers to the features they enable.
     ExecutionWrapperProperties wrapperProperties = new ExecutionWrapperProperties();
+
+    // Add cgroups1 wrapper mapping for wrapper-based v1 approach
     wrapperProperties.mapping.put(
         new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups1())),
-        new ArrayList<String>(
-            Arrays.asList(
-                "limit_execution",
-                ExecutionProperties.CORES,
-                ExecutionProperties.MIN_CORES,
-                ExecutionProperties.MAX_CORES,
-                ExecutionProperties.MIN_MEM,
-                ExecutionProperties.MAX_MEM)));
-    wrapperProperties.mapping.put(
-        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups2())),
         new ArrayList<String>(
             Arrays.asList(
                 "limit_execution",
