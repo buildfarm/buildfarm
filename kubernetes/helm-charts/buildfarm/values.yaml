@@ -34,6 +34,14 @@ server:
     tag: ""
   replicaCount: 1
 
+  javaToolOptions: >-
+    -XX:+UseContainerSupport
+    -XX:MaxRAMPercentage=80.0
+    -XX:+UseStringDeduplication
+    -XX:+UseCompressedOops
+    -XX:+HeapDumpOnOutOfMemoryError
+    -Djava.util.logging.config.file=/server-log-props/logging.properties
+
   livenessProbe:
     grpc:
       port: 8980
@@ -161,6 +169,14 @@ shardWorker:
             type: Utilization
             averageUtilization: 50
     targetCPUUtilizationPercentage: 50 # effective only in `v1`
+  
+  javaToolOptions: >-
+    -XX:+UseContainerSupport
+    -XX:MaxRAMPercentage=80.0
+    -XX:+UseStringDeduplication
+    -XX:+UseCompressedOops
+    -XX:+HeapDumpOnOutOfMemoryError
+    -Djava.util.logging.config.file=/shard-worker-log-props/logging.properties
 
   livenessProbe:
     grpc:
@@ -284,6 +300,14 @@ execWorker:
             type: Utilization
             averageUtilization: 50
     targetCPUUtilizationPercentage: 50 # effective only in `v1`
+
+  javaToolOptions: >-
+    -XX:+UseContainerSupport
+    -XX:MaxRAMPercentage=80.0
+    -XX:+UseStringDeduplication
+    -XX:+UseCompressedOops
+    -XX:+HeapDumpOnOutOfMemoryError
+    -Djava.util.logging.config.file=/exec-worker-log-props/logging.properties
 
   livenessProbe:
     grpc:
