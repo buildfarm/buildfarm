@@ -41,7 +41,7 @@ spec:
             - name: CONFIG_PATH
               value: /config/config.yml
             - name: JAVA_TOOL_OPTIONS
-              value: -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+HeapDumpOnOutOfMemoryError -Djava.util.logging.config.file=/server-log-props/logging.properties
+              value: {{ .Values.server.javaToolOptions }}
             {{- if .Values.server.extraEnv }}
             {{- toYaml .Values.server.extraEnv | nindent 12 }}
             {{- end }}
