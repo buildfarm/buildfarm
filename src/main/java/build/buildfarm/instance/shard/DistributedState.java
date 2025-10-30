@@ -44,6 +44,14 @@ public class DistributedState {
   public RedisHashMap storageWorkers;
 
   /**
+   * @field servers
+   * @brief All of the active servers register themselves to the cluster.
+   * @details This is done to keep track of which servers are online and known by the rest of the
+   *     cluster.
+   */
+  public RedisHashMap servers;
+
+  /**
    * @field prequeue
    * @brief Where execution requests are initially placed once recieved from the frontend.
    * @details This is to allow the frontend to quickly place requests and use its resources to take

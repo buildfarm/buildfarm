@@ -48,9 +48,6 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.GetClientStartTime;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueEntry;
@@ -72,6 +69,8 @@ import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -86,7 +85,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -135,6 +133,8 @@ public class RedisShardBackplane implements Backplane {
               JsonFormat.TypeRegistry.newBuilder()
                   .add(WorkerExecutedMetadata.getDescriptor())
                   .build());
+
+  private static final Gson gson = new Gson();
 
   private final String source; // used in operation change publication
   private final boolean subscribeToBackplane;
@@ -561,10 +561,6 @@ public class RedisShardBackplane implements Backplane {
       startFailsafeOperationThread();
     }
     pipelineExecutor = BuildfarmExecutors.getPipelinePool();
-
-    // Record client start time
-    client.call(
-        jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -797,6 +793,52 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  @Override
+  public void addServer(String serverName, String serverType) throws IOException {
+    // Skip server registration if servers map is not initialized (e.g., in tests)
+    if (state.servers == null) {
+      return;
+    }
+
+    long currentTimeMillis = System.currentTimeMillis();
+    long expireAt = currentTimeMillis + (configs.getBackplane().getServerExpire() * 1000L);
+    String serverJson =
+        String.format(
+            "{\"name\":\"%s\",\"type\":\"%s\",\"firstRegisteredAt\":%d,\"lastRegisteredAt\":%d,\"expireAt\":%d}",
+            serverName, serverType, currentTimeMillis, currentTimeMillis, expireAt);
+
+    client.run(jedis -> state.servers.insert(jedis, serverName, serverJson));
+  }
+
+  @Override
+  public boolean removeServer(String serverName, String reason) throws IOException {
+    if (state.servers == null) {
+      return false;
+    }
+    return client.call(jedis -> state.servers.remove(jedis, serverName));
+  }
+
+  @Override
+  public void deregisterServer(String serverName) throws IOException {
+    removeServer(serverName, "Requested shutdown");
+  }
+
+  @Override
+  public Set<String> getServers() throws IOException {
+    if (state.servers == null) {
+      return Set.of();
+    }
+    return client.call(jedis -> state.servers.keys(jedis));
+  }
+
+  @Override
+  public void cleanupExpiredServers() throws IOException {
+    if (state.servers == null) {
+      return;
+    }
+    client.run(this::fetchAndExpireServers);
+  }
+
   private CasWorkerMap createCasWorkerMap(UnifiedJedis jedis) {
     return new JedisCasWorkerMap(
         jedis, configs.getBackplane().getCasPrefix(), configs.getBackplane().getCasExpire());
@@ -901,6 +943,70 @@ public class RedisShardBackplane implements Backplane {
     }
     removeInvalidWorkers(jedis, now, invalidWorkers.build(), publish);
     return returnWorkers;
+  }
+
+  private Set<String> fetchAndExpireServers(UnifiedJedis jedis) {
+    if (state.servers == null) {
+      return Set.of();
+    }
+
+    Map<String, String> servers = state.servers.asMap(jedis);
+    long now = System.currentTimeMillis();
+    Set<String> validServers = Sets.newHashSet();
+    ImmutableList.Builder<String> expiredServers = ImmutableList.builder();
+
+    for (Map.Entry<String, String> entry : servers.entrySet()) {
+      String serverName = entry.getKey();
+      String json = entry.getValue();
+      try {
+        if (json == null) {
+          expiredServers.add(serverName);
+        } else {
+          // Parse JSON string as JsonObject and extract expireAt
+          JsonObject jsonObject = gson.fromJson(json, JsonObject.class);
+          Long expireAt = getExpireAtFromJsonObject(jsonObject);
+          if (expireAt == null || expireAt <= now) {
+            expiredServers.add(serverName);
+          } else {
+            validServers.add(serverName);
+          }
+        }
+      } catch (Exception e) {
+        // Any parsing error, consider it expired
+        log.log(Level.WARNING, "Failed to parse server JSON for " + serverName, e);
+        expiredServers.add(serverName);
+      }
+    }
+
+    removeExpiredServers(jedis, expiredServers.build());
+    return validServers;
+  }
+
+  /**
+   * Extracts the expireAt value from a JsonObject. Returns null if the expireAt field is not found
+   * or invalid.
+   */
+  private Long getExpireAtFromJsonObject(JsonObject jsonObject) {
+    if (jsonObject == null || !jsonObject.has("expireAt")) {
+      return null;
+    }
+
+    try {
+      return jsonObject.get("expireAt").getAsLong();
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private void removeExpiredServers(UnifiedJedis jedis, List<String> expiredServers) {
+    for (String serverName : expiredServers) {
+      try {
+        state.servers.remove(jedis, serverName);
+        log.info("Removed expired server: " + serverName);
+      } catch (Exception e) {
+        log.log(Level.WARNING, "Failed to remove expired server: " + serverName, e);
+      }
+    }
   }
 
   public static ActionResult parseActionResult(String json) {
@@ -1545,27 +1651,6 @@ public class RedisShardBackplane implements Backplane {
           .setDispatchedSize(dispatchedSize.get())
           .build();
     }
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request)
-      throws IOException {
-    List<GetClientStartTime> startTimes = new ArrayList<>();
-    for (String key : request.getHostNameList()) {
-      try {
-        startTimes.add(
-            client.call(
-                jedis ->
-                    GetClientStartTime.newBuilder()
-                        .setInstanceName(key)
-                        .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
-                        .build()));
-      } catch (NumberFormatException nfe) {
-        log.warning("Could not obtain start time for " + key);
-      }
-    }
-    return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
   }
 
   @Override
