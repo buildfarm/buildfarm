@@ -45,6 +45,24 @@ public class ResourceLimits {
   public boolean useLinuxSandbox = false;
 
   /**
+   * @field useHermeticLinuxSandbox
+   * @brief Whether to use same feature as bazel's hermetic linux sandbox
+   *     (--experimental_use_hermetic_linux_sandbox) for action from the target.
+   * @details Other resource limits will be translated into the appropriate CLI arguments for the
+   *     sandbox.
+   */
+  public boolean useHermeticLinuxSandbox = false;
+
+  /**
+   * @field sandboxMountPair
+   * @brief Directories to mount into the sandbox.
+   * @details This is used with useHermeticLinuxSandbox to specify additional directories to mount
+   *     into the hermetic sandbox. The key is the source path on the host and the value is the
+   *     target path in the sandbox. This is similar to bazel's --sandbox_add_mount_pair.
+   */
+  public HashMap<String, String> sandboxMountPair = new HashMap<>();
+
+  /**
    * @field useExecutionPolicies
    * @brief Whether to use the worker's configured execution policies.
    * @details Choosing a first-class execution wrapper, like the linux-sandbox, may decide to then

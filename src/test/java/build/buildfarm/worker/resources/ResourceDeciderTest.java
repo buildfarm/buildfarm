@@ -880,4 +880,45 @@ public class ResourceDeciderTest {
     // ASSERT
     assertThat(limits.useLinuxSandbox).isFalse();
   }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that sandbox_add_mount_pair can be parsed as JSON array
+  // Failure explanation: mount pairs were not stored as expected
+  @Test
+  public void decideResourceLimitationsTestSandboxAddMountPairJsonArray() throws Exception {
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName(ExecutionProperties.HERMETIC_LINUX_SANDBOX)
+                            .setValue("true"))
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName(ExecutionProperties.SANDBOX_ADD_MOUNT_PAIR)
+                            .setValue(
+                                "[\"/usr/bin/cp\", \"/usr/bin/grep\","
+                                    + " \"/host/sed:/usr/bin/sed\"]")))
+            .build();
+
+    // ACT
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
+            new SandboxSettings());
+
+    // ASSERT
+    assertThat(limits.useHermeticLinuxSandbox).isTrue();
+    assertThat(limits.sandboxMountPair).containsEntry("/usr/bin/cp", "/usr/bin/cp");
+    assertThat(limits.sandboxMountPair).containsEntry("/usr/bin/grep", "/usr/bin/grep");
+    assertThat(limits.sandboxMountPair).containsEntry("/host/sed", "/usr/bin/sed");
+  }
 }

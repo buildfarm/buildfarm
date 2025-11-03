@@ -1007,14 +1007,15 @@ class ShardWorkerContext implements WorkerContext {
     // Possibly set network restrictions.
     // This is not the ideal implementation of block-network.
     // For now, without the linux-sandbox, we will unshare the network namespace.
-    if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
+    if (limits.network.blockNetwork && !limits.useLinuxSandbox && !limits.useHermeticLinuxSandbox) {
       arguments.add(configs.getExecutionWrappers().getUnshare(), "-n", "-r");
     }
 
     // Decide the CLI for running the sandbox
     // For reference on how bazel spawns the sandbox:
     // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
-    if (limits.useLinuxSandbox) {
+    // Use linux sandbox if explicitly requested OR if hermetic sandbox is requested
+    if (limits.useLinuxSandbox || limits.useHermeticLinuxSandbox) {
       LinuxSandboxOptions options = decideLinuxSandboxOptions(limits, workingDirectory);
       addLinuxSandboxCli(arguments, options);
     }
@@ -1140,9 +1141,25 @@ class ShardWorkerContext implements WorkerContext {
     options.fakeHostname = limits.network.fakeHostname;
     options.workingDir = workingDirectory.toString();
 
+    // Enable hermetic mode if requested
+    options.hermetic = limits.useHermeticLinuxSandbox;
+
     // Bazel encodes these directly
     options.writableFiles.add(execFileSystem.root().toString());
     options.writableFiles.add(workingDirectory.toString());
+
+    // Add mount pairs for hermetic sandbox
+    for (Map.Entry<String, String> mountPair : limits.sandboxMountPair.entrySet()) {
+      String source = mountPair.getKey();
+      String target = mountPair.getValue();
+      if (source.equals(target)) {
+        // Single path - bind mount to same location
+        options.bindMountTargets.add(source);
+      } else {
+        // source:target pair
+        options.bindMountTargets.add(source + ":" + target);
+      }
+    }
 
     // For the time being, the linux-sandbox version of "nobody"
     // does not pair with buildfarm's implementation of exec_owner: "nobody".
@@ -1190,6 +1207,10 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add("-U");
     }
 
+    if (options.hermetic) {
+      arguments.add("-h");
+    }
+
     if (!options.workingDir.isEmpty()) {
       arguments.add("-W");
       arguments.add(options.workingDir);
@@ -1206,6 +1227,18 @@ class ShardWorkerContext implements WorkerContext {
     for (String dir : options.tmpfsDirs) {
       arguments.add("-e");
       arguments.add(dir);
+    }
+
+    for (String bindMount : options.bindMountTargets) {
+      String[] paths = bindMount.split(":");
+      if (paths.length == 2) {
+        log.log(Level.WARNING, "Invalid mount pair: " + bindMount);
+        continue;
+      }
+      arguments.add("-M");
+      arguments.add(paths[0]);
+      arguments.add("-m");
+      arguments.add(paths[1]);
     }
 
     arguments.add("--");
