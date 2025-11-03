@@ -102,6 +102,32 @@ java_binary(
 )
 
 java_binary(
+    name = "bf-diff",
+    srcs = ["Diff.java"],
+    main_class = "build.buildfarm.tools.Diff",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/java/build/buildfarm/common/resources",
+        "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/server/services",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "@buildfarm_maven//:com_google_guava_guava",
+        "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",
+        "@buildfarm_maven//:io_grpc_grpc_api",
+        "@buildfarm_maven//:io_grpc_grpc_context",
+        "@buildfarm_maven//:io_grpc_grpc_core",
+        "@buildfarm_maven//:io_grpc_grpc_protobuf",
+        "@buildfarm_maven//:io_grpc_grpc_stub",
+        "@googleapis//google/rpc:rpc_java_proto",
+    ],
+)
+
+java_binary(
     name = "bf-cat",
     srcs = ["Cat.java"],
     data = [
