@@ -107,6 +107,7 @@ backplane:
 worker:
   port: 8981
   publicName: localhost:8981
+  tags: []
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
