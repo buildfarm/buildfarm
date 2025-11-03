@@ -48,6 +48,7 @@ import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toComple
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
 import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.CacheCapabilities;
@@ -3367,6 +3368,9 @@ public class ServerInstance extends NodeInstance {
             ? SymlinkAbsolutePathStrategy.Value.ALLOWED
             : SymlinkAbsolutePathStrategy.Value.DISALLOWED;
     return super.getCacheCapabilities().toBuilder()
+        .setActionCacheUpdateCapabilities(
+            ActionCacheUpdateCapabilities.newBuilder()
+                .setUpdateEnabled(!configs.getServer().isActionCacheReadOnly()))
         .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
         .build();
   }
