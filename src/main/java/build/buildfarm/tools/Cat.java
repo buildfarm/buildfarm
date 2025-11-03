@@ -603,7 +603,7 @@ class Cat implements Callable<Integer> {
   }
 
   private static void listOperations(Instance instance, Iterable<String> args, IndentStream out) throws IOException {
-    String pageToken = "";
+    String pageToken = Instance.SENTINEL_PAGE_TOKEN;
     java.util.Iterator<String> arg = args.iterator();
     String filter = "";
     String name = "executions";
