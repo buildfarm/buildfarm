@@ -47,6 +47,7 @@ import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddr
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
@@ -815,6 +816,7 @@ public class StubInstance extends InstanceBase {
     return nextPageToken;
   }
 
+  // future could be ExecuteResponse
   @Override
   public ListenableFuture<Void> execute(
       // TODO should this be ActionKey
@@ -824,7 +826,34 @@ public class StubInstance extends InstanceBase {
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata metadata,
       Watcher watcher) {
-    throw new UnsupportedOperationException();
+    SettableFuture<Void> result = SettableFuture.create();
+    newExStub()
+        .execute(
+            ExecuteRequest.newBuilder()
+                .setInstanceName(getName())
+                .setActionDigest(DigestUtil.toDigest(actionDigest))
+                .setDigestFunction(actionDigest.getDigestFunction())
+                .setExecutionPolicy(executionPolicy)
+                .setResultsCachePolicy(resultsCachePolicy)
+                .setSkipCacheLookup(true)
+                .build(),
+            new StreamObserver<Operation>() {
+              @Override
+              public void onNext(Operation operation) {
+                watcher.observe(operation);
+              }
+
+              @Override
+              public void onError(Throwable t) {
+                result.setException(t);
+              }
+
+              @Override
+              public void onCompleted() {
+                result.set(null);
+              }
+            });
+    return result;
   }
 
   @Override
