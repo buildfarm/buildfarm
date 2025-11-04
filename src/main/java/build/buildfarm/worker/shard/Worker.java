@@ -842,6 +842,10 @@ public final class Worker extends LoggingMain {
 
   private void awaitTermination() throws InterruptedException {
     pipeline.join();
+    pipeline = null;
+    if (configs.getWorker().getCapabilities().isExecution()) {
+      initiateShutdown();
+    }
     if (server != null && !server.isTerminated()) {
       int retries = 5;
       while (retries > 0) {
