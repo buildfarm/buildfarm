@@ -1495,7 +1495,21 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       // prevent the lru db from being processed -> removed in the purge below
       files.remove(lru);
     } catch (NoSuchFileException e) {
-      // ignore
+      // ignore - LRU file doesn't exist, will scan all files
+    } catch (Exception e) {
+      // Handle corrupted LRU file - delete it and fall back to full scan
+      log.log(
+          Level.WARNING,
+          "LRU file is corrupted and cannot be parsed. Deleting corrupted LRU file and falling back"
+              + " to full cache scan.",
+          e);
+      try {
+        Files.deleteIfExists(lru);
+        log.log(Level.INFO, "Deleted corrupted LRU file: " + lru);
+      } catch (IOException deleteEx) {
+        log.log(Level.SEVERE, "Failed to delete corrupted LRU file: " + lru, deleteEx);
+      }
+      // Continue with full scan - all files will be processed in the loop below
     }
     for (Path file : files) {
       String basename = file.getFileName().toString();
