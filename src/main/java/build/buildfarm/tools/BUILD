@@ -35,6 +35,34 @@ java_plugin(
 )
 
 java_binary(
+    name = "bfssh",
+    srcs = ["Bfssh.java"],
+    main_class = "build.buildfarm.tools.Bfssh",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@buildfarm_maven//:com_google_guava_guava",
+        "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:io_grpc_grpc_api",
+        "@buildfarm_maven//:io_grpc_grpc_context",
+        "@buildfarm_maven//:io_grpc_grpc_core",
+        "@buildfarm_maven//:io_grpc_grpc_protobuf",
+        "@buildfarm_maven//:io_grpc_grpc_stub",
+        "@googleapis//google/bytestream:bytestream_java_grpc",
+        "@googleapis//google/bytestream:bytestream_java_proto",
+        "@googleapis//google/longrunning:longrunning_java_proto",
+        "@googleapis//google/longrunning:operations_proto",
+        "@googleapis//google/rpc:rpc_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+    ],
+)
+
+java_binary(
     name = "bf-executor",
     srcs = ["Executor.java"],
     main_class = "build.buildfarm.tools.Executor",
