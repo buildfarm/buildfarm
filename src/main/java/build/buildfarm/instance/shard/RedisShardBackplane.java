@@ -1512,7 +1512,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public boolean canQueue() throws IOException {
     return state.executionQueue.getMaxQueueSize() < 0
-        || state.executionQueue.canQueue(client.call(jedis -> jedis));
+        || client.call(jedis -> state.executionQueue.canQueue(jedis));
   }
 
   @SuppressWarnings("ConstantConditions")
