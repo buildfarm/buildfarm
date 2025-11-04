@@ -66,12 +66,13 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
   private void withCancellation(
       ServerCallStreamObserver<Operation> serverCallStreamObserver, ListenableFuture<Void> future) {
+    Context context = Context.current();
     addCallback(
         future,
         new FutureCallback<Void>() {
           boolean isCancelled() {
             return serverCallStreamObserver.isCancelled()
-                || Context.current().isCancelled()
+                || context.isCancelled()
                 || future.isCancelled();
           }
 
@@ -95,7 +96,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
             }
           }
         },
-        Context.current().fixedContextExecutor(directExecutor()));
+        context.fixedContextExecutor(directExecutor()));
     serverCallStreamObserver.setOnCancelHandler(() -> future.cancel(false));
   }
 
