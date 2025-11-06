@@ -145,6 +145,7 @@ maven.install(
         "io.netty:netty-transport-native-epoll",
         "io.netty:netty-transport-native-kqueue",
         "io.netty:netty-transport-native-unix-common",
+        "io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations:2.14.0",
         "io.prometheus:simpleclient:0.16.0",
         "io.prometheus:simpleclient_hotspot:0.16.0",
         "io.prometheus:simpleclient_httpserver:0.16.0",
