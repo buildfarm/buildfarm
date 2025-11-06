@@ -32,6 +32,7 @@ import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.logging.Level;
+import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 /**
@@ -47,6 +48,7 @@ import lombok.extern.java.Log;
 @Log
 class DispatchedMonitor implements Runnable {
   private final BooleanSupplier shouldStop;
+  private final BooleanSupplier isLeader;
   private final Scannable<DispatchedOperation> location;
   private final BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
   private final int intervalSeconds;
@@ -63,11 +65,14 @@ class DispatchedMonitor implements Runnable {
    */
   DispatchedMonitor(
       BooleanSupplier shouldStop,
+      @Nullable BooleanSupplier isLeader,
       Scannable<DispatchedOperation> location,
       BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer,
       int intervalSeconds,
       Duration requeueDelay) {
     this.shouldStop = shouldStop;
+    this.isLeader =
+        isLeader != null ? isLeader : () -> true; // Default to always leader if not provided
     this.location = location;
     this.requeuer = requeuer;
     this.intervalSeconds = intervalSeconds;
@@ -214,6 +219,11 @@ class DispatchedMonitor implements Runnable {
    * @throws InterruptedException if the thread is interrupted while waiting for requeue operations
    */
   void iterate() throws InterruptedException {
+    // Only perform work if this node is the leader
+    if (!isLeader.getAsBoolean()) {
+      log.log(Level.FINE, "DispatchedMonitor: Skipping iteration (not leader)");
+      return;
+    }
     getOnlyInterruptibly(submitAll());
   }
 
