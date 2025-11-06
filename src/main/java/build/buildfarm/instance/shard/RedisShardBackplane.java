@@ -555,6 +555,16 @@ public class RedisShardBackplane implements Backplane {
     return client.isClosed();
   }
 
+  /**
+   * @brief Get a UnifiedJedis instance for direct Redis operations.
+   * @details This method provides access to the underlying UnifiedJedis client for operations that
+   *     need direct Redis access, such as leader election.
+   * @return A UnifiedJedis instance
+   */
+  public UnifiedJedis getJedis() {
+    return jedisClusterFactory.get();
+  }
+
   @Override
   public ListenableFuture<Void> watchExecution(String executionName, Watcher watcher) {
     TimedWatcher timedWatcher =
