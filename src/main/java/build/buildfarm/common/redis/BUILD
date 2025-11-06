@@ -14,6 +14,7 @@ java_library(
         "@buildfarm_maven//:com_google_code_findbugs_jsr305",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:io_grpc_grpc_api",
+        "@buildfarm_maven//:io_opentelemetry_instrumentation_opentelemetry_instrumentation_annotations",
         "@buildfarm_maven//:org_apache_commons_commons_pool2",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@buildfarm_maven//:redis_clients_jedis",
