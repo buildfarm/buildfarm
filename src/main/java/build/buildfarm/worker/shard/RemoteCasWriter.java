@@ -21,7 +21,6 @@ import static java.util.concurrent.TimeUnit.DAYS;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
-import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.RetryException;
@@ -31,6 +30,7 @@ import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.Digest;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
+import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
@@ -148,7 +148,7 @@ public class RemoteCasWriter implements CasWriter {
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
       throws IOException {
     SettableFuture<Long> writtenFuture = SettableFuture.create();
-    int chunkSizeBytes = (int) Size.kbToBytes(128);
+    int chunkSizeBytes = 128 * 1024;
 
     // The following callback is performed each time the write stream is ready.
     // For each callback we only transfer a small part of the input stream in order to avoid
@@ -203,13 +203,16 @@ public class RemoteCasWriter implements CasWriter {
     return writtenFuture;
   }
 
+  /**
+   * Copy some limited bytes from <code>in</code> to <code>out</code>.
+   *
+   * @param in Input source, must not be null
+   * @param out Output sink, must be write-able
+   * @param bytesAmount Bytes to write, must be non-negative
+   * @return <code>true</code> if at least one byte was written.
+   * @throws IOException
+   */
   private boolean copyBytes(InputStream in, OutputStream out, int bytesAmount) throws IOException {
-    byte[] buf = new byte[bytesAmount];
-    int n = in.read(buf);
-    if (n > 0) {
-      out.write(buf, 0, n);
-      return true;
-    }
-    return false;
+    return ByteStreams.copy(ByteStreams.limit(in, bytesAmount), out) > 0;
   }
 }
