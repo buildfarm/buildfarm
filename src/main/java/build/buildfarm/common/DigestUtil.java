@@ -14,8 +14,8 @@
 
 package build.buildfarm.common;
 
-import static com.google.protobuf.ByteString.EMPTY;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.protobuf.ByteString.EMPTY;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.DigestFunction;
