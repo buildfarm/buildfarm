@@ -15,6 +15,7 @@
 package build.buildfarm.common;
 
 import static com.google.protobuf.ByteString.EMPTY;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.DigestFunction;
@@ -130,7 +131,7 @@ public class DigestUtil {
     }
 
     public boolean isValidHexDigest(String hexDigest) {
-      return hexDigest != null && hexDigest.length() * 8 / 2 == hash.bits();
+      return checkNotNull(hexDigest).length() * 8 / 2 == hash.bits();
     }
   }
 
@@ -333,6 +334,9 @@ public class DigestUtil {
       digestUtil = parseHash(hash);
     } else {
       digestUtil = forHash(components[0]);
+    }
+    if (digestUtil == null) {
+      throw new IllegalArgumentException("cannot determine digest type for: " + digest);
     }
     return Digest.newBuilder()
         .setHash(hash)
