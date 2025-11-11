@@ -155,7 +155,7 @@ class ShardWorkerContext implements WorkerContext {
   private boolean pauseReportResult = false;
 
   static SetMultimap<String, String> getMatchProvisions(
-      Iterable<ExecutionPolicy> policies, String name, int executeStageWidth) {
+      Iterable<ExecutionPolicy> policies, Iterable<String> workerNames, int executeStageWidth) {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
     Platform matchPlatform =
         ExecutionPolicies.getMatchPlatform(
@@ -164,12 +164,46 @@ class ShardWorkerContext implements WorkerContext {
       provisions.put(property.getName(), property.getValue());
     }
     provisions.put(PROVISION_CORES_NAME, String.format("%d", executeStageWidth));
-    provisions.put(ExecutionProperties.WORKER, name);
+    for (String workerName : workerNames) {
+      provisions.put(ExecutionProperties.WORKER, workerName);
+    }
     return provisions.build();
   }
 
+  /**
+   * @brief Worker lifetime-persistent Context
+   * @details Intended to manage backplane, CFC exec filesystem, and CAS storage interactions
+   * @param name Name used to identify this worker on executions
+   * @param matchWorkerNames All names where this worker should match Worker platform properties
+   * @param operationPollPeriod Duration between active execution poller runs
+   * @param operationPoller Poller activity on periodic runs
+   * @param inputFetchStageWidth Number of execution slots for concurrent input fetches
+   * @param executeStageWidth Number of execution slots for concurrent action execution
+   * @param reportResultStageWidth Number of execution slots for concurrent result reports/cleanup
+   * @param inputFetchDeadline The duration input fetch must complete in before return to queue
+   * @param backplane A source of truth and reporting for execution and content
+   * @param execFileSystem Manager of execution filesystem presentation
+   * @param inputStreamFactory Supplier of CAS streams for reading
+   * @param policies Policies which will/can be applied to executions
+   * @param instance Instance used for ActionResult post and Operation lease reporting
+   * @param defaultActionTimeout Duration if timeout is unspecified per-execution for execute abort
+   * @param maximumActionTimeout Duration above which per-execution timeout is rejected
+   * @param defaultMaxCores The default consumption of execution stage slots per execution
+   * @param limitGlobalExecution Whether to limit the sum of execution cpu utilization to
+   *     executeStageWidth
+   * @param onlyMulticoreTests Whether to respect any cores selection of non-tests
+   * @param allowBringYourOwnContainer Whether an execution may specify a container wrapper for
+   *     execution
+   * @param errorOperationRemainingResources Whether an execution with remaining pids attached to
+   *     its limited resources after exit is an error
+   * @param errorOperationOutputSizeExceeded Whether an execution that exceeds the storage max entry
+   *     size of an output is an error
+   * @param resourceSet The resources available to the worker
+   * @param writer The CAS writer for output content of executions
+   */
   ShardWorkerContext(
       String name,
+      Iterable<String> matchWorkerNames,
       Duration operationPollPeriod,
       OperationPoller operationPoller,
       int inputFetchStageWidth,
@@ -192,7 +226,7 @@ class ShardWorkerContext implements WorkerContext {
       LocalResourceSet resourceSet,
       CasWriter writer) {
     this.name = name;
-    this.matchProvisions = getMatchProvisions(policies, name, executeStageWidth);
+    this.matchProvisions = getMatchProvisions(policies, matchWorkerNames, executeStageWidth);
     this.operationPollPeriod = operationPollPeriod;
     this.operationPoller = operationPoller;
     this.inputFetchStageWidth = inputFetchStageWidth;
@@ -906,7 +940,6 @@ class ShardWorkerContext implements WorkerContext {
   public ResourceLimits commandExecutionSettings(Command command) {
     return ResourceDecider.decideResourceLimitations(
         command,
-        name,
         defaultMaxCores,
         onlyMulticoreTests,
         limitGlobalExecution,
