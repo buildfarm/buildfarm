@@ -102,7 +102,8 @@ public class ShardWorkerContextTest {
   WorkerContext createTestContext(
       Iterable<ExecutionPolicy> policies, LocalResourceSet resourceSet) {
     return new ShardWorkerContext(
-        "test",
+        "testWorker",
+        ImmutableList.of("test"),
         /* operationPollPeriod= */ Duration.getDefaultInstance(),
         /* operationPoller= */ (queueEntry, stage, requeueAt) -> false,
         /* inlineContentLimit= */

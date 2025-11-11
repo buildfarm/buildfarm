@@ -82,6 +82,7 @@ import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -737,9 +738,13 @@ public final class Worker extends LoggingMain {
       writer = new LocalCasWriter(execFileSystem);
     }
 
+    String endpointName = configs.getWorker().getPublicName();
+    String hostName = InetAddress.getLocalHost().getHostName();
+
     context =
         new ShardWorkerContext(
-            configs.getWorker().getPublicName(),
+            endpointName,
+            ImmutableList.of(endpointName, hostName, identifier),
             Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build(),
             backplane::pollExecution,
             inputFetchStageWidth,
@@ -789,11 +794,9 @@ public final class Worker extends LoggingMain {
       pipeline.add(reportResultStage, 1);
     }
 
-    String workerName = InetAddress.getLocalHost().getHostName();
-
     WorkerProfileService workerProfileService =
         new WorkerProfileService(
-            workerName,
+            endpointName,
             configs.getWorker().getPublicName(),
             storage,
             matchStage,
