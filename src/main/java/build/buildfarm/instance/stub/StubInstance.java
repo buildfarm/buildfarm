@@ -87,8 +87,6 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BackplaneStatusRequest;
 import build.buildfarm.v1test.BatchWorkerProfilesRequest;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.PollOperationRequest;
@@ -985,11 +983,6 @@ public class StubInstance extends InstanceBase {
                 .setInstanceName(getName())
                 .addAllWorkerNames(names)
                 .build());
-  }
-
-  @Override
-  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

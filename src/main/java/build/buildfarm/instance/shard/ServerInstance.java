@@ -98,8 +98,6 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.GetClientStartTimeRequest;
-import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
@@ -750,6 +748,10 @@ public class ServerInstance extends NodeInstance {
     if (prometheusMetricsThread != null) {
       prometheusMetricsThread.start();
     }
+  }
+
+  public Backplane getBackplane() {
+    return backplane;
   }
 
   @Override
@@ -3011,15 +3013,6 @@ public class ServerInstance extends NodeInstance {
   @Override
   protected Logger getLogger() {
     return log;
-  }
-
-  @Override
-  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
-    try {
-      return backplane.getClientStartTime(request);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
   }
 
   @Override
