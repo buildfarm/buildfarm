@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -188,16 +189,22 @@ public class RedisShardSubscriberTest {
 
   RedisShardSubscriber createSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
+      Iterable<String> channels,
       Map<String, ShardWorker> workers,
-      Executor executor,
       Consumer<String> onWorkerRemoved) {
+    Map<String, Executor> executors = new ConcurrentHashMap<>();
+    if (channels != null) {
+      for (String channel : channels) {
+        executors.put(channel, directExecutor());
+      }
+    }
     return new RedisShardSubscriber(
-        watchers, workers, WorkerType.NONE.getNumber(), WORKER_CHANNEL, onWorkerRemoved, executor);
+        watchers, workers, WorkerType.NONE.getNumber(), WORKER_CHANNEL, onWorkerRemoved, executors);
   }
 
   RedisShardSubscriber createSubscriber(
-      ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
-    return createSubscriber(watchers, /* workers= */ null, executor, name -> {});
+      ListMultimap<String, TimedWatchFuture> watchers, Iterable<String> channels) {
+    return createSubscriber(watchers, channels, /* workers= */ null, name -> {});
   }
 
   RedisShardSubscriber createSubscriber(ListMultimap<String, TimedWatchFuture> watchers) {
@@ -219,7 +226,8 @@ public class RedisShardSubscriberTest {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    String novelChannel = "novel-channel";
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, List.of(novelChannel));
 
     TestConnection testConnection = new TestConnection();
     Thread proceedThread = new Thread(() -> operationSubscriber.start(testConnection));
@@ -228,7 +236,6 @@ public class RedisShardSubscriberTest {
       MICROSECONDS.sleep(10);
     }
 
-    String novelChannel = "novel-channel";
     TimedWatcher novelWatcher = new UnobservableWatcher();
     operationSubscriber.watch(novelChannel, novelWatcher);
     assertThat(Iterables.getOnlyElement(watchers.get(novelChannel)).getWatcher())
@@ -246,9 +253,9 @@ public class RedisShardSubscriberTest {
   public void watchedOperationChannelsReflectsWatchers() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
-    assertThat(operationSubscriber.watchedOperationChannels()).isEmpty();
     String addedChannel = "added-channel";
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, List.of(addedChannel));
+    assertThat(operationSubscriber.watchedOperationChannels()).isEmpty();
     watchers.put(addedChannel, null);
     assertThat(operationSubscriber.watchedOperationChannels()).containsExactly(addedChannel);
     watchers.removeAll(addedChannel);
@@ -259,7 +266,11 @@ public class RedisShardSubscriberTest {
   public void expiredWatchedOperationChannelsReflectsWatchers() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
+    String unexpiredChannel = "channel-with-unexpired-watcher";
+    String expiredChannel = "channel-with-expired-watcher";
+    String mixedChannel = "channel-with-some-expired-watchers";
+    RedisShardSubscriber operationSubscriber =
+        createSubscriber(watchers, List.of(unexpiredChannel, expiredChannel, mixedChannel));
 
     TimedWatcher unexpiredWatcher = new UnobservableWatcher(Instant.MAX);
     TimedWatcher expiredWatcher = new UnobservableWatcher(Instant.EPOCH);
@@ -268,16 +279,13 @@ public class RedisShardSubscriberTest {
 
     assertThat(operationSubscriber.expiredWatchedOperationChannels(now)).isEmpty();
 
-    String unexpiredChannel = "channel-with-unexpired-watcher";
     watchers.put(unexpiredChannel, new LidlessTimedWatchFuture(unexpiredWatcher));
     assertThat(operationSubscriber.expiredWatchedOperationChannels(now)).isEmpty();
 
-    String expiredChannel = "channel-with-expired-watcher";
     watchers.put(expiredChannel, new LidlessTimedWatchFuture(expiredWatcher));
     assertThat(operationSubscriber.expiredWatchedOperationChannels(now))
         .containsExactly(expiredChannel);
 
-    String mixedChannel = "channel-with-some-expired-watchers";
     watchers.put(mixedChannel, new LidlessTimedWatchFuture(unexpiredWatcher));
     watchers.put(mixedChannel, new LidlessTimedWatchFuture(expiredWatcher));
     watchers.put(mixedChannel, new LidlessTimedWatchFuture(expiredWatcher));
@@ -297,8 +305,8 @@ public class RedisShardSubscriberTest {
   public void existingChannelWatcherSuppressesSubscription() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
     String existingChannel = "existing-channel";
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, List.of(existingChannel));
     TimedWatcher existingWatcher = new UnobservableWatcher();
     watchers.put(existingChannel, new LidlessTimedWatchFuture(existingWatcher));
     TimedWatcher novelWatcher = new UnobservableWatcher();
@@ -312,7 +320,9 @@ public class RedisShardSubscriberTest {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    String doneMessageChannel = "done-message-channel";
+    RedisShardSubscriber operationSubscriber =
+        createSubscriber(watchers, List.of(doneMessageChannel));
 
     TestConnection testConnection = new TestConnection();
     Thread proceedThread = new Thread(() -> operationSubscriber.start(testConnection));
@@ -321,7 +331,6 @@ public class RedisShardSubscriberTest {
       MICROSECONDS.sleep(10);
     }
 
-    String doneMessageChannel = "done-message-channel";
     AtomicBoolean observed = new AtomicBoolean(false);
     TimedWatcher doneMessageWatcher =
         new TimedWatcher(Instant.now()) {
@@ -360,7 +369,7 @@ public class RedisShardSubscriberTest {
     String resetChannel = "reset-channel";
     watchers.put(resetChannel, new LidlessTimedWatchFuture(resetWatcher));
 
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, List.of(resetChannel));
     operationSubscriber.resetWatchers(resetChannel, Instant.MAX);
     assertThat(resetWatcher.isExpiredAt(now)).isFalse();
   }
@@ -372,9 +381,9 @@ public class RedisShardSubscriberTest {
     TimedWatcher expiredWatcher = mock(TimedWatcher.class);
     when(expiredWatcher.isExpiredAt(any(Instant.class))).thenReturn(true);
 
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
-
     String expireChannel = "expire-channel";
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, List.of(expireChannel));
+
     TimedWatchFuture watchFuture =
         new TimedWatchFuture(expiredWatcher) {
           @Override
@@ -399,33 +408,31 @@ public class RedisShardSubscriberTest {
   public void unsetTypeOperationChangeIsIgnored() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    String unsetTypeChannel = "expire-channel";
+    RedisShardSubscriber operationSubscriber =
+        createSubscriber(watchers, List.of(unsetTypeChannel));
 
-    operationSubscriber.onOperationChange(
-        "unset-type-operation", OperationChange.getDefaultInstance());
+    operationSubscriber.onOperationChange(unsetTypeChannel, OperationChange.getDefaultInstance());
   }
 
   @Test
   public void invalidOperationChangeIsIgnored() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    String invalidChannel = "invalid-operation-change";
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, List.of(invalidChannel));
 
-    operationSubscriber.onMessage("invalid-operation-change", "not-json!#?");
+    operationSubscriber.onMessage(invalidChannel, "not-json!#?");
   }
 
   @Test
   public void addSupportedWorkerTypeOnWorkerChange() throws IOException {
     Map<String, ShardWorker> workers = new HashMap<>();
+    Map<String, Executor> executors = new HashMap<>();
     int storageWorkerType = WorkerType.STORAGE.getNumber();
     RedisShardSubscriber operationSubscriber =
         new RedisShardSubscriber(
-            /* watchers */ null,
-            workers,
-            storageWorkerType,
-            WORKER_CHANNEL,
-            name -> {},
-            directExecutor());
+            /* watchers */ null, workers, storageWorkerType, WORKER_CHANNEL, name -> {}, executors);
     String workerChangeJson =
         JsonFormat.printer()
             .print(
@@ -440,10 +447,11 @@ public class RedisShardSubscriberTest {
   @Test
   public void ignoreUnsupportedWorkerTypeOnWorkerChange() throws IOException {
     Map<String, ShardWorker> workers = new HashMap<>();
+    Map<String, Executor> executors = new HashMap<>();
     int workerType = WorkerType.STORAGE.getNumber();
     RedisShardSubscriber operationSubscriber =
         new RedisShardSubscriber(
-            /* watchers */ null, workers, workerType, WORKER_CHANNEL, name -> {}, directExecutor());
+            /* watchers */ null, workers, workerType, WORKER_CHANNEL, name -> {}, executors);
     String workerChangeJson =
         JsonFormat.printer()
             .print(
@@ -464,7 +472,7 @@ public class RedisShardSubscriberTest {
     workers.put("removeWorkerName", ShardWorker.getDefaultInstance());
     Consumer<String> onWorkerRemoved = mock(Consumer.class);
     RedisShardSubscriber operationSubscriber =
-        createSubscriber(null, workers, directExecutor(), onWorkerRemoved);
+        createSubscriber(null, null, workers, onWorkerRemoved);
 
     String removeWorkerName = "removed-worker";
 

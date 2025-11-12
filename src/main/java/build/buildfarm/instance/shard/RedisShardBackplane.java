@@ -147,7 +147,6 @@ public class RedisShardBackplane implements Backplane {
   private Thread failsafeOperationThread = null;
   private RedisShardSubscriber subscriber = null;
   private RedisShardSubscription operationSubscription = null;
-  private ExecutorService subscriberService = null;
   private ExecutorService dequeueService = null;
   private ExecutorService pipelineExecutor = null;
   private @Nullable RedisClient client = null;
@@ -479,7 +478,6 @@ public class RedisShardBackplane implements Backplane {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    subscriberService = BuildfarmExecutors.getSubscriberPool();
     subscriber =
         new RedisShardSubscriber(
             watchers,
@@ -487,8 +485,7 @@ public class RedisShardBackplane implements Backplane {
             WorkerType.STORAGE.getNumber(),
             configs.getBackplane().getWorkerChannel(),
             onWorkerRemoved,
-            subscriberService);
-
+            new ConcurrentHashMap<>());
     operationSubscription =
         new RedisShardSubscription(
             subscriber,
@@ -596,14 +593,6 @@ public class RedisShardBackplane implements Backplane {
         log.log(Level.FINER, "dequeueService has been stopped");
       } else {
         log.log(Level.WARNING, "dequeueService has not stopped");
-      }
-    }
-    if (subscriberService != null) {
-      subscriberService.shutdown();
-      if (subscriberService.awaitTermination(10, SECONDS)) {
-        log.log(Level.FINER, "subscriberService has been stopped");
-      } else {
-        log.log(Level.WARNING, "subscriberService has not stopped");
       }
     }
     if (client != null) {
