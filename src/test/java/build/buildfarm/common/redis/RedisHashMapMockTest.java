@@ -42,13 +42,8 @@ public class RedisHashMapMockTest {
     MockitoAnnotations.initMocks(this);
   }
 
-  // Function under test: RedisHashMap
-  // Reason for testing: the container can be constructed with a valid name.
-  // Failure explanation: the container is throwing an exception upon construction
-  @Test
-  public void redisPriorityQueueConstructsWithoutError() throws Exception {
-    // ACT
-    new RedisHashMap("test");
+  private RedisHashMap<String> testRedisHashMap() {
+    return new RedisHashMap<>("test", new IdentityTranslator());
   }
 
   // Function under test: insert
@@ -57,7 +52,7 @@ public class RedisHashMapMockTest {
   @Test
   public void redisInsert() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = testRedisHashMap();
 
     // ACT
     map.insert(redis, "key1", "value1");
@@ -76,7 +71,7 @@ public class RedisHashMapMockTest {
   @Test
   public void redisRemove() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = testRedisHashMap();
 
     // ACT
     map.insert(redis, "key1", "value1");
@@ -93,7 +88,7 @@ public class RedisHashMapMockTest {
   @Test
   public void redisRepresentation() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = testRedisHashMap();
 
     // ACT
     map.keys(redis);
@@ -110,7 +105,7 @@ public class RedisHashMapMockTest {
   @Test
   public void redisInsertIfMissing() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = testRedisHashMap();
 
     // ACT
     map.insertIfMissing(redis, "key", "value");
@@ -126,7 +121,7 @@ public class RedisHashMapMockTest {
   @Test
   public void redisExists() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = testRedisHashMap();
 
     // ACT
     map.exists(redis, "key");
@@ -141,7 +136,7 @@ public class RedisHashMapMockTest {
   @Test
   public void redisSize() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = testRedisHashMap();
 
     // ACT
     map.size(redis);

@@ -18,5 +18,6 @@ java_library(
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@buildfarm_maven//:org_redisson_redisson",
         "@buildfarm_maven//:redis_clients_jedis",
+        "@com_google_protobuf//java/core",
     ],
 )

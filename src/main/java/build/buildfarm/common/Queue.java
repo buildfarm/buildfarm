@@ -23,13 +23,13 @@ public interface Queue<E> {
   Supplier<Long> size(AbstractPipeline pipeline);
 
   // maybe switch to iterator?
-  void visit(Visitor<String> visitor);
+  void visit(Visitor<E> visitor);
 
-  void visitDequeue(Visitor<String> visitor);
+  void visitDequeue(Visitor<E> visitor);
 
   boolean removeFromDequeue(E e);
 
   void removeFromDequeue(AbstractPipeline pipeline, E e);
 
-  ScanResult<String> scan(String cursor, int count, String match);
+  ScanResult<E> scan(String cursor, int count, String match);
 }

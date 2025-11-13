@@ -77,11 +77,11 @@ public class BalancedRedisQueueMockTest {
   public void removeFromDequeueFalseWhenValueIsMissing() throws Exception {
     // ARRANGE
     when(subQueue.removeFromDequeue(any(String.class))).thenReturn(false);
-    BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of("test"), this::subQueueDecorate);
+    BalancedRedisQueue<String> queue =
+        new BalancedRedisQueue<>("test", ImmutableList.of("test"), this::subQueueDecorate);
 
     // ACT
-    Boolean success = queue.removeFromDequeue(redis, new BalancedQueueEntry("test", "baz"));
+    Boolean success = queue.removeFromDequeue(redis, new BalancedQueueEntry<>("test", "baz"));
 
     // ASSERT
     assertThat(success).isFalse();
@@ -95,8 +95,8 @@ public class BalancedRedisQueueMockTest {
   public void removeFromDequeueTrueWhenValueExists() throws Exception {
     // ARRANGE
     when(subQueue.removeFromDequeue(any(String.class))).thenReturn(true);
-    BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of("test"), this::subQueueDecorate);
+    BalancedRedisQueue<String> queue =
+        new BalancedRedisQueue<>("test", ImmutableList.of("test"), this::subQueueDecorate);
 
     // ACT
     Boolean success = queue.removeFromDequeue(redis, new BalancedQueueEntry("test", "bar"));
@@ -263,9 +263,9 @@ public class BalancedRedisQueueMockTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    Visitor<BalancedQueueEntry> visitor =
+    Visitor<BalancedQueueEntry<String>> visitor =
         new Visitor<>() {
-          public void visit(BalancedQueueEntry entry) {
+          public void visit(BalancedQueueEntry<String> entry) {
             visited.add(entry.value());
           }
         };
@@ -307,9 +307,9 @@ public class BalancedRedisQueueMockTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    Visitor<BalancedQueueEntry> visitor =
+    Visitor<BalancedQueueEntry<String>> visitor =
         new Visitor<>() {
-          public void visit(BalancedQueueEntry entry) {
+          public void visit(BalancedQueueEntry<String> entry) {
             visited.add(entry.value());
           }
         };

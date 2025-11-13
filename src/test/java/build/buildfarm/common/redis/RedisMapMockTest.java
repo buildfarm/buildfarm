@@ -36,15 +36,6 @@ import redis.clients.jedis.params.GetExParams;
  */
 @RunWith(JUnit4.class)
 public class RedisMapMockTest {
-  // Function under test: redisMap
-  // Reason for testing: the map can be constructed with a valid cluster instance and name
-  // Failure explanation: the map is throwing an exception upon construction
-  @Test
-  public void redisMapConstructsWithoutError() throws Exception {
-    // ARRANGE
-    new RedisMap("test");
-  }
-
   // Function under test: insert
   // Reason for testing: test how an element is added to a map
   // Failure explanation: jedis was not called as expected
@@ -52,7 +43,7 @@ public class RedisMapMockTest {
   public void insertInsert() throws Exception {
     // ARRANGE
     JedisCluster redis = mock(JedisCluster.class);
-    RedisMap map = new RedisMap("test");
+    RedisMap<String> map = new RedisMap<>("test", new IdentityTranslator());
 
     // ACT
     map.insert(redis, "key", "value", 60);
@@ -68,7 +59,7 @@ public class RedisMapMockTest {
   public void removeRemove() throws Exception {
     // ARRANGE
     JedisCluster redis = mock(JedisCluster.class);
-    RedisMap map = new RedisMap("test");
+    RedisMap<String> map = new RedisMap<>("test", new IdentityTranslator());
 
     // ACT
     map.insert(redis, "key", "value", 60);
@@ -86,7 +77,7 @@ public class RedisMapMockTest {
     // ARRANGE
     JedisCluster redis = mock(JedisCluster.class);
     when(redis.get("test:key")).thenReturn("value");
-    RedisMap map = new RedisMap("test");
+    RedisMap<String> map = new RedisMap<>("test", new IdentityTranslator());
 
     // ACT
     map.insert(redis, "key", "value", 60);
@@ -106,7 +97,7 @@ public class RedisMapMockTest {
     JedisCluster redis = mock(JedisCluster.class);
     GetExParams params = GetExParams.getExParams().ex(60);
     when(redis.getEx("test:key", params)).thenReturn("value");
-    RedisMap map = new RedisMap("test");
+    RedisMap<String> map = new RedisMap<>("test", new IdentityTranslator());
 
     // ACT
     map.insert(redis, "key", "value", 60);
