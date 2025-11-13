@@ -59,6 +59,7 @@ class Bfssh {
         Action.newBuilder()
             .setCommandDigest(DigestUtil.toDigest(commandDigest))
             .setPlatform(platform)
+            .setDoNotCache(true)
             .build();
     Digest actionDigest = digestUtil.compute(action);
     ImmutableList<Request> requests =
