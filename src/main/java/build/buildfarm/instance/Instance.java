@@ -131,8 +131,7 @@ public interface Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Watcher operationObserver)
-      throws InterruptedException;
+      Watcher operationObserver);
 
   BackplaneStatus backplaneStatus();
 
