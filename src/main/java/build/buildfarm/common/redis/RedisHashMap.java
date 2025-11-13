@@ -14,7 +14,12 @@
 
 package build.buildfarm.common.redis;
 
+import static com.google.common.collect.Iterables.transform;
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Maps.transformValues;
+
 import com.google.common.collect.Iterables;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,7 +37,7 @@ import redis.clients.jedis.resps.ScanResult;
  *     before and after the map data structure is created (since it exists in redis). Therefore, two
  *     redis maps with the same name, would in fact be the same underlying redis map.
  */
-public class RedisHashMap {
+public class RedisHashMap<T> {
   /**
    * @field name
    * @brief The unique name of the map.
@@ -42,12 +47,19 @@ public class RedisHashMap {
   private final String name;
 
   /**
+   * @field translator
+   * @brief The translator used to pull/push content into the generic type.
+   */
+  private final StringTranslator<T> translator;
+
+  /**
    * @brief Constructor.
    * @details Construct a named redis map with an established redis cluster.
    * @param name The global name of the map.
    */
-  public RedisHashMap(String name) {
+  public RedisHashMap(String name, StringTranslator<T> translator) {
     this.name = name;
+    this.translator = translator;
   }
 
   /**
@@ -60,8 +72,8 @@ public class RedisHashMap {
    * @return Whether a new key was inserted. If a key is overwritten with a new value, this would be
    *     false.
    */
-  public boolean insert(UnifiedJedis jedis, String key, String value) {
-    return jedis.hset(name, key, value) == 1;
+  public boolean insert(UnifiedJedis jedis, String key, T value) {
+    return jedis.hset(name, key, translator.print(value)) == 1;
   }
 
   /**
@@ -72,12 +84,12 @@ public class RedisHashMap {
    * @param value The value for the key.
    * @return Whether a new key was inserted. If a key already exists, this would be false.
    */
-  public boolean insertIfMissing(UnifiedJedis jedis, String key, String value) {
-    return jedis.hsetnx(name, key, value) == 1;
+  public boolean insertIfMissing(UnifiedJedis jedis, String key, T value) {
+    return jedis.hsetnx(name, key, translator.print(value)) == 1;
   }
 
-  public Response<Long> insertIfMissing(AbstractPipeline jedis, String key, String value) {
-    return jedis.hsetnx(name, key, value);
+  public Response<Long> insertIfMissing(AbstractPipeline jedis, String key, T value) {
+    return jedis.hsetnx(name, key, translator.print(value));
   }
 
   /**
@@ -140,16 +152,22 @@ public class RedisHashMap {
     return jedis.hkeys(name);
   }
 
-  public ScanResult<Map.Entry<String, String>> scan(
-      UnifiedJedis jedis, String hashCursor, int count) {
+  public ScanResult<Map.Entry<String, T>> scan(UnifiedJedis jedis, String hashCursor, int count) {
     // unlike full map search, we should have good scan key coherency
     // avoid switching this around while trying to pad out the results
     int scanCount = count * 2;
     ScanParams scanParams = new ScanParams().count(scanCount);
-    return new OffsetScanner<Map.Entry<String, String>>() {
+    return new OffsetScanner<Map.Entry<String, T>>() {
       @Override
-      protected ScanResult<Map.Entry<String, String>> scan(String cursor, int remaining) {
-        return jedis.hscan(name, cursor, scanParams);
+      protected ScanResult<Map.Entry<String, T>> scan(String cursor, int remaining) {
+        ScanResult<Map.Entry<String, String>> scanResults = jedis.hscan(name, cursor, scanParams);
+        List<Map.Entry<String, T>> results =
+            newArrayList(
+                Iterables.transform(
+                    scanResults.getResult(),
+                    entry ->
+                        new SimpleEntry<>(entry.getKey(), translator.parse(entry.getValue()))));
+        return new ScanResult<>(scanResults.getCursor(), results);
       }
     }.fill(hashCursor, count);
   }
@@ -160,8 +178,8 @@ public class RedisHashMap {
    * @param jedis Jedis cluster client.
    * @return The redis hashmap represented as a java map.
    */
-  public Map<String, String> asMap(UnifiedJedis jedis) {
-    return jedis.hgetAll(name);
+  public Map<String, T> asMap(UnifiedJedis jedis) {
+    return transformValues(jedis.hgetAll(name), translator::parse);
   }
 
   /**
@@ -170,7 +188,7 @@ public class RedisHashMap {
    * @param fields The name of the fields.
    * @return Values associated with the specified fields
    */
-  public List<String> mget(UnifiedJedis jedis, Iterable<String> fields) {
-    return jedis.hmget(name, Iterables.toArray(fields, String.class));
+  public Iterable<T> mget(UnifiedJedis jedis, Iterable<String> fields) {
+    return transform(jedis.hmget(name, Iterables.toArray(fields, String.class)), translator::parse);
   }
 }

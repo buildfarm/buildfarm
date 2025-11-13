@@ -18,6 +18,8 @@ import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.redis.BalancedRedisQueue;
+import build.buildfarm.common.redis.Codec;
+import build.buildfarm.common.redis.IdentityTranslator;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.QueueDecorator;
 import build.buildfarm.common.redis.RedisHashMap;
@@ -27,24 +29,34 @@ import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.common.redis.RedisPriorityQueue;
 import build.buildfarm.common.redis.RedisQueue;
 import build.buildfarm.common.redis.RedisSetMap;
+import build.buildfarm.common.redis.StringTranslator;
+import build.buildfarm.common.redis.TranslatedQueueDecorator;
+import build.buildfarm.instance.shard.codec.InstantTranslator;
+import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.time.Instant;
 import java.util.List;
 import redis.clients.jedis.UnifiedJedis;
 
 public class DistributedStateCreator {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public static DistributedState create(UnifiedJedis jedis) {
+  public static DistributedState create(UnifiedJedis jedis, Codec codec) {
     DistributedState state = new DistributedState();
 
     // Create containers that make up the backplane
-    state.actionCache = createActionCache();
-    state.prequeue = createPrequeue(jedis);
-    state.executionQueue = createExecutionQueue(jedis);
-    state.blockedActions = new RedisMap(configs.getBackplane().getActionBlocklistPrefix());
-    state.blockedInvocations = new RedisMap(configs.getBackplane().getInvocationBlocklistPrefix());
+    state.actionCache =
+        new RedisMap<>(configs.getBackplane().getActionCachePrefix(), codec.actionResult());
+    state.prequeue = createPrequeue(jedis, codec.executeEntry());
+    state.executionQueue = createExecutionQueue(jedis, codec.queueEntry());
+    StringTranslator<String> identityTranslator = new IdentityTranslator();
+    state.blockedActions =
+        new RedisMap<>(configs.getBackplane().getActionBlocklistPrefix(), identityTranslator);
+    state.blockedInvocations =
+        new RedisMap<>(configs.getBackplane().getInvocationBlocklistPrefix(), identityTranslator);
     state.toolInvocations =
         new RedisSetMap(
             configs.getBackplane().getToolInvocationsPrefix(),
@@ -53,19 +65,26 @@ public class DistributedStateCreator {
     state.executions =
         new Executions(
             state.toolInvocations,
+            codec.execution(),
             configs.getBackplane().getOperationPrefix(), // FIXME change to Execution
             configs.getBackplane().getActionsPrefix(),
             configs.getBackplane().getOperationExpire(),
             configs.getBackplane().getActionExecutionExpire());
-    state.processingExecutions = new RedisMap(configs.getBackplane().getProcessingPrefix());
-    state.dispatchingExecutions = new RedisMap(configs.getBackplane().getDispatchingPrefix());
+    StringTranslator<Instant> instantTranslator = new InstantTranslator();
+    state.processingExecutions =
+        new RedisMap<>(configs.getBackplane().getProcessingPrefix(), instantTranslator);
+    state.dispatchingExecutions =
+        new RedisMap<>(configs.getBackplane().getDispatchingPrefix(), instantTranslator);
     state.dispatchedExecutions =
-        new RedisHashMap(
-            configs.getBackplane().getDispatchedOperationsHashName()); // FIXME change to Executions
+        new RedisHashMap<>(
+            configs.getBackplane().getDispatchedOperationsHashName(),
+            codec.dispatchedExecution()); // FIXME change to Executions
     state.executeWorkers =
-        new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_execute");
+        new RedisHashMap<>(
+            configs.getBackplane().getWorkersHashName() + "_execute", codec.worker());
     state.storageWorkers =
-        new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_storage");
+        new RedisHashMap<>(
+            configs.getBackplane().getWorkersHashName() + "_storage", codec.worker());
     state.correlatedInvocationsIndex =
         new RedisSetMap(
             configs.getBackplane().getCorrelatedInvocationsIndexPrefix(),
@@ -80,31 +99,30 @@ public class DistributedStateCreator {
     return state;
   }
 
-  private static RedisMap createActionCache() {
-    return new RedisMap(configs.getBackplane().getActionCachePrefix());
-  }
-
-  private static BalancedRedisQueue createPrequeue(UnifiedJedis jedis) {
+  private static BalancedRedisQueue<ExecuteEntry> createPrequeue(
+      UnifiedJedis jedis, StringTranslator<ExecuteEntry> translator) {
     // Construct the prequeue so that elements are balanced across all redis nodes.
-    return new BalancedRedisQueue(
+    return new BalancedRedisQueue<>(
         getPreQueuedOperationsListName(),
         getQueueHashes(jedis, getPreQueuedOperationsListName()),
         configs.getBackplane().getMaxPreQueueDepth(),
-        getQueueDecorator());
+        new TranslatedQueueDecorator<>(getQueueDecorator(), translator));
   }
 
-  private static ExecutionQueue createExecutionQueue(UnifiedJedis jedis) {
+  private static ExecutionQueue createExecutionQueue(
+      UnifiedJedis jedis, StringTranslator<QueueEntry> translator) {
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
     // eligibility and placement of operations.
     // Therefore, it is recommended to have a final provision queue with no actual platform
     // requirements.  This will ensure that all operations are eligible for the final queue.
-    ImmutableList.Builder<ProvisionedRedisQueue> provisionedQueues = new ImmutableList.Builder<>();
+    ImmutableList.Builder<ProvisionedRedisQueue<QueueEntry>> provisionedQueues =
+        new ImmutableList.Builder<>();
     for (Queue queueConfig : configs.getBackplane().getQueues()) {
-      ProvisionedRedisQueue provisionedQueue =
-          new ProvisionedRedisQueue(
+      ProvisionedRedisQueue<QueueEntry> provisionedQueue =
+          new ProvisionedRedisQueue<QueueEntry>(
               getQueueName(queueConfig),
-              getQueueDecorator(),
+              new TranslatedQueueDecorator<>(getQueueDecorator(), translator),
               getQueueHashes(jedis, getQueueName(queueConfig)),
               toMultimap(queueConfig.getPlatform().getPropertiesList()),
               queueConfig.isAllowUnmatched());
@@ -146,7 +164,7 @@ public class DistributedStateCreator {
     return set;
   }
 
-  private static QueueDecorator getQueueDecorator() {
+  private static QueueDecorator<String> getQueueDecorator() {
     return configs.getBackplane().isPriorityQueue()
         ? RedisPriorityQueue::decorate
         : RedisQueue::decorate;

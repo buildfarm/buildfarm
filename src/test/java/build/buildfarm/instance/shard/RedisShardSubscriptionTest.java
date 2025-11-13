@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
+import build.buildfarm.instance.shard.codec.json.JsonCodec;
 import com.github.fppt.jedismock.RedisServer;
 import com.github.fppt.jedismock.operations.server.MockExecutor;
 import com.github.fppt.jedismock.server.Response;
@@ -50,7 +51,8 @@ public class RedisShardSubscriptionTest {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    return new RedisShardSubscriber(watchers, null, 1, "worker-channel", workerName -> {}, null);
+    return new RedisShardSubscriber(
+        watchers, null, 1, "worker-channel", workerName -> {}, null, JsonCodec.CODEC);
   }
 
   @Test

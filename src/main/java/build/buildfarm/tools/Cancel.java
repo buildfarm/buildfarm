@@ -32,7 +32,6 @@ class Cancel {
         instance.cancelOperation(args[i]);
       }
     } else {
-
       // read them from STDIN, separated by newlines
       Scanner scanner = new Scanner(System.in);
 

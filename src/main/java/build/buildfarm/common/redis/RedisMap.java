@@ -42,7 +42,7 @@ import redis.clients.jedis.util.JedisClusterCRC16;
  *     before and after the map data structure is created (since it exists in redis). Therefore, two
  *     redis maps with the same name, would in fact be the same underlying redis map.
  */
-public class RedisMap {
+public class RedisMap<T> {
   /**
    * @field name
    * @brief The unique name of the map.
@@ -50,6 +50,12 @@ public class RedisMap {
    *     the same name, they would be instances of the same underlying redis map.
    */
   private final String name;
+
+  /**
+   * @field translator
+   * @brief The translator used to pull/push content into the generic type.
+   */
+  private final StringTranslator<T> translator;
 
   /**
    * @field expiration_s
@@ -63,9 +69,10 @@ public class RedisMap {
    * @brief Constructor.
    * @details Construct a named redis map with an established redis cluster.
    * @param name The global name of the map.
+   * @param translator The translator for the specified type.
    */
-  public RedisMap(String name) {
-    this(name, 24 * 60 * 60);
+  public RedisMap(String name, StringTranslator<T> translator) {
+    this(name, translator, /* timeout_s= */ 24 * 60 * 60);
   }
 
   /**
@@ -73,9 +80,11 @@ public class RedisMap {
    * @details Construct a named redis map with an established redis cluster.
    * @param name The global name of the map.
    * @param timeout_s When to expire entries.
+   * @param translator The translator for the specified type.
    */
-  public RedisMap(String name, int timeout_s) {
+  public RedisMap(String name, StringTranslator<T> translator, int timeout_s) {
     this.name = name;
+    this.translator = translator;
     this.expiration_s = timeout_s;
   }
 
@@ -88,8 +97,8 @@ public class RedisMap {
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
    * @note Overloaded.
    */
-  public void insert(UnifiedJedis jedis, String key, String value, int timeout_s) {
-    jedis.setex(createKeyName(key), timeout_s, value);
+  public void insert(UnifiedJedis jedis, String key, T value, int timeout_s) {
+    jedis.setex(createKeyName(key), timeout_s, translator.print(value));
   }
 
   /**
@@ -101,10 +110,10 @@ public class RedisMap {
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
    * @note Overloaded.
    */
-  public void insert(UnifiedJedis jedis, String key, String value, long timeout_s) {
+  public void insert(UnifiedJedis jedis, String key, T value, long timeout_s) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
-    jedis.setex(createKeyName(key), (int) timeout_s, value);
+    jedis.setex(createKeyName(key), (int) timeout_s, translator.print(value));
   }
 
   /**
@@ -115,16 +124,16 @@ public class RedisMap {
    * @param value The value for the key.
    * @note Overloaded.
    */
-  public void insert(UnifiedJedis jedis, String key, String value) {
+  public void insert(UnifiedJedis jedis, String key, T value) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
     SetParams setParams = SetParams.setParams().ex(expiration_s);
-    jedis.set(createKeyName(key), value, setParams);
+    jedis.set(createKeyName(key), translator.print(value), setParams);
   }
 
-  public boolean putIfAbsent(UnifiedJedis jedis, String key, String value) {
+  public boolean putIfAbsent(UnifiedJedis jedis, String key, T value) {
     SetParams setParams = SetParams.setParams().nx().ex(expiration_s);
-    return "OK".equals(jedis.set(createKeyName(key), value, setParams));
+    return "OK".equals(jedis.set(createKeyName(key), translator.print(value), setParams));
   }
 
   /**
@@ -166,8 +175,8 @@ public class RedisMap {
    * @note Overloaded.
    * @note Suggested return identifier: value.
    */
-  public String get(UnifiedJedis jedis, String key) {
-    return jedis.get(createKeyName(key));
+  public T get(UnifiedJedis jedis, String key) {
+    return translator.parse(jedis.get(createKeyName(key)));
   }
 
   /**
@@ -179,9 +188,9 @@ public class RedisMap {
    * @note Overloaded.
    * @note Suggested return identifier: value.
    */
-  public String getex(UnifiedJedis jedis, String key, long timeout_s) {
+  public T getex(UnifiedJedis jedis, String key, long timeout_s) {
     GetExParams params = GetExParams.getExParams().ex(timeout_s);
-    return jedis.getEx(createKeyName(key), params);
+    return translator.parse(jedis.getEx(createKeyName(key), params));
   }
 
   /**
@@ -193,7 +202,7 @@ public class RedisMap {
    * @note Overloaded.
    * @note Suggested return identifier: values.
    */
-  public Iterable<Map.Entry<String, String>> get(UnifiedJedis jedis, Iterable<String> keys) {
+  public Iterable<Map.Entry<String, T>> get(UnifiedJedis jedis, Iterable<String> keys) {
     // Fetch items via pipeline
     try (AbstractPipeline p = jedis.pipelined()) {
       List<Map.Entry<String, Response<String>>> values = new ArrayList<>();
@@ -202,9 +211,10 @@ public class RedisMap {
               key -> values.add(new AbstractMap.SimpleEntry<>(key, p.get(createKeyName(key)))));
       p.sync();
 
-      List<Map.Entry<String, String>> resolved = new ArrayList<>();
+      List<Map.Entry<String, T>> resolved = new ArrayList<>();
       for (Map.Entry<String, Response<String>> val : values) {
-        resolved.add(new AbstractMap.SimpleEntry<>(val.getKey(), val.getValue().get()));
+        resolved.add(
+            new AbstractMap.SimpleEntry<>(val.getKey(), translator.parse(val.getValue().get())));
       }
       return resolved;
     }

@@ -17,15 +17,12 @@ package build.buildfarm.instance.shard;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.newArrayList;
 
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.buildfarm.common.redis.IdentityTranslator;
 import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisSetMap;
-import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.common.redis.StringTranslator;
 import com.google.longrunning.Operation;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.JsonFormat;
-import com.google.rpc.PreconditionFailure;
-import java.util.logging.Level;
+import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 import redis.clients.jedis.UnifiedJedis;
@@ -41,20 +38,6 @@ import redis.clients.jedis.resps.ScanResult;
  */
 @Log
 public class Executions {
-  private static final JsonFormat.Parser operationParser =
-      JsonFormat.parser()
-          .usingTypeRegistry(
-              JsonFormat.TypeRegistry.newBuilder()
-                  .add(ExecuteOperationMetadata.getDescriptor())
-                  .add(QueuedOperationMetadata.getDescriptor())
-                  .add(PreconditionFailure.getDescriptor())
-                  .build())
-          .ignoringUnknownFields();
-
-  static JsonFormat.Parser getParser() {
-    return operationParser;
-  }
-
   public RedisSetMap toolInvocations;
 
   /**
@@ -62,14 +45,14 @@ public class Executions {
    * @brief A mapping from executionName -> operation
    * @details Operation names are unique.
    */
-  public RedisMap executions;
+  public RedisMap<Operation> executions;
 
   /**
    * @field actions
    * @brief A mapping from actionKey -> operationName
    * @details ActionKeys which may produce execution merges.
    */
-  public RedisMap actions;
+  public RedisMap<String> actions;
 
   /**
    * @brief Constructor.
@@ -81,13 +64,14 @@ public class Executions {
    */
   public Executions(
       RedisSetMap toolInvocations,
+      StringTranslator translator,
       String name,
       String actionsName,
       int timeout_s,
       int action_timeout_s) {
     this.toolInvocations = toolInvocations;
-    executions = new RedisMap(name, timeout_s);
-    actions = new RedisMap(actionsName, action_timeout_s);
+    executions = new RedisMap<>(name, translator, timeout_s);
+    actions = new RedisMap<>(actionsName, new IdentityTranslator(), action_timeout_s);
   }
 
   /**
@@ -100,7 +84,7 @@ public class Executions {
    * @note Suggested return identifier: operation.
    */
   public Operation get(UnifiedJedis jedis, String name) {
-    return parse(executions.get(jedis, name));
+    return executions.get(jedis, name);
   }
 
   /**
@@ -113,28 +97,14 @@ public class Executions {
    * @note Suggested return identifier: operations.
    */
   public Iterable<Operation> get(UnifiedJedis jedis, Iterable<String> names) {
-    return transform(executions.get(jedis, names), entry -> Executions.parse(entry.getValue()));
-  }
-
-  private static Operation parse(String operationJson) {
-    if (operationJson != null) {
-      try {
-        Operation.Builder operationBuilder = Operation.newBuilder();
-        operationParser.merge(operationJson, operationBuilder);
-        return operationBuilder.build();
-      } catch (InvalidProtocolBufferException e) {
-        log.log(Level.SEVERE, "error parsing operation from " + operationJson, e);
-      }
-    }
-    return null;
+    return transform(executions.get(jedis, names), Map.Entry::getValue);
   }
 
   private ScanResult<Operation> parseScanResult(UnifiedJedis jedis, ScanResult<String> scanResult) {
     return new ScanResult<>(
         scanResult.getCursor(),
         newArrayList(
-            transform(
-                executions.get(jedis, scanResult.getResult()), entry -> parse(entry.getValue()))));
+            transform(executions.get(jedis, scanResult.getResult()), Map.Entry::getValue)));
   }
 
   public ScanResult<Operation> scan(UnifiedJedis jedis, String cursor, int count) {
@@ -146,8 +116,8 @@ public class Executions {
     return parseScanResult(jedis, toolInvocations.scan(jedis, toolInvocationId, setCursor, count));
   }
 
-  public void insert(UnifiedJedis jedis, String name, String operationJson) {
-    executions.insert(jedis, name, operationJson);
+  public void insert(UnifiedJedis jedis, String name, Operation operation) {
+    executions.insert(jedis, name, operation);
   }
 
   /**
@@ -157,8 +127,8 @@ public class Executions {
    * @param name name of operation.
    * @param operationJson Json of the operation.
    */
-  public boolean create(UnifiedJedis jedis, String actionKey, String name, String operationJson) {
-    executions.insert(jedis, name, operationJson);
+  public boolean create(UnifiedJedis jedis, String actionKey, String name, Operation operation) {
+    executions.insert(jedis, name, operation);
     if (!actions.putIfAbsent(jedis, actionKey, name)) {
       return false;
     }
