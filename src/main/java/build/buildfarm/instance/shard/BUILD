@@ -2,7 +2,7 @@ load("@rules_java//java:java_library.bzl", "java_library")
 
 java_library(
     name = "shard",
-    srcs = glob(["*.java"]),
+    srcs = glob(["**/*.java"]),
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [

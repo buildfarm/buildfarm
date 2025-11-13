@@ -14,10 +14,9 @@
 
 package build.buildfarm.instance.shard;
 
-import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
-import static build.buildfarm.instance.shard.RedisShardBackplane.parseWorkerChange;
 import static java.lang.String.format;
 
+import build.buildfarm.common.redis.Codec;
 import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ShardWorker;
@@ -27,7 +26,6 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import java.time.Instant;
@@ -70,6 +68,7 @@ class RedisShardSubscriber extends JedisPubSub {
   private final String workerChannel;
   private final Consumer<String> onWorkerRemoved;
   private final Executor executor;
+  private final Codec codec;
   private SettableFuture<Void> subscribeFuture = null;
 
   RedisShardSubscriber(
@@ -78,13 +77,15 @@ class RedisShardSubscriber extends JedisPubSub {
       int workerChangeTypeMask,
       String workerChannel,
       Consumer<String> onWorkerRemoved,
-      Executor executor) {
+      Executor executor,
+      Codec codec) {
     this.watchers = watchers;
     this.workers = workers;
     this.workerChangeTypeMask = workerChangeTypeMask;
     this.workerChannel = workerChannel;
     this.onWorkerRemoved = onWorkerRemoved;
     this.executor = executor;
+    this.codec = codec;
   }
 
   public List<String> watchedOperationChannels() {
@@ -210,17 +211,9 @@ class RedisShardSubscriber extends JedisPubSub {
   @Override
   public void onMessage(String channel, String message) {
     if (channel.equals(workerChannel)) {
-      onWorkerMessage(message);
+      onWorkerChange(codec.workerChange().parse(message));
     } else {
       onOperationMessage(channel, message);
-    }
-  }
-
-  void onWorkerMessage(String message) {
-    try {
-      onWorkerChange(parseWorkerChange(message));
-    } catch (InvalidProtocolBufferException e) {
-      log.log(Level.INFO, format("invalid worker change message: %s", message), e);
     }
   }
 
@@ -265,11 +258,11 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   void onOperationMessage(String channel, String message) {
-    try {
-      onOperationChange(channel, parseOperationChange(message));
-    } catch (InvalidProtocolBufferException e) {
-      log.log(
-          Level.INFO, format("invalid operation change message for %s: %s", channel, message), e);
+    OperationChange change = codec.operationChange().parse(message);
+    if (change != null) {
+      onOperationChange(channel, change);
+    } else {
+      log.warning(format("invalid operation change message for %s: %s", channel, message));
     }
   }
 
