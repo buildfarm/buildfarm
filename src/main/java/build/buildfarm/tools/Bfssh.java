@@ -131,8 +131,6 @@ class Bfssh {
     Platform platform =
         Platform.newBuilder()
             .addProperties(
-                Property.newBuilder().setName("execution-policy").setValue("as-nobody").build())
-            .addProperties(
                 Property.newBuilder().setName("Worker").setValue(worker + ":8981").build())
             .build();
 
