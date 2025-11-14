@@ -18,6 +18,7 @@
 # Use the flag --check if you want the script to fail when formatting is not correct.
 
 FORMAT_JAVA=true
+FORMAT_HAWKEYE=true
 REMOVE_NEWLINES_AFTER_START_BRACKET=true
 
 # Print an error such that it will surface in the context of buildkite
@@ -97,10 +98,26 @@ run_buildifier () {
     $BAZEL run $BUILDIFIER -- -r > /dev/null 2>&1
 }
 
+run_hawkeye() {
+  if [[ "$*" == "--check" ]]
+  then
+    $BAZEL run //tools/lint/hawkeye:hawkeye -- check --fail-if-unknown
+    handle_format_error_check
+    return
+  else
+    $BAZEL run //tools/lint/hawkeye:hawkeye -- format --fail-if-unknown
+
+  fi
+}
+
 if [ "${FORMAT_JAVA:-false}" = true ]; then
     run_java_formatter "$@"
 fi;
 
 if [ "${FORMAT_BUILD:-false}" = true ]; then
     run_buildifier "$@"
+fi;
+
+if [ "${FORMAT_HAWKEYE:-false}" = true ]; then
+    run_hawkeye "$@"
 fi;
