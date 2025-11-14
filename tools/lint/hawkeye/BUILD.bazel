@@ -1,0 +1,24 @@
+"""
+You can check license files with:
+
+```
+bazel run //tools/lint/hawkeye -- check --fail-if-unknown
+```
+
+You can update header comments with:
+
+```
+bazel run //tools/lint/hawkeye -- format --fail-if-unknown
+```
+"""
+
+alias(
+    name = "hawkeye",
+    actual = select({
+        "@bazel_tools//src/conditions:darwin": "@hawkeye-aarch64-apple-darwin//:hawkeye",
+        "@bazel_tools//src/conditions:darwin_x86_64": "@hawkeye-x86_64-apple-darwin//:hawkeye",
+        "@bazel_tools//src/conditions:linux_x86_64": "@hawkeye-x86_64-unknown-linux-gnu//:hawkeye",
+        "//conditions:default": "@hawkeye-aarch64-apple-darwin//:hawkeye",
+    }),
+    visibility = ["//visibility:public"],
+)

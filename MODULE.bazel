@@ -253,3 +253,12 @@ find_rpm = use_extension("@rules_pkg//toolchains/rpm:rpmbuild_configure.bzl", "f
 use_repo(find_rpm, "rules_pkg_rpmbuild")
 
 register_toolchains("@rules_pkg_rpmbuild//:all")
+
+####
+hawkeye = use_extension("//tools/lint/hawkeye:extensions.bzl", "hawkeye", dev_dependency = True)
+use_repo(
+    hawkeye,
+    "hawkeye-aarch64-apple-darwin",
+    "hawkeye-x86_64-apple-darwin",
+    "hawkeye-x86_64-unknown-linux-gnu",
+)
