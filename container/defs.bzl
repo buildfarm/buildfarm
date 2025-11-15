@@ -20,7 +20,8 @@ def multiarch_oci_image(name, image):
     image_push(
         name = "public_push_%s" % name,
         image = name,
-        repository = "index.docker.io/bazelbuild/%s" % name,
+        registry = "index.docker.io",
+        repository = "bazelbuild/%s" % name,
         # Specify the tag with `bazel run public_push_buildfarm-server public_push_buildfarm-worker -- --tag latest`
         tags = ["container"],
     )
