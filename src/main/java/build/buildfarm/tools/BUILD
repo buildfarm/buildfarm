@@ -389,6 +389,26 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "bf-edit",
+    srcs = ["Edit.java"],
+    main_class = "build.buildfarm.tools.Edit",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:io_grpc_grpc_api",
+        "@buildfarm_maven//:io_grpc_grpc_context",
+        "@buildfarm_maven//:io_grpc_grpc_core",
+        "@buildfarm_maven//:io_grpc_grpc_protobuf",
+        "@buildfarm_maven//:io_grpc_grpc_stub",
+    ],
+)
+
 java_library(
     name = "worker-profiler-printer",
     srcs = ["WorkerProfilePrinter.java"],
