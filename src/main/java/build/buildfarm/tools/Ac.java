@@ -22,26 +22,53 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
+import java.util.concurrent.Callable;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
 
-// This tool can be used to interact directly with the Action Cache API.
-// ./tool <URL> shard SHA256 <command>
-class Ac {
-  public static void main(String[] args) throws Exception {
-    // get arguments for establishing an instance
-    String host = args[0];
-    String instanceName = args[1];
-    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
+/** Interact directly with the Action Cache API. */
+@Command(
+    name = "ac",
+    mixinStandardHelpOptions = true,
+    description = "Interact directly with the Action Cache API")
+class Ac implements Callable<Integer> {
+
+  @Parameters(
+      index = "0",
+      description =
+          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
+              + " 'grpcs://', or omitted (default 'grpc://')")
+  private String host;
+
+  @Parameters(index = "1", description = "The instance name")
+  private String instanceName;
+
+  @Parameters(index = "2", description = "The digest hash function (e.g., SHA256)")
+  private String hashFunction;
+
+  @Override
+  public Integer call() throws Exception {
+    DigestUtil digestUtil = DigestUtil.forHash(hashFunction);
 
     // create instance
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, channel);
 
-    // upload fake data to the Action Cache.
-    DigestUtil.ActionKey key =
-        DigestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("Hello, World")));
-    ActionResult.Builder result = ActionResult.newBuilder();
-    instance.putActionResult(key, result.build());
+    try {
+      // upload fake data to the Action Cache.
+      DigestUtil.ActionKey key =
+          DigestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("Hello, World")));
+      ActionResult.Builder result = ActionResult.newBuilder();
+      instance.putActionResult(key, result.build());
+    } finally {
+      instance.stop();
+    }
+    return 0;
+  }
 
-    instance.stop();
+  public static void main(String[] args) {
+    int exitCode = new CommandLine(new Ac()).execute(args);
+    System.exit(exitCode);
   }
 }
