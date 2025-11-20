@@ -22,7 +22,7 @@ bazel_dep(name = "rules_cc", version = "0.2.13")
 bazel_dep(name = "rules_java", version = "8.15.2")
 bazel_dep(name = "rules_jvm_external", version = "6.8")
 bazel_dep(name = "rules_license", version = "1.0.0")
-bazel_dep(name = "rules_oci", version = "2.2.6")
+bazel_dep(name = "rules_img", version = "0.2.9")
 bazel_dep(name = "rules_pkg", version = "1.1.0")
 
 # Test dependencies
@@ -183,39 +183,24 @@ use_repo(
     "unpinned_buildfarm_maven",
 )
 
-oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+pull = use_repo_rule("@rules_img//img:pull.bzl", "pull")
 
 # Server base image
-oci.pull(
+pull(
     name = "amazon_corretto_java_image_base",
     digest = "sha256:53463affec61309c62bf118c2d8cbc5d1b4b11e6f456e9f2a71e4f0a4b27f037",
-    image = "public.ecr.aws/amazoncorretto/amazoncorretto",
-    platforms = [
-        "linux/amd64",
-        "linux/arm64/v8",
-    ],
+    registry = "public.ecr.aws",
+    repository = "amazoncorretto/amazoncorretto",
     tag = "21",
 )
 
 # Worker base image
-oci.pull(
-    name = "ubuntu_noble",  # aka 24
+pull(
+    name = "ubuntu_noble",
     digest = "sha256:a1da084ca1429dd84a71e364e88985b4b85934f3d8717bfdc00f2fd06170158a",
-    image = "index.docker.io/bazelbuild/buildfarm-worker-base",
-    platforms = [
-        "linux/amd64",
-        "linux/arm64",
-    ],
+    registry = "index.docker.io",
+    repository = "bazelbuild/buildfarm-worker-base",
     tag = "noble",
-)
-use_repo(
-    oci,
-    "amazon_corretto_java_image_base",
-    "amazon_corretto_java_image_base_linux_amd64",
-    "amazon_corretto_java_image_base_linux_arm64_v8",
-    "ubuntu_noble",
-    "ubuntu_noble_linux_amd64",
-    "ubuntu_noble_linux_arm64",
 )
 
 # https://github.com/bazelbuild/rules_python/pull/713#issuecomment-1885628496

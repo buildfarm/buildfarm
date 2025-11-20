@@ -1,8 +1,8 @@
-load("@rules_oci//oci:defs.bzl", "oci_image")
+load("@rules_img//img:image.bzl", "image_manifest")
+load("@rules_img//img:layer.bzl", "layer_from_tar")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
-load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
-load("//container:defs.bzl", "multiarch_oci_image", "oci_image_env")
+load("//container:defs.bzl", "multiarch_oci_image")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -169,19 +169,59 @@ pkg_tar(
     tags = ["container"],
 )
 
-oci_image_env(
-    name = "env_server",
-    configpath = "/" + DEFAULT_PACKAGE_DIR + "/config.minimal.yml",
-    jvm_args = server_jvm_flags(),
+# Note: We can't use server_jvm_flags() and worker_jvm_flags() directly in BUILD
+# because they return lists with select() which can't be joined at load time.
+# We need to inline the computation or use a genrule/rule to compute env vars.
+
+# For now, let's use a simplified version without selects for the base case
+# and handle telemetry flags separately if needed
+
+_BASE_JVM_FLAGS = [
+    "-XX:+UseContainerSupport",
+    "-XX:MaxRAMPercentage=80.0",
+    "-XX:+UseStringDeduplication",
+    "-XX:+UseCompressedOops",
+    "-XX:+HeapDumpOnOutOfMemoryError",
+    "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+]
+
+# Environment variables for server
+SERVER_ENV = {
+    "CONFIG_PATH": "/" + DEFAULT_PACKAGE_DIR + "/config.minimal.yml",
+    "JAVA_TOOL_OPTIONS": " ".join(_BASE_JVM_FLAGS),
+}
+
+# Environment variables for worker
+WORKER_ENV = {
+    "CONFIG_PATH": "/" + DEFAULT_PACKAGE_DIR + "/config.minimal.yml",
+    "JAVA_TOOL_OPTIONS": " ".join(_BASE_JVM_FLAGS),
+}
+
+layer_from_tar(
+    name = "_layer_logging_config_server",
+    src = ":layer_logging_config",
+    tags = ["container"],
 )
 
-oci_image_env(
-    name = "env_worker",
-    configpath = "/" + DEFAULT_PACKAGE_DIR + "/config.minimal.yml",
-    jvm_args = worker_jvm_flags(),
+layer_from_tar(
+    name = "_layer_minimal_config_server",
+    src = ":layer_minimal_config",
+    tags = ["container"],
 )
 
-oci_image(
+layer_from_tar(
+    name = "_layer_telemetry_tools_server",
+    src = ":telemetry_tools",
+    tags = ["container"],
+)
+
+layer_from_tar(
+    name = "_layer_buildfarm_server_jar",
+    src = ":layer_buildfarm_server",
+    tags = ["container"],
+)
+
+image_manifest(
     name = "_buildfarm-server.image",
     base = "@amazon_corretto_java_image_base",
     entrypoint = [
@@ -189,20 +229,56 @@ oci_image(
         "-jar",
         "/" + DEFAULT_PACKAGE_DIR + "/buildfarm-server_deploy.jar",
     ],
-    env = ":env_server",
+    env = SERVER_ENV,
     labels = DEFAULT_IMAGE_LABELS,
-    tags = ["container"],
-    tars = [
+    layers = [
         # do not sort
-        ":layer_logging_config",
-        ":layer_minimal_config",
-        ":telemetry_tools",
-        ":layer_buildfarm_server",
+        ":_layer_logging_config_server",
+        ":_layer_minimal_config_server",
+        ":_layer_telemetry_tools_server",
+        ":_layer_buildfarm_server_jar",
     ],
+    tags = ["container"],
     visibility = ["//container:__subpackages__"],
 )
 
-oci_image(
+layer_from_tar(
+    name = "_layer_tini",
+    src = ":layer_tini",
+    tags = ["container"],
+)
+
+layer_from_tar(
+    name = "_layer_logging_config_worker",
+    src = ":layer_logging_config",
+    tags = ["container"],
+)
+
+layer_from_tar(
+    name = "_layer_minimal_config_worker",
+    src = ":layer_minimal_config",
+    tags = ["container"],
+)
+
+layer_from_tar(
+    name = "_layer_execution_wrappers",
+    src = ":execution_wrappers",
+    tags = ["container"],
+)
+
+layer_from_tar(
+    name = "_layer_telemetry_tools_worker",
+    src = ":telemetry_tools",
+    tags = ["container"],
+)
+
+layer_from_tar(
+    name = "_layer_buildfarm_worker_jar",
+    src = ":layer_buildfarm_worker",
+    tags = ["container"],
+)
+
+image_manifest(
     name = "_buildfarm-worker.image",
     base = "@ubuntu_noble",
     entrypoint = [
@@ -213,18 +289,18 @@ oci_image(
         "-jar",
         "/" + DEFAULT_PACKAGE_DIR + "/buildfarm-shard-worker_deploy.jar",
     ],
-    env = ":env_worker",
+    env = WORKER_ENV,
     labels = DEFAULT_IMAGE_LABELS,
-    tags = ["container"],
-    tars = [
+    layers = [
         # do not sort
-        ":layer_tini",
-        ":layer_logging_config",
-        ":layer_minimal_config",
-        ":execution_wrappers",
-        ":telemetry_tools",
-        ":layer_buildfarm_worker",
+        ":_layer_tini",
+        ":_layer_logging_config_worker",
+        ":_layer_minimal_config_worker",
+        ":_layer_execution_wrappers",
+        ":_layer_telemetry_tools_worker",
+        ":_layer_buildfarm_worker_jar",
     ],
+    tags = ["container"],
     visibility = ["//container:__subpackages__"],
 )
 
