@@ -19,6 +19,7 @@ import static build.buildfarm.common.grpc.Channels.createChannel;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import io.grpc.ManagedChannel;
+import java.util.Scanner;
 
 class Cancel {
   public static void main(String[] args) throws Exception {
@@ -26,9 +27,20 @@ class Cancel {
     String instanceName = args[1];
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, channel);
-    for (int i = 2; i < args.length; i++) {
-      instance.cancelOperation(args[i]);
+    if (args.length > 2) {
+      for (int i = 2; i < args.length; i++) {
+        instance.cancelOperation(args[i]);
+      }
+    } else {
+
+      // read them from STDIN, separated by newlines
+      Scanner scanner = new Scanner(System.in);
+
+      while (scanner.hasNext()) {
+        instance.cancelOperation(scanner.nextLine());
+      }
     }
+
     instance.stop();
   }
 }
