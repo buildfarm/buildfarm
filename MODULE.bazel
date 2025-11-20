@@ -89,6 +89,7 @@ maven.install(
         "com.google.protobuf:protobuf-java-util:4.32.1",
         "com.owteam.engUtils:netrc:2.0.1",
         "commons-io:commons-io:2.20.0",
+        "info.picocli:picocli:4.7.7",
         "io.grpc:grpc-api",  # Version is specified via the BOM below
         "io.grpc:grpc-auth",
         "io.grpc:grpc-context",

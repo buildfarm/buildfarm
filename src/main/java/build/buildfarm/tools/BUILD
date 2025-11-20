@@ -315,6 +315,7 @@ java_binary(
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
