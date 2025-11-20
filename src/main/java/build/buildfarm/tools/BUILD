@@ -125,6 +125,7 @@ java_binary(
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
