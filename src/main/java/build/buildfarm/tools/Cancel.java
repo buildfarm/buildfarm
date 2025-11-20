@@ -21,7 +21,6 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import io.grpc.ManagedChannel;
 import java.util.List;
-import java.util.Scanner;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -65,13 +64,6 @@ class Cancel implements Callable<Integer> {
       if (operationNames != null && !operationNames.isEmpty()) {
         for (String operationName : operationNames) {
           instance.cancelOperation(operationName);
-        }
-      } else {
-        // read them from STDIN, separated by newlines
-        Scanner scanner = new Scanner(System.in);
-
-        while (scanner.hasNext()) {
-          instance.cancelOperation(scanner.nextLine());
         }
       }
     } finally {
