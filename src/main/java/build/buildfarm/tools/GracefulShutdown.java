@@ -22,81 +22,98 @@ import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.WorkerControlGrpc;
 import io.grpc.ManagedChannel;
+import java.util.concurrent.Callable;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
 
-class GracefulShutdown {
-  /**
-   * Example command: GracefulShutdown ShutDown workerIp buildfarm-endpoint
-   *
-   * @param args
-   */
-  @SuppressWarnings({"JavaDoc", "ResultOfMethodCallIgnored"})
-  private static void shutDownGracefully(String[] args) {
-    String workerName = args[1];
-    String bfEndpoint = args[2];
-    System.out.println(
-        "Sending ShutDownWorkerGracefully request to bf "
-            + bfEndpoint
-            + " to shut down worker "
-            + workerName
-            + " gracefully");
-    ManagedChannel channel = createChannel(bfEndpoint);
-    AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
-    adminBlockingStub.shutDownWorkerGracefully(
-        ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
+/** Graceful shutdown operations for buildfarm workers. */
+@Command(
+    name = "gracefulshutdown",
+    mixinStandardHelpOptions = true,
+    description = "Graceful shutdown operations for buildfarm workers",
+    subcommands = {
+      GracefulShutdown.ShutDown.class,
+      GracefulShutdown.PrepareWorker.class,
+      GracefulShutdown.DisableProtection.class
+    })
+class GracefulShutdown implements Callable<Integer> {
 
-    System.out.println("Request is sent");
+  @Override
+  public Integer call() {
+    CommandLine.usage(this, System.out);
+    return 0;
   }
 
-  /**
-   * Example command: GracefulShutdown PrepareWorker WorkerIp:port
-   *
-   * @param args
-   */
-  @SuppressWarnings({"JavaDoc", "ResultOfMethodCallIgnored"})
-  private static void prepareWorkerForShutDown(String[] args) {
-    String workerIpWithPort = args[1];
-    System.out.println("Inform worker " + workerIpWithPort + " to prepare for shutdown!");
-    ManagedChannel channel = createChannel(workerIpWithPort);
-    WorkerControlGrpc.WorkerControlBlockingStub workerControlBlockingStub =
-        WorkerControlGrpc.newBlockingStub(channel);
-    workerControlBlockingStub.prepareWorkerForGracefulShutdown(
-        PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
-    System.out.println("Worker " + workerIpWithPort + " informed!");
+  /** Shut down a worker gracefully. */
+  @Command(name = "ShutDown", description = "Shut down a worker gracefully")
+  static class ShutDown implements Callable<Integer> {
+    @Parameters(index = "0", description = "Worker name or IP")
+    private String workerName;
+
+    @Parameters(index = "1", description = "Buildfarm endpoint [scheme://]host:port")
+    private String bfEndpoint;
+
+    @Override
+    public Integer call() {
+      System.out.println(
+          "Sending ShutDownWorkerGracefully request to bf "
+              + bfEndpoint
+              + " to shut down worker "
+              + workerName
+              + " gracefully");
+      ManagedChannel channel = createChannel(bfEndpoint);
+      AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
+      adminBlockingStub.shutDownWorkerGracefully(
+          ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
+
+      System.out.println("Request is sent");
+      return 0;
+    }
   }
 
-  /**
-   * Example command: GracefulShutdown DisableProtection WorkerIp buildfarm_endpoint
-   *
-   * @param args
-   */
-  @SuppressWarnings({"JavaDoc", "ResultOfMethodCallIgnored"})
-  private static void disableScaleInProtection(String[] args) {
-    String instancePrivateIp = args[1];
-    String bfEndpoint = args[2];
-    System.out.println("Ready to disable scale in protection of " + instancePrivateIp);
-    ManagedChannel channel = createChannel(bfEndpoint);
-    AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
-    adminBlockingStub.disableScaleInProtection(
-        DisableScaleInProtectionRequest.newBuilder().setInstanceName(instancePrivateIp).build());
-    System.out.println("Request for " + instancePrivateIp + " sent");
+  /** Prepare a worker for shutdown. */
+  @Command(name = "PrepareWorker", description = "Prepare a worker for shutdown")
+  static class PrepareWorker implements Callable<Integer> {
+    @Parameters(index = "0", description = "Worker IP with port (e.g., WorkerIp:port)")
+    private String workerIpWithPort;
+
+    @Override
+    public Integer call() {
+      System.out.println("Inform worker " + workerIpWithPort + " to prepare for shutdown!");
+      ManagedChannel channel = createChannel(workerIpWithPort);
+      WorkerControlGrpc.WorkerControlBlockingStub workerControlBlockingStub =
+          WorkerControlGrpc.newBlockingStub(channel);
+      workerControlBlockingStub.prepareWorkerForGracefulShutdown(
+          PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
+      System.out.println("Worker " + workerIpWithPort + " informed!");
+      return 0;
+    }
+  }
+
+  /** Disable scale-in protection. */
+  @Command(name = "DisableProtection", description = "Disable scale-in protection for an instance")
+  static class DisableProtection implements Callable<Integer> {
+    @Parameters(index = "0", description = "Instance private IP")
+    private String instancePrivateIp;
+
+    @Parameters(index = "1", description = "Buildfarm endpoint [scheme://]host:port")
+    private String bfEndpoint;
+
+    @Override
+    public Integer call() {
+      System.out.println("Ready to disable scale in protection of " + instancePrivateIp);
+      ManagedChannel channel = createChannel(bfEndpoint);
+      AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
+      adminBlockingStub.disableScaleInProtection(
+          DisableScaleInProtectionRequest.newBuilder().setInstanceName(instancePrivateIp).build());
+      System.out.println("Request for " + instancePrivateIp + " sent");
+      return 0;
+    }
   }
 
   public static void main(String[] args) {
-    switch (args[0]) {
-      case "ShutDown":
-        shutDownGracefully(args);
-        break;
-      case "PrepareWorker":
-        prepareWorkerForShutDown(args);
-        break;
-      case "DisableProtection":
-        disableScaleInProtection(args);
-        break;
-      default:
-        System.out.println(
-            "The action your choose is wrong. Please choose one from ShutDown, PrepareWorker, and"
-                + " DisableProtection");
-        break;
-    }
+    int exitCode = new CommandLine(new GracefulShutdown()).execute(args);
+    System.exit(exitCode);
   }
 }
