@@ -33,10 +33,46 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
 
-class Mount {
+/** Mount an REAPI directory via FUSE. */
+@Command(
+    name = "mount",
+    mixinStandardHelpOptions = true,
+    description = "Mount an REAPI directory specified by digest at a mount point")
+class Mount implements Callable<Integer> {
+
+  @Parameters(
+      index = "0",
+      description =
+          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
+              + " 'grpcs://', or omitted (default 'grpc://')")
+  private String host;
+
+  @Parameters(index = "1", description = "The instance name")
+  private String instanceName;
+
+  @Parameters(index = "2", description = "Root directory path where the mount will be created")
+  private String root;
+
+  @Parameters(index = "3", description = "Digest of the directory to mount")
+  private String digestStr;
+
+  @Parameters(index = "4", description = "Name of the mount point (subdirectory under root)")
+  private String name;
+
+  @Override
+  public Integer call() throws Exception {
+    Digest inputRoot = DigestUtil.parseDigest(digestStr);
+    mountDirectory(host, instanceName, root, inputRoot, name);
+    return 0;
+  }
+
   @SuppressWarnings("BusyWait")
-  public static void mount(
+  private static void mountDirectory(
       String host, String instanceName, String root, Digest inputRoot, String name)
       throws IOException, InterruptedException {
     ManagedChannel channel = createChannel(host);
@@ -87,18 +123,8 @@ class Mount {
     }
   }
 
-  public static void main(String[] args) throws Exception {
-    if (args.length != 5) {
-      System.err.println("Usage: bf-mount <endpoint> <instance-name> <root> <digest> <name>");
-      System.err.println("\nMount an REAPI directory specified by 'digest' at 'name' under 'root'");
-      System.exit(1);
-    }
-
-    String host = args[0];
-    String instanceName = args[1];
-    String root = args[2];
-    Digest inputRoot = DigestUtil.parseDigest(args[3]);
-    String name = args[4];
-    mount(host, instanceName, root, inputRoot, name);
+  public static void main(String[] args) {
+    int exitCode = new CommandLine(new Mount()).execute(args);
+    System.exit(exitCode);
   }
 }
