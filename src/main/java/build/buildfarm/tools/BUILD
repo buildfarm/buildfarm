@@ -76,6 +76,7 @@ java_binary(
         "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
