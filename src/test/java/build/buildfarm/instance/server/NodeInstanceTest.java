@@ -83,6 +83,8 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -694,7 +696,98 @@ public class NodeInstanceTest {
             eq(requestMetadata));
   }
 
-  @SuppressWarnings("unchecked")
+  @Test
+  public void createHeadersMapView_returnsEmptyMapForEmptyInput() {
+    // Arrange
+    Map<String, String> headers = new HashMap<>();
+    // Act
+    Map<String, String> globalHeaders = NodeInstance.calculateGlobalHeaders(headers);
+    Map<Integer, Map<String, String>> result =
+        NodeInstance.createHeadersMapView(headers, globalHeaders);
+    // Assert
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  public void createHeadersMapView_returnsGlobalHeadersForAllIndices() {
+    // Arrange
+    Map<String, String> headers =
+        Map.of(
+            "Authorization", "Bearer token",
+            "X-Custom-Header", "value");
+
+    // Act
+    Map<String, String> globalHeaders = NodeInstance.calculateGlobalHeaders(headers);
+    Map<Integer, Map<String, String>> result =
+        NodeInstance.createHeadersMapView(headers, globalHeaders);
+
+    // Assert
+    // Should contain an entry for any index with global headers
+    Map<String, String> anyIndexHeaders = result.getOrDefault(0, globalHeaders);
+    assertThat(anyIndexHeaders).isNotNull();
+    assertThat(anyIndexHeaders).containsEntry("Authorization", "Bearer token");
+    assertThat(anyIndexHeaders).containsEntry("X-Custom-Header", "value");
+    assertThat(anyIndexHeaders).hasSize(2);
+  }
+
+  @Test
+  public void createHeadersMapView_handlesIndexedHeaders() {
+    // Arrange
+    Map<String, String> headers =
+        Map.of(
+            "0:Authorization", "Bearer token0",
+            "1:Authorization", "Bearer token1",
+            "X-Global-Header", "global");
+
+    // Act
+    Map<String, String> globalHeaders = NodeInstance.calculateGlobalHeaders(headers);
+    Map<Integer, Map<String, String>> result =
+        NodeInstance.createHeadersMapView(headers, globalHeaders);
+
+    // Assert
+    // Check index 0 headers
+    Map<String, String> index0Headers = result.getOrDefault(0, globalHeaders);
+    assertThat(index0Headers).isNotNull();
+    assertThat(index0Headers).containsEntry("Authorization", "Bearer token0");
+    assertThat(index0Headers).containsEntry("X-Global-Header", "global");
+
+    // Check index 1 headers
+    Map<String, String> index1Headers = result.getOrDefault(1, globalHeaders);
+    assertThat(index1Headers).isNotNull();
+    assertThat(index1Headers).containsEntry("Authorization", "Bearer token1");
+    assertThat(index1Headers).containsEntry("X-Global-Header", "global");
+
+    // Verify no other indices were created
+    assertThat(result).hasSize(2);
+  }
+
+  @Test
+  public void createHeadersMapView_mergesGlobalAndIndexedHeaders() {
+    // Arrange
+    Map<String, String> headers =
+        Map.of(
+            "Authorization", "GlobalToken",
+            "0:Authorization", "Index0Token",
+            "X-Common-Header", "CommonValue");
+
+    // Act
+    Map<String, String> globalHeaders = NodeInstance.calculateGlobalHeaders(headers);
+    Map<Integer, Map<String, String>> result =
+        NodeInstance.createHeadersMapView(headers, globalHeaders);
+
+    // Assert
+    Map<String, String> index0Headers = result.getOrDefault(0, globalHeaders);
+    assertThat(index0Headers).isNotNull();
+    assertThat(index0Headers).containsEntry("Authorization", "Index0Token");
+    assertThat(index0Headers).containsEntry("X-Common-Header", "CommonValue");
+
+    // Check that another index would get the global Authorization
+    Map<String, String> index1Headers = result.getOrDefault(1, globalHeaders);
+    assertThat(index1Headers).isNotNull();
+    assertThat(index1Headers).containsEntry("Authorization", "GlobalToken");
+    assertThat(index1Headers).containsEntry("X-Common-Header", "CommonValue");
+  }
+
   @Test
   public void outputDirectoriesFilesAreEnsuredPresent() throws Exception {
     // our test subjects - these should appear in the findMissingBlobs request
