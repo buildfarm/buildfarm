@@ -23,3 +23,7 @@ repos:
   hooks:
   - id: buildifier
   - id: buildifier-lint
+- repo: https://github.com/korandoru/hawkeye
+  rev: v6.3.0
+  hooks:
+  - id: hawkeye-format
