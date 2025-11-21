@@ -35,6 +35,16 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 
+/**
+ * Monitors dispatched operations and requeues operations that have exceeded their dispatch timeout.
+ *
+ * <p>This monitor runs continuously in a background thread, periodically scanning all dispatched
+ * operations and requeuing any that have been dispatched longer than their configured timeout
+ * duration. This ensures that operations don't get stuck indefinitely on unresponsive workers.
+ *
+ * <p>The monitor uses a configurable interval to check operations and compares the current time
+ * against each operation's {@code requeueAt} timestamp to determine if requeuing is needed.
+ */
 @Log
 class DispatchedMonitor implements Runnable {
   private final BooleanSupplier shouldStop;
@@ -42,6 +52,14 @@ class DispatchedMonitor implements Runnable {
   private final BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
   private final int intervalSeconds;
 
+  /**
+   * Constructs a new DispatchedMonitor.
+   *
+   * @param shouldStop supplier that returns {@code true} when the monitor should stop running
+   * @param location scannable source of dispatched operations to monitor
+   * @param requeuer function that requeues a queue entry with a specified delay duration
+   * @param intervalSeconds number of seconds to wait between monitoring iterations
+   */
   DispatchedMonitor(
       BooleanSupplier shouldStop,
       Scannable<DispatchedOperation> location,
@@ -53,6 +71,16 @@ class DispatchedMonitor implements Runnable {
     this.intervalSeconds = intervalSeconds;
   }
 
+  /**
+   * Requeues a dispatched operation that has exceeded its dispatch timeout.
+   *
+   * <p>This method logs the overdue operation, initiates the requeue process with a 60-second
+   * delay, and adds a listener to track and log the requeue operation's completion time.
+   *
+   * @param o the dispatched operation to requeue
+   * @param now the current timestamp in milliseconds used for calculating overdue duration
+   * @return a listenable future that completes when the requeue operation finishes
+   */
   private ListenableFuture<Void> requeueDispatchedExecution(DispatchedOperation o, long now) {
     QueueEntry queueEntry = o.getQueueEntry();
     String operationName = queueEntry.getExecuteEntry().getOperationName();
@@ -71,6 +99,15 @@ class DispatchedMonitor implements Runnable {
     return requeuedFuture;
   }
 
+  /**
+   * Logs information about an overdue dispatched operation.
+   *
+   * <p>Creates a diagnostic log message indicating how long the operation has been overdue and the
+   * timestamp comparison that triggered the requeue decision.
+   *
+   * @param o the overdue dispatched operation
+   * @param now the current timestamp in milliseconds
+   */
   private void logOverdueOperation(DispatchedOperation o, long now) {
     // log that the dispatched operation is overdue in order to indicate that it should be requeued.
     String operationName = o.getQueueEntry().getExecuteEntry().getOperationName();
@@ -82,6 +119,16 @@ class DispatchedMonitor implements Runnable {
     log.log(Level.INFO, message);
   }
 
+  /**
+   * Tests whether a dispatched operation should be requeued based on its timeout.
+   *
+   * <p>If the current time has reached or exceeded the operation's requeue timestamp, this method
+   * initiates a requeue and passes the resulting future to the provided consumer.
+   *
+   * @param now the current timestamp in milliseconds
+   * @param dispatchedOperation the dispatched operation to test
+   * @param onFuture consumer that receives the requeue future if the operation is overdue
+   */
   private void testDispatchedOperation(
       long now,
       DispatchedOperation dispatchedOperation,
@@ -92,6 +139,20 @@ class DispatchedMonitor implements Runnable {
     }
   }
 
+  /**
+   * Scans all dispatched operations and submits overdue operations for requeuing.
+   *
+   * <p>This method iterates through all dispatched operations in pages of 100, testing each one to
+   * determine if it should be requeued. All requeue futures are collected and returned as a single
+   * future that completes successfully even if individual requeue operations fail.
+   *
+   * <p>The scan continues until all operations have been processed or the monitor is signaled to
+   * stop. Any exceptions during scanning are logged unless the monitor is stopping.
+   *
+   * @return a future that completes when all requeue operations have finished, containing a list of
+   *     results (successful operations return null, failed operations return null due to
+   *     successfulAsList behavior)
+   */
   private ListenableFuture<List<Void>> submitAll() {
     ImmutableList.Builder<ListenableFuture<Void>> requeuedFutures = ImmutableList.builder();
     try {
@@ -113,6 +174,20 @@ class DispatchedMonitor implements Runnable {
     return successfulAsList(requeuedFutures.build());
   }
 
+  /**
+   * Waits for a future to complete, allowing interruption but handling execution exceptions.
+   *
+   * <p>This method blocks until the future completes. If an execution exception occurs (which is
+   * unlikely when using successfulAsList), it extracts and rethrows the cause as a runtime
+   * exception.
+   *
+   * @param <T> the type of the future's result
+   * @param future the future to wait for
+   * @return the result of the future once it completes
+   * @throws InterruptedException if the thread is interrupted while waiting
+   * @throws RuntimeException if the future completes with a runtime exception
+   * @throws UncheckedExecutionException if the future completes with a checked exception
+   */
   static <T> T getOnlyInterruptibly(ListenableFuture<T> future) throws InterruptedException {
     try {
       return future.get();
@@ -127,10 +202,27 @@ class DispatchedMonitor implements Runnable {
     }
   }
 
+  /**
+   * Performs a single iteration of the monitoring cycle.
+   *
+   * <p>This method scans all dispatched operations and waits for all requeue operations to complete
+   * before returning.
+   *
+   * @throws InterruptedException if the thread is interrupted while waiting for requeue operations
+   */
   void iterate() throws InterruptedException {
     getOnlyInterruptibly(submitAll());
   }
 
+  /**
+   * Runs the monitor loop until stopped or interrupted.
+   *
+   * <p>This method repeatedly sleeps for the configured interval and then performs a monitoring
+   * iteration. It continues until the shouldStop supplier returns true or the thread is
+   * interrupted.
+   *
+   * @throws InterruptedException if the thread is interrupted during sleep or iteration
+   */
   private void runInterruptibly() throws InterruptedException {
     while (!shouldStop.getAsBoolean()) {
       if (Thread.currentThread().isInterrupted()) {
@@ -141,6 +233,16 @@ class DispatchedMonitor implements Runnable {
     }
   }
 
+  /**
+   * Executes the monitoring loop when the monitor is started as a thread.
+   *
+   * <p>This method is synchronized to ensure only one monitoring thread can run at a time. It logs
+   * the start and exit of the monitor, and properly handles interruption by restoring the interrupt
+   * status when exiting.
+   *
+   * <p>The monitor will continue running until interrupted or signaled to stop via the shouldStop
+   * supplier.
+   */
   @Override
   public synchronized void run() {
     log.log(Level.INFO, "DispatchedMonitor: Running");
