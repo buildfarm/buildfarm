@@ -45,7 +45,6 @@ server:
     deploymentEnvironment: AWS
     clusterEndpoint: grpc://localhost
   metrics:
-    publisher: LOG
     logLevel: FINEST
     topic: test
     topicMaxConnections: 1000
