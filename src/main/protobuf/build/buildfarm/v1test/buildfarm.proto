@@ -462,7 +462,7 @@ message BackplaneStatus {
 
 
   reserved 5 to 8; // cas_lookup_size, action_cache_size, blocked_actions_size, blocked_invocations_size
-  reserved 10; // dispatched_size
+  reserved 10; // fetch_time_ms
 }
 
 message QueuedOperationMetadata {
