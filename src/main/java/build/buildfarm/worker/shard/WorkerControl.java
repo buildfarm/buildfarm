@@ -33,10 +33,9 @@ public class WorkerControl extends WorkerControlGrpc.WorkerControlImplBase {
   /**
    * Start point of worker graceful shutdown.
    *
-   * @param request
-   * @param responseObserver
+   * @param request Request to prepare worker for graceful shutdown
+   * @param responseObserver Response observer for the request
    */
-  @SuppressWarnings({"JavaDoc", "ConstantConditions"})
   @Override
   public void prepareWorkerForGracefulShutdown(
       PrepareWorkerForGracefulShutDownRequest request,
@@ -50,6 +49,12 @@ public class WorkerControl extends WorkerControlGrpc.WorkerControlImplBase {
     }
   }
 
+  /**
+   * Pipeline change request handler.
+   *
+   * @param request Request to change worker pipeline
+   * @param responseObserver Response observer for the request
+   */
   @Override
   public void pipelineChange(
       WorkerPipelineChangeRequest request,
