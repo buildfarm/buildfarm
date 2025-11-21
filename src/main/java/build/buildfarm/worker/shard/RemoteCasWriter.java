@@ -21,6 +21,7 @@ import static java.util.concurrent.TimeUnit.DAYS;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.RetryException;
@@ -148,7 +149,7 @@ public class RemoteCasWriter implements CasWriter {
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
       throws IOException {
     SettableFuture<Long> writtenFuture = SettableFuture.create();
-    int chunkSizeBytes = 128 * 1024;
+    int chunkSizeBytes = (int) Size.kbToBytes(128);
 
     // The following callback is performed each time the write stream is ready.
     // For each callback we only transfer a small part of the input stream in order to avoid
