@@ -182,7 +182,7 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public void blacklistAction(String actionId) {
+  public void blocklistAction(String actionId) {
     throw new UnsupportedOperationException();
   }
 

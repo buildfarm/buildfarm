@@ -3365,7 +3365,7 @@ public class ServerInstance extends NodeInstance {
     if (!useDenyList) {
       return false;
     }
-    return backplane.isBlacklisted(requestMetadata);
+    return backplane.isBlocklisted(requestMetadata);
   }
 
   @Override

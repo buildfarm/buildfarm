@@ -420,24 +420,24 @@ public class RedisShardBackplaneTest {
   }
 
   @Test
-  public void invocationsCanBeBlacklisted() throws IOException {
+  public void invocationsCanBeBlocklisted() throws IOException {
     UUID toolInvocationId = UUID.randomUUID();
     UnifiedJedis jedis = mock(UnifiedJedis.class);
-    String invocationBlacklistKey =
-        configs.getBackplane().getInvocationBlacklistPrefix() + ":" + toolInvocationId;
-    when(jedis.exists(invocationBlacklistKey)).thenReturn(true);
+    String invocationBlocklistKey =
+        configs.getBackplane().getInvocationBlocklistPrefix() + ":" + toolInvocationId;
+    when(jedis.exists(invocationBlocklistKey)).thenReturn(true);
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
-    RedisShardBackplane backplane = createBackplane("invocation-blacklist-test");
+    RedisShardBackplane backplane = createBackplane("invocation-blocklist-test");
     backplane.start("startTime/test:0000", name -> {});
     assertThat(
-            backplane.isBlacklisted(
+            backplane.isBlocklisted(
                 RequestMetadata.newBuilder()
                     .setToolInvocationId(toolInvocationId.toString())
                     .build()))
         .isTrue();
 
     verify(mockJedisClusterFactory, times(1)).get();
-    verify(jedis, times(1)).exists(invocationBlacklistKey);
+    verify(jedis, times(1)).exists(invocationBlocklistKey);
   }
 
   @Test

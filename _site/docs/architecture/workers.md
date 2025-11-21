@@ -53,7 +53,7 @@ Execution is a superscalar stage which initiates operation executions, applying 
 
 ### Report Result
 
-The Report Result stage injects any outputs from the operation into the CAS, and populates the ActionResult from from the results of the execution. It can inject into the ActionCache for cacheable actions, and can record an action in the blacklist if it violates output policy. The operation transitions to COMPLETED state after the outputs are recorded. After this stage is complete, the execution directory is destroyed, and the Operation exits the worker.
+The Report Result stage injects any outputs from the operation into the CAS, and populates the ActionResult from from the results of the execution. It can inject into the ActionCache for cacheable actions, and can record an action in the blocklist if it violates output policy. The operation transitions to COMPLETED state after the outputs are recorded. After this stage is complete, the execution directory is destroyed, and the Operation exits the worker.
 
 # Exec Filesystem
 

@@ -151,7 +151,7 @@ public interface Backplane {
    * Identify an action that should not be executed, and respond to all requests it matches with
    * failover-compatible responses.
    */
-  void blacklistAction(String actionId) throws IOException;
+  void blocklistAction(String actionId) throws IOException;
 
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the digest of the action
@@ -311,8 +311,8 @@ public interface Backplane {
 
   void queue(QueueEntry queueEntry, Operation operation) throws IOException;
 
-  /** Test for whether a request is blacklisted */
-  boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException;
+  /** Test for whether a request is blocklisted */
+  boolean isBlocklisted(RequestMetadata requestMetadata) throws IOException;
 
   /** Test for whether an operation may be queued */
   boolean canQueue() throws IOException;
