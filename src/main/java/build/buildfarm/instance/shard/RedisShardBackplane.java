@@ -935,11 +935,11 @@ public class RedisShardBackplane implements Backplane {
   // we do this by action hash only, so that we can use RequestMetadata to filter
   @SuppressWarnings("ConstantConditions")
   @Override
-  public void blacklistAction(String actionId) throws IOException {
+  public void blocklistAction(String actionId) throws IOException {
     client.run(
         jedis ->
             state.blockedActions.insert(
-                jedis, actionId, "", configs.getBackplane().getActionBlacklistExpire()));
+                jedis, actionId, "", configs.getBackplane().getActionBlocklistExpire()));
   }
 
   private String printActionResult(ActionResult actionResult)
@@ -1331,7 +1331,7 @@ public class RedisShardBackplane implements Backplane {
     String dispatchedEntryJson = printPollOperation(queueEntry, 0);
     client.run(
         jedis -> {
-          if (isBlacklisted(jedis, queueEntry.getExecuteEntry().getRequestMetadata())) {
+          if (isBlocklisted(jedis, queueEntry.getExecuteEntry().getRequestMetadata())) {
             pollExecution(
                 jedis, executionName, dispatchedEntryJson); // complete our lease to error operation
           } else {
@@ -1491,15 +1491,15 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException {
+  public boolean isBlocklisted(RequestMetadata requestMetadata) throws IOException {
     if (requestMetadata.getToolInvocationId().isEmpty()
         && requestMetadata.getActionId().isEmpty()) {
       return false;
     }
-    return client.call(jedis -> isBlacklisted(jedis, requestMetadata));
+    return client.call(jedis -> isBlocklisted(jedis, requestMetadata));
   }
 
-  private boolean isBlacklisted(UnifiedJedis jedis, RequestMetadata requestMetadata) {
+  private boolean isBlocklisted(UnifiedJedis jedis, RequestMetadata requestMetadata) {
     boolean isActionBlocked =
         (!requestMetadata.getActionId().isEmpty()
             && state.blockedActions.exists(jedis, requestMetadata.getActionId()));

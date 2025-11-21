@@ -43,8 +43,8 @@ public class DistributedStateCreator {
     state.actionCache = createActionCache();
     state.prequeue = createPrequeue(jedis);
     state.executionQueue = createExecutionQueue(jedis);
-    state.blockedActions = new RedisMap(configs.getBackplane().getActionBlacklistPrefix());
-    state.blockedInvocations = new RedisMap(configs.getBackplane().getInvocationBlacklistPrefix());
+    state.blockedActions = new RedisMap(configs.getBackplane().getActionBlocklistPrefix());
+    state.blockedInvocations = new RedisMap(configs.getBackplane().getInvocationBlocklistPrefix());
     state.toolInvocations =
         new RedisSetMap(
             configs.getBackplane().getToolInvocationsPrefix(),

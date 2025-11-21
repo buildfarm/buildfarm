@@ -120,7 +120,7 @@ public interface WorkerContext {
 
   boolean putOperation(Operation operation) throws IOException, InterruptedException;
 
-  void blacklistAction(String actionId) throws IOException, InterruptedException;
+  void blocklistAction(String actionId) throws IOException, InterruptedException;
 
   void putActionResult(ActionKey actionKey, ActionResult actionResult)
       throws IOException, InterruptedException;
