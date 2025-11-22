@@ -808,11 +808,11 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public void blacklistAction(String actionId) throws IOException, InterruptedException {
+  public void blocklistAction(String actionId) throws IOException, InterruptedException {
     createBackplaneRetrier()
         .execute(
             () -> {
-              backplane.blacklistAction(actionId);
+              backplane.blocklistAction(actionId);
               return null;
             });
   }

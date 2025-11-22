@@ -61,7 +61,7 @@ public class RedisHashMapTest {
   @Test
   public void redisPriorityQueueConstructsWithoutError() throws Exception {
     // ACT
-    new RedisHashMap("test");
+    new RedisHashMap<>("test", new IdentityTranslator());
   }
 
   // Function under test: insert & keys
@@ -70,7 +70,7 @@ public class RedisHashMapTest {
   @Test
   public void redisInsertAndGetKeys() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
 
     // ACT
     map.insert(redis, "key1", "value1");
@@ -93,7 +93,7 @@ public class RedisHashMapTest {
   @Test
   public void redisInsertAndAsMap() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
 
     // ACT
     map.insert(redis, "key1", "value1");
@@ -116,7 +116,7 @@ public class RedisHashMapTest {
   @Test
   public void redisElementRemoved() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
 
     // ACT
     map.insert(redis, "key1", "value1");
@@ -140,7 +140,7 @@ public class RedisHashMapTest {
   @Test
   public void redisInsertWasMissing() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
 
     // ACT
     boolean wasAdded = map.insertIfMissing(redis, "key1", "value1");
@@ -160,7 +160,7 @@ public class RedisHashMapTest {
   @Test
   public void redisInsertWasNotMissing() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
 
     // ACT
     map.insertIfMissing(redis, "key1", "value1");
@@ -181,7 +181,7 @@ public class RedisHashMapTest {
   @Test
   public void redisExistFails() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
 
     // ACT
     boolean exists = map.exists(redis, "key");
@@ -196,7 +196,7 @@ public class RedisHashMapTest {
   @Test
   public void redisExistSucceeds() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
     map.insert(redis, "key", "value");
 
     // ACT
@@ -212,7 +212,7 @@ public class RedisHashMapTest {
   @Test
   public void redisSizeGrowth() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
 
     // ACT
     map.insert(redis, "key1", "value1");
@@ -239,7 +239,7 @@ public class RedisHashMapTest {
   @Test
   public void redisRemoveAll() throws Exception {
     // ARRANGE
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
     Map<String, String> expected = new HashMap<>();
     expected.put("key1", "value1");
     expected.put("key4", "value4");
@@ -259,7 +259,7 @@ public class RedisHashMapTest {
 
   @Test
   public void redisMget() {
-    RedisHashMap map = new RedisHashMap("test");
+    RedisHashMap<String> map = new RedisHashMap<>("test", new IdentityTranslator());
     map.insert(redis, "key1", "value1");
     map.insert(redis, "key2", "value2");
     map.insert(redis, "key3", "value3");
