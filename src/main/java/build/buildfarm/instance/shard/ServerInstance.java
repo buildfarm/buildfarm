@@ -93,7 +93,7 @@ import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.server.Filter;
 import build.buildfarm.instance.server.NodeInstance;
-import build.buildfarm.instance.shard.codec.json.JsonCodec;
+import build.buildfarm.instance.shard.codec.ShardCodec;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
@@ -304,7 +304,7 @@ public class ServerInstance extends NodeInstance {
           /* subscribeToBackplane= */ true,
           configs.getServer().isRunFailsafeOperation(),
           ServerInstance::stripExecution,
-          JsonCodec.CODEC);
+          ShardCodec.DEFAULT_CODEC);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }
