@@ -40,6 +40,7 @@ java_test(
     name = "RedisShardBackplaneTest",
     size = "small",
     srcs = [
+        "ExecutionsTest.java",
         "RedisShardBackplaneTest.java",
         "UnobservableWatcher.java",
     ],

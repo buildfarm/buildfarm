@@ -87,6 +87,11 @@ public class Executions {
     return executions.get(jedis, name);
   }
 
+  private Iterable<Map.Entry<String, Operation>> getOrName(
+      UnifiedJedis jedis, Iterable<String> names) {
+    return executions.get(jedis, names, key -> Operation.newBuilder().setName(key).build());
+  }
+
   /**
    * @brief Get the executions by executionNames.
    * @details If the execution does not exist, null is returned.
@@ -97,14 +102,13 @@ public class Executions {
    * @note Suggested return identifier: operations.
    */
   public Iterable<Operation> get(UnifiedJedis jedis, Iterable<String> names) {
-    return transform(executions.get(jedis, names), Map.Entry::getValue);
+    return transform(getOrName(jedis, names), Map.Entry::getValue);
   }
 
   private ScanResult<Operation> parseScanResult(UnifiedJedis jedis, ScanResult<String> scanResult) {
     return new ScanResult<>(
         scanResult.getCursor(),
-        newArrayList(
-            transform(executions.get(jedis, scanResult.getResult()), Map.Entry::getValue)));
+        newArrayList(transform(getOrName(jedis, scanResult.getResult()), Map.Entry::getValue)));
   }
 
   public ScanResult<Operation> scan(UnifiedJedis jedis, String cursor, int count) {
