@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.StreamSupport;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Connection;
@@ -202,7 +203,8 @@ public class RedisMap<T> {
    * @note Overloaded.
    * @note Suggested return identifier: values.
    */
-  public Iterable<Map.Entry<String, T>> get(UnifiedJedis jedis, Iterable<String> keys) {
+  public Iterable<Map.Entry<String, T>> get(
+      UnifiedJedis jedis, Iterable<String> keys, Function<String, T> onNull) {
     // Fetch items via pipeline
     try (AbstractPipeline p = jedis.pipelined()) {
       List<Map.Entry<String, Response<String>>> values = new ArrayList<>();
@@ -213,8 +215,11 @@ public class RedisMap<T> {
 
       List<Map.Entry<String, T>> resolved = new ArrayList<>();
       for (Map.Entry<String, Response<String>> val : values) {
-        resolved.add(
-            new AbstractMap.SimpleEntry<>(val.getKey(), translator.parse(val.getValue().get())));
+        T t = translator.parse(val.getValue().get());
+        if (t == null) {
+          t = onNull.apply(val.getKey());
+        }
+        resolved.add(new AbstractMap.SimpleEntry<>(val.getKey(), t));
       }
       return resolved;
     }
