@@ -16,9 +16,11 @@ package build.buildfarm.instance.shard.codec;
 
 import build.buildfarm.common.redis.Codec;
 import build.buildfarm.instance.shard.codec.b64.B64Codec;
+import build.buildfarm.instance.shard.codec.failover.FailoverCodec;
+import build.buildfarm.instance.shard.codec.json.JsonCodec;
 
 public final class ShardCodec {
-  public static final Codec DEFAULT_CODEC = B64Codec.CODEC;
+  public static final Codec DEFAULT_CODEC = FailoverCodec.create(B64Codec.CODEC, JsonCodec.CODEC);
 
   private ShardCodec() {}
 }
