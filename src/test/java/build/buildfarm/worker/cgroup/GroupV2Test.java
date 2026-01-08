@@ -33,7 +33,7 @@ import org.junit.runners.JUnit4;
 public class GroupV2Test {
   @Before
   public void setup() {
-    Group.VERSION = CGroupVersion.CGROUPS_V2;
+    Group.setVersionForTesting(CGroupVersion.CGROUPS_V2);
     Assume.assumeFalse(isWindows());
   }
 

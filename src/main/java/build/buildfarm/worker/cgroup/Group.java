@@ -88,15 +88,31 @@ public final class Group {
   @Getter private final Cpu cpu;
   @Getter private final Mem mem;
 
-  @SuppressWarnings(
-      "PMD.MutableStaticState") // Unit tests set this. When CGroups v1 support is gone, this will
-  // go away, too.
-  public static CGroupVersion VERSION;
+  private static CGroupVersion VERSION;
 
   static {
     // Must be done in order
     VERSION = new CGroupVersionProvider().get();
     rootPath = getSelfCgroup(VERSION);
+  }
+
+  /**
+   * Get the CGroup version.
+   *
+   * @return CGroup version
+   */
+  public static CGroupVersion getVersion() {
+    return VERSION;
+  }
+
+  /**
+   * Set the CGroup version for testing purposes only.
+   *
+   * @param version CGroup version to set
+   */
+  @VisibleForTesting
+  static void setVersionForTesting(CGroupVersion version) {
+    VERSION = version;
   }
 
   /**
