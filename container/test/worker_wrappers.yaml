@@ -1,7 +1,7 @@
 schemaVersion: 2.0.0
 # These align with the default paths in //src/main/java/build/buildfarm/common/config/ExecutionWrappers.java
 fileExistenceTests:
-- name: cgroups cgexec
+- name: cgroups cexec
     # This is installed by the OS package manager.
   path: /usr/bin/cgexec
   shouldExist: true

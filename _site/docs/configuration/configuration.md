@@ -388,31 +388,13 @@ worker:
     alwaysUseAsNobody: false
     alwaysUseCgroups: true
     alwaysUseTmpFs: true
-    tmpFsPaths: ["/tmp", "/dev/shm"]
-    selectForBlockNetwork: true
-    selectForTmpFs: true
+    additionalWritePaths: []
+    tmpFsPaths: []
+    selectForBlockNetwork: false
+    selectForTmpFs: false
 ```
 
-Note: In order for these settings to take effect, you must also configure `limitGlobalExecution: true`. In addition, if using nobody user, the as-nobody wrapper must be prioritized, making your worker configs as follows:
-
-```yaml
-worker:
-  execOwner: nobody
-  limitGlobalExecution: true
-  executionPolicies:
-    - prioritized: true
-      executionWrapper:
-        path: "/app/build_buildfarm/as-nobody"
-        arguments:
-  sandboxSettings:
-    alwaysUseSandbox: true
-    alwaysUseAsNobody: false
-    alwaysUseCgroups: true
-    alwaysUseTmpFs: true
-    tmpFsPaths: ["/tmp", "/dev/shm"]
-    selectForBlockNetwork: true
-    selectForTmpFs: true
-```
+Note: In order for these settings to take effect, you must also configure `limitGlobalExecution: true`.
 
 ### Dequeue Match
 

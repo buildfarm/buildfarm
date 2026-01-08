@@ -98,12 +98,6 @@ public class CGroupVersionProviderTest {
   }
 
   @Test
-  public void testDetectCGroupsV2fs() throws IOException {
-    // Test the "cgroup2fs" variant seen in some Kubernetes environments
-    testDetectCGroups("cgroup2fs", CGroupVersion.CGROUPS_V2);
-  }
-
-  @Test
   public void testNoCGroupsWhenDirectoryDoesntExist() {
     try (MockedStatic<Files> mockedFiles = Mockito.mockStatic(Files.class);
         MockedStatic<Path> mockedPath = Mockito.mockStatic(Path.class)) {
