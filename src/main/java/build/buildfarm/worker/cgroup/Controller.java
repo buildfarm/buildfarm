@@ -21,7 +21,6 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 
@@ -37,11 +36,7 @@ abstract class Controller implements IOResource {
   public abstract String getControllerName();
 
   protected final Path getPath() {
-    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
-      return group.getPath();
-    } else {
-      return group.getPath(getControllerName());
-    }
+    return group.getPath();
   }
 
   protected final void open() throws IOException {
@@ -80,7 +75,7 @@ abstract class Controller implements IOResource {
   @Override
   public boolean isReferenced() {
     try {
-      return !group.isEmpty(getControllerName());
+      return !group.isEmpty();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -88,7 +83,7 @@ abstract class Controller implements IOResource {
 
   private void setOwner(String propertyName, UserPrincipal owner) throws IOException {
     Path path = getPath().resolve(propertyName);
-    if (Files.exists(path)) { // cgroups v1 protector
+    if (Files.exists(path)) {
       Files.setOwner(path, owner);
     }
   }
@@ -97,12 +92,6 @@ abstract class Controller implements IOResource {
     // an execution owner must be able to join a cgroup through group task/proc ownership
     open();
     setOwner("cgroup.procs", owner);
-    // TODO: this is a cgroups v1 thing
-    try {
-      setOwner("tasks", owner);
-    } catch (NoSuchFileException nsfe) {
-      /* swallowed */
-    }
   }
 
   protected void writeInt(String propertyName, int value) throws IOException {
