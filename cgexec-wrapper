@@ -3,7 +3,7 @@
 set -e
 # This is a drop-in replacement for cgexec, with the following differences:
 #
-# - It will put child processes in a cgroup relative to THIS cgroup's parent.
+# - It will put child processes in a cgroup relative to THIS process's cgroup.
 
 # Required arguments:
 # -g <controllers>:<CgroupName>
@@ -43,21 +43,31 @@ fi
 # - the cgroup Path. This is the only part we care about.
 cgroupNameRelativePath="$(cut -d':' -f3- < /proc/self/cgroup)"
 
-# This diverges from `cgexec` where we place ourselves in a group relative to parent.
+# Buildfarm's Java worker evacuates itself to an "evacuation" subdirectory during
+# initialization for cgroupsv2. The execution cgroups are created relative to the
+# ORIGINAL container cgroup (the parent of "evacuation"), not the evacuation cgroup itself.
+# If we're in an evacuation cgroup, use its parent as the base.
+if [[ "$cgroupNameRelativePath" == */evacuation ]]; then
+    cgroupBasePath=$(dirname "$cgroupNameRelativePath")
+else
+    cgroupBasePath="$cgroupNameRelativePath"
+fi
+
+# This diverges from `cgexec` where we place ourselves in a group relative to the base cgroup.
 # Example:
 # cgroupName = `executions/operations/29aec796-ad19-4e6b-a83b-b8b9f55d0abb`
-# This process starts in the ${cgroupNameRelativePath} cgroup:
-#   ├─${baseCgroup}
-#   │ ├─${cgroupNameRelativePath}
-#   │ │ ├─123456 /tini -- java -jar /app/build_buildfarm/buildfarm-shard-worker_deploy.jar
-#   │ │ └─123457 java -jar /app/build_buildfarm/buildfarm-shard-worker_deploy.jar
-#   │ └─executions
-#   │   └─operations
-#   │     └─29aec796-ad19-4e6b-a83b-b8b9f55d0abb
-#   │        └─123458 ${@}
-baseCgroup=$(dirname "${cgroupNameRelativePath}")
-# Bouncing my own PID $$ into /sys/fs/cgroup${baseCgroup}/$cgroupName"
-echo $$ > "/sys/fs/cgroup${baseCgroup}/$cgroupName/cgroup.procs"
+# Worker process is in the "evacuation" subdirectory:
+#   ${cgroupBasePath} (e.g. /kubepods/pod-xxx/container-yyy)
+#   ├─ evacuation/
+#   │  ├─ 123456 /tini -- java -jar /app/build_buildfarm/buildfarm-shard-worker_deploy.jar
+#   │  └─ 123457 java -jar /app/build_buildfarm/buildfarm-shard-worker_deploy.jar
+#   └─ executions/
+#      └─ operations/
+#         └─ 29aec796-ad19-4e6b-a83b-b8b9f55d0abb/
+#            └─ 123458 ${@}
+
+# Bouncing my own PID $$ into /sys/fs/cgroup${cgroupBasePath}/$cgroupName/cgroup.procs
+echo $$ > "/sys/fs/cgroup${cgroupBasePath}/$cgroupName/cgroup.procs"
 
 # Exec the rest of the arguments as-is
 exec "$@"
