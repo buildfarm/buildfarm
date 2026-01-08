@@ -170,7 +170,6 @@ worker:
   persistentWorkerActionMnemonicAllowlist:
   - '*'
 executionWrappers:
-  cgroups1: /usr/bin/cgexec
   cgroups2: /app/build_buildfarm/cgexec-wrapper
   unshare: /usr/bin/unshare
   linuxSandbox: /app/build_buildfarm/linux-sandbox

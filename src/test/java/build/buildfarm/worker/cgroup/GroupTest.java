@@ -89,15 +89,6 @@ public class GroupTest {
   }
 
   @Test
-  public void testGetSelfCgroupV1() throws IOException {
-    // Act: Call the test implementation with cgroups v1
-    Path result = testGetSelfCgroup(CGroupVersion.CGROUPS_V1, null);
-
-    // Assert: For v1, it should always return /sys/fs/cgroup regardless of file content
-    assertThat(result.toString()).isEqualTo("/sys/fs/cgroup");
-  }
-
-  @Test
   public void testGetSelfCgroupV2WithMultipleLines() throws IOException {
     // Arrange: Setup cgroups v2 content with multiple lines (realistic content)
     List<String> cgroupV2Content =
