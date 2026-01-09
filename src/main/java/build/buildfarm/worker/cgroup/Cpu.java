@@ -30,12 +30,6 @@ public class Cpu extends Controller {
     return "cpu";
   }
 
-  @Deprecated(forRemoval = true)
-  public int getShares() throws IOException {
-    open();
-    return readLong("cpu.shares");
-  }
-
   /**
    * Represents how much CPU shares are allocated.
    *
@@ -49,16 +43,10 @@ public class Cpu extends Controller {
     if (shares > 0) {
       open();
       // If you really have a 1000-core machine, please patch this =)
-      checkArgument(
-          shares < 1000,
-          "for cgroups v1 and v2 compatibility, the argument is now the cpu cores to allocate.");
-      if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
-        // cpu.weight in the range [1,10_000]
-        // the default is 100, so we want to set something every time.
-        writeInt("cpu.weight", shares);
-      } else if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
-        writeInt("cpu.shares", shares * 1024);
-      }
+      checkArgument(shares < 1000, "shares must be less than 1000");
+      // cpu.weight in the range [1,10_000]
+      // the default is 100, so we want to set something every time.
+      writeInt("cpu.weight", shares);
     }
   }
 
@@ -69,18 +57,6 @@ public class Cpu extends Controller {
    */
   public void setMaxCpu(int cpuCores) throws IOException {
     open();
-    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
-      writeIntPair("cpu.max", cpuCores * CPU_GRANULARITY, CPU_GRANULARITY);
-    } else if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
-      setCFSPeriodAndQuota(CPU_GRANULARITY, cpuCores * CPU_GRANULARITY);
-    }
-  }
-
-  // CGroups v1
-  @Deprecated(forRemoval = true)
-  private void setCFSPeriodAndQuota(int periodMicroseconds, int quotaMicroseconds)
-      throws IOException {
-    writeInt("cpu.cfs_period_us", periodMicroseconds);
-    writeInt("cpu.cfs_quota_us", quotaMicroseconds);
+    writeIntPair("cpu.max", cpuCores * CPU_GRANULARITY, CPU_GRANULARITY);
   }
 }
