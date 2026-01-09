@@ -91,7 +91,13 @@ abstract class Controller implements IOResource {
   public void setOwner(UserPrincipal owner) throws IOException {
     // an execution owner must be able to join a cgroup through group task/proc ownership
     open();
-    setOwner("cgroup.procs", owner);
+    // For cgroups v2, we do NOT set ownership of cgroup.procs because:
+    // 1. cgexec-wrapper joins the cgroup while still running as root (before privilege drop)
+    // 2. Setting ownership to a non-root user prevents root from writing due to cgroupv2 delegation
+    // For cgroups v1, we still need to set ownership so the action process can join
+    if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
+      setOwner("cgroup.procs", owner);
+    }
   }
 
   protected void writeInt(String propertyName, int value) throws IOException {
