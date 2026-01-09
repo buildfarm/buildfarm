@@ -27,9 +27,9 @@ public class Backplane {
   private String workerChannel = "WorkerChannel";
   private String actionCachePrefix = "ActionCache";
   private int actionCacheExpire = 2419200; // 4 Weeks
-  private String actionBlacklistPrefix = "ActionBlacklist";
-  private int actionBlacklistExpire = 3600; // 1 Hour;
-  private String invocationBlacklistPrefix = "InvocationBlacklist";
+  private String actionBlocklistPrefix = "ActionBlocklist";
+  private int actionBlocklistExpire = 3600; // 1 Hour;
+  private String invocationBlocklistPrefix = "InvocationBlocklist";
   private String operationPrefix = "Operation";
   private String actionsPrefix = "Action";
   private int operationExpire = 604800; // 1 Week

@@ -40,6 +40,7 @@ java_test(
     name = "RedisShardBackplaneTest",
     size = "small",
     srcs = [
+        "ExecutionsTest.java",
         "RedisShardBackplaneTest.java",
         "UnobservableWatcher.java",
     ],
@@ -88,6 +89,7 @@ java_test(
         "//src/main/java/build/buildfarm/backplane",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
+        "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/server",
         "//src/main/java/build/buildfarm/instance/shard",

@@ -20,6 +20,7 @@ import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;
+import com.google.protobuf.Message;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,7 @@ import java.util.Set;
  *     distribute operations by their properties and allows workers to dequeue from particular
  *     queues.
  */
-public class ProvisionedRedisQueue {
+public class ProvisionedRedisQueue<E extends Message> {
   /**
    * @field WILDCARD_VALUE
    * @brief Wildcard value.
@@ -123,7 +124,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name,
-      QueueDecorator queueDecorator,
+      QueueDecorator<E> queueDecorator,
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions) {
     this(name, queueDecorator, hashtags, filterProvisions, false);
@@ -142,7 +143,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name,
-      QueueDecorator queueDecorator,
+      QueueDecorator<E> queueDecorator,
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {
@@ -220,7 +221,7 @@ public class ProvisionedRedisQueue {
    * @return The internal queue.
    * @note Suggested return identifier: queue.
    */
-  public BalancedRedisQueue queue() {
+  public BalancedRedisQueue<E> queue() {
     return queue;
   }
 

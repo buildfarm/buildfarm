@@ -48,6 +48,7 @@ import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toComple
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
 import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.CacheCapabilities;
@@ -92,6 +93,7 @@ import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.server.Filter;
 import build.buildfarm.instance.server.NodeInstance;
+import build.buildfarm.instance.shard.codec.json.JsonCodec;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
@@ -304,7 +306,8 @@ public class ServerInstance extends NodeInstance {
           identifier,
           /* subscribeToBackplane= */ true,
           configs.getServer().isRunFailsafeOperation(),
-          ServerInstance::stripExecution);
+          ServerInstance::stripExecution,
+          JsonCodec.CODEC);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }
@@ -3364,7 +3367,7 @@ public class ServerInstance extends NodeInstance {
     if (!useDenyList) {
       return false;
     }
-    return backplane.isBlacklisted(requestMetadata);
+    return backplane.isBlocklisted(requestMetadata);
   }
 
   @Override
@@ -3374,6 +3377,9 @@ public class ServerInstance extends NodeInstance {
             ? SymlinkAbsolutePathStrategy.Value.ALLOWED
             : SymlinkAbsolutePathStrategy.Value.DISALLOWED;
     return super.getCacheCapabilities().toBuilder()
+        .setActionCacheUpdateCapabilities(
+            ActionCacheUpdateCapabilities.newBuilder()
+                .setUpdateEnabled(!configs.getServer().isActionCacheReadOnly()))
         .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
         .build();
   }

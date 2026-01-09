@@ -31,15 +31,12 @@ import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.JsonFormat;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 import lombok.extern.java.Log;
 import redis.clients.jedis.AbstractPipeline;
@@ -59,7 +56,7 @@ public class ExecutionQueue {
   private static final Duration MAX_TIMEOUT = Duration.ofSeconds(8);
 
   public record ExecutionQueueEntry(
-      BalancedRedisQueue queue, BalancedQueueEntry balancedQueueEntry, QueueEntry queueEntry) {}
+      BalancedRedisQueue queue, BalancedQueueEntry<QueueEntry> balancedQueueEntry) {}
 
   /**
    * @field maxQueueSize
@@ -74,7 +71,7 @@ public class ExecutionQueue {
    * @brief Different queues based on platform execution requirements.
    * @details The appropriate queues are chosen based on given properties.
    */
-  private final List<ProvisionedRedisQueue> queues;
+  private final List<ProvisionedRedisQueue<QueueEntry>> queues;
 
   /**
    * @field currentDequeueIndex
@@ -89,7 +86,7 @@ public class ExecutionQueue {
    * @details Construct the operation queue with various provisioned redis queues.
    * @param queues Provisioned queues.
    */
-  public ExecutionQueue(List<ProvisionedRedisQueue> queues) {
+  public ExecutionQueue(List<ProvisionedRedisQueue<QueueEntry>> queues) {
     this.queues = queues;
     this.maxQueueSize = -1; // infinite size
   }
@@ -100,25 +97,17 @@ public class ExecutionQueue {
    * @param queues Provisioned queues.
    * @param maxQueueSize The maximum amount of elements that should be added to the queue.
    */
-  public ExecutionQueue(List<ProvisionedRedisQueue> queues, int maxQueueSize) {
+  public ExecutionQueue(List<ProvisionedRedisQueue<QueueEntry>> queues, int maxQueueSize) {
     this.queues = queues;
     this.maxQueueSize = maxQueueSize;
   }
 
-  private static Visitor<BalancedQueueEntry> createExecutionQueueVisitor(
-      UnifiedJedis jedis, BalancedRedisQueue queue, Visitor<ExecutionQueueEntry> visitor) {
+  private static Visitor<BalancedQueueEntry<QueueEntry>> createExecutionQueueVisitor(
+      BalancedRedisQueue queue, Visitor<ExecutionQueueEntry> visitor) {
     return new Visitor<>() {
       @Override
-      public void visit(BalancedQueueEntry balancedQueueEntry) {
-        String entry = balancedQueueEntry.value();
-        QueueEntry.Builder queueEntry = QueueEntry.newBuilder();
-        try {
-          JsonFormat.parser().merge(entry, queueEntry);
-          visitor.visit(new ExecutionQueueEntry(queue, balancedQueueEntry, queueEntry.build()));
-        } catch (InvalidProtocolBufferException e) {
-          log.log(Level.SEVERE, "invalid QueueEntry json: " + entry, e);
-          queue.removeFromDequeue(jedis, balancedQueueEntry);
-        }
+      public void visit(BalancedQueueEntry<QueueEntry> balancedQueueEntry) {
+        visitor.visit(new ExecutionQueueEntry(queue, balancedQueueEntry));
       }
     };
   }
@@ -132,7 +121,7 @@ public class ExecutionQueue {
   public void visitDequeue(UnifiedJedis jedis, Visitor<ExecutionQueueEntry> visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
       BalancedRedisQueue queue = provisionedQueue.queue();
-      queue.visitDequeue(jedis, createExecutionQueueVisitor(jedis, queue, visitor));
+      queue.visitDequeue(jedis, createExecutionQueueVisitor(queue, visitor));
     }
   }
 
@@ -161,7 +150,7 @@ public class ExecutionQueue {
   public void visit(UnifiedJedis jedis, Visitor<ExecutionQueueEntry> visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
       BalancedRedisQueue queue = provisionedQueue.queue();
-      queue.visit(jedis, createExecutionQueueVisitor(jedis, queue, visitor));
+      queue.visit(jedis, createExecutionQueueVisitor(queue, visitor));
     }
   }
 
@@ -235,8 +224,8 @@ public class ExecutionQueue {
    * @param val The value to push onto the queue.
    */
   public void push(
-      UnifiedJedis jedis, List<Platform.Property> provisions, String val, int priority) {
-    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
+      UnifiedJedis jedis, List<Platform.Property> provisions, QueueEntry val, int priority) {
+    BalancedRedisQueue<QueueEntry> queue = chooseEligibleQueue(provisions);
     queue.offer(jedis, val, (double) priority);
   }
 
@@ -269,7 +258,7 @@ public class ExecutionQueue {
     // try each of the internal queues with exponential backoff
     Duration currentTimeout = START_TIMEOUT;
     while (true) {
-      BalancedQueueEntry balancedQueueEntry = null;
+      BalancedQueueEntry<QueueEntry> balancedQueueEntry = null;
       int index = roundRobinPopIndex(queues);
       ProvisionedRedisQueue provisionedQueue = queues.get(index);
       BalancedRedisQueue queue = provisionedQueue.queue();
@@ -284,16 +273,7 @@ public class ExecutionQueue {
 
       // return if found
       if (balancedQueueEntry != null) {
-        try {
-          QueueEntry.Builder queueEntryBuilder = QueueEntry.newBuilder();
-          JsonFormat.parser().merge(balancedQueueEntry.value(), queueEntryBuilder);
-          QueueEntry queueEntry = queueEntryBuilder.build();
-
-          return new ExecutionQueueEntry(queue, balancedQueueEntry, queueEntry);
-        } catch (InvalidProtocolBufferException e) {
-          queue.removeFromDequeue(jedis, balancedQueueEntry);
-          log.log(Level.SEVERE, "error parsing queue entry", e);
-        }
+        return new ExecutionQueueEntry(queue, balancedQueueEntry);
       }
 
       // not quite immediate yet...
@@ -401,8 +381,8 @@ public class ExecutionQueue {
    * @return The chosen queue.
    * @note Suggested return identifier: queue.
    */
-  private BalancedRedisQueue chooseEligibleQueue(List<Platform.Property> provisions) {
-    for (ProvisionedRedisQueue provisionedQueue : queues) {
+  private BalancedRedisQueue<QueueEntry> chooseEligibleQueue(List<Platform.Property> provisions) {
+    for (ProvisionedRedisQueue<QueueEntry> provisionedQueue : queues) {
       if (provisionedQueue.isEligible(toMultimap(provisions))) {
         return provisionedQueue.queue();
       }
@@ -501,16 +481,6 @@ public class ExecutionQueue {
     return set;
   }
 
-  private static QueueEntry parse(String json) {
-    QueueEntry.Builder queueEntry = QueueEntry.newBuilder();
-    try {
-      JsonFormat.parser().merge(json, queueEntry);
-    } catch (InvalidProtocolBufferException e) {
-      log.log(Level.SEVERE, "invalid QueueEntry json: " + json, e);
-    }
-    return queueEntry.build();
-  }
-
   public ScanResult<ExecutionQueueEntry> scan(
       UnifiedJedis jedis, String queueCursor, int count, String match) {
     int queueIndex = queueCursor.indexOf('{') + 1;
@@ -520,9 +490,9 @@ public class ExecutionQueue {
       currentQueue = queueCursor.substring(queueIndex, queueEnd);
       queueCursor = queueCursor.substring(queueEnd + 1);
     }
-    Iterator<ProvisionedRedisQueue> queueIter = queues.iterator();
+    Iterator<ProvisionedRedisQueue<QueueEntry>> queueIter = queues.iterator();
 
-    BalancedRedisQueue queue = null;
+    BalancedRedisQueue<QueueEntry> queue = null;
     while (currentQueue != null && queueIter.hasNext()) {
       queue = queueIter.next().queue();
       if (queue.getName().equals(currentQueue)) {
@@ -543,17 +513,15 @@ public class ExecutionQueue {
         queue = queueIter.next().queue();
         currentQueue = queue.getName();
       }
-      final BalancedRedisQueue entryQueue = queue;
-      ScanResult<BalancedQueueEntry> scanResult =
+      final BalancedRedisQueue<QueueEntry> entryQueue = queue;
+      ScanResult<BalancedQueueEntry<QueueEntry>> scanResult =
           queue.scan(jedis, queueCursor, count - result.size(), match);
       queueCursor = scanResult.getCursor();
       result.addAll(
           newArrayList(
               transform(
                   scanResult.getResult(),
-                  balancedQueueEntry ->
-                      new ExecutionQueueEntry(
-                          entryQueue, balancedQueueEntry, parse(balancedQueueEntry.value())))));
+                  balancedQueueEntry -> new ExecutionQueueEntry(entryQueue, balancedQueueEntry))));
     }
 
     if (queueCursor.equals(SCAN_POINTER_START)) {

@@ -50,7 +50,10 @@ public class Pipeline implements Iterable<PipelineStage> {
   }
 
   public void interrupt(PipelineStage stage) {
-    stageThreads.get(stage).interrupt();
+    Thread stageThread = stageThreads.get(stage);
+    if (stageThread != null) {
+      stageThread.interrupt();
+    }
   }
 
   public void start() {

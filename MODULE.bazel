@@ -7,28 +7,28 @@ module(
 
 bazel_dep(name = "grpc", version = "1.74.1", repo_name = "com_github_grpc_grpc")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
-bazel_dep(name = "aspect_bazel_lib", version = "2.21.2")
-bazel_dep(name = "bazel_skylib", version = "1.8.2")
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.2")
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "blake3", version = "1.8.2")
-bazel_dep(name = "buildifier_prebuilt", version = "8.2.0.2")
-bazel_dep(name = "gazelle", version = "0.45.0")
+bazel_dep(name = "buildifier_prebuilt", version = "8.2.1.1")
+bazel_dep(name = "gazelle", version = "0.47.0")
 bazel_dep(name = "grpc-java", version = "1.75.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20240819-fe8ba054a")
 bazel_dep(name = "grpc-proto", version = "0.0.0-20240627-ec30f58", repo_name = "io_grpc_grpc_proto")
 bazel_dep(name = "hermetic_cc_toolchain", version = "3.2.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "protobuf", version = "29.5", repo_name = "com_google_protobuf")
-bazel_dep(name = "rules_cc", version = "0.2.10")
+bazel_dep(name = "rules_cc", version = "0.2.16")
 bazel_dep(name = "rules_java", version = "8.15.2")
-bazel_dep(name = "rules_jvm_external", version = "6.8")
+bazel_dep(name = "rules_jvm_external", version = "6.9")
 bazel_dep(name = "rules_license", version = "1.0.0")
-bazel_dep(name = "rules_oci", version = "2.2.6")
-bazel_dep(name = "rules_pkg", version = "1.1.0")
+bazel_dep(name = "rules_oci", version = "2.2.7")
+bazel_dep(name = "rules_pkg", version = "1.2.0")
 
 # Test dependencies
 bazel_dep(
     name = "container_structure_test",
-    version = "1.21.1",
+    version = "1.22.1",
     dev_dependency = True,
 )
 
@@ -62,7 +62,7 @@ maven.install(
         "com.amazonaws:aws-java-sdk-s3",
         "com.amazonaws:aws-java-sdk-secretsmanager",
         "com.fasterxml.jackson.core:jackson-databind:2.20.0",
-        "com.github.ben-manes.caffeine:caffeine:3.2.2",
+        "com.github.ben-manes.caffeine:caffeine:3.2.3",
         "com.github.docker-java:docker-java",
         "com.github.docker-java:docker-java-api",
         "com.github.docker-java:docker-java-core",
@@ -133,7 +133,6 @@ maven.install(
         "org.openjdk.jmh:jmh-core:1.37",
         "org.openjdk.jmh:jmh-generator-annprocess:1.37",
         "org.projectlombok:lombok:1.18.40",
-        "org.redisson:redisson:3.51.0",
         "org.slf4j:slf4j-simple:2.0.17",
         "org.threeten:threetenbp:1.7.2",
         "org.xerial:sqlite-jdbc:3.50.3.0",
@@ -220,7 +219,7 @@ use_repo(
 
 # https://github.com/bazelbuild/rules_python/pull/713#issuecomment-1885628496
 # Satisfy running tests in Docker as root.
-bazel_dep(name = "rules_python", version = "1.6.3")
+bazel_dep(name = "rules_python", version = "1.7.0")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
@@ -253,3 +252,12 @@ find_rpm = use_extension("@rules_pkg//toolchains/rpm:rpmbuild_configure.bzl", "f
 use_repo(find_rpm, "rules_pkg_rpmbuild")
 
 register_toolchains("@rules_pkg_rpmbuild//:all")
+
+####
+hawkeye = use_extension("//tools/lint/hawkeye:extensions.bzl", "hawkeye", dev_dependency = True)
+use_repo(
+    hawkeye,
+    "hawkeye-aarch64-apple-darwin",
+    "hawkeye-x86_64-apple-darwin",
+    "hawkeye-x86_64-unknown-linux-gnu",
+)

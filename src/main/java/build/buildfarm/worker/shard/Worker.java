@@ -57,6 +57,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
+import build.buildfarm.instance.shard.codec.json.JsonCodec;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.Digest;
@@ -660,7 +661,8 @@ public final class Worker extends LoggingMain {
               identifier,
               /* subscribeToBackplane= */ true,
               /* runFailsafeOperation= */ false,
-              this::stripOperation);
+              this::stripOperation,
+              JsonCodec.CODEC);
       backplane.start(configs.getWorker().getPublicName(), workerStubs::invalidate);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
@@ -843,6 +845,10 @@ public final class Worker extends LoggingMain {
 
   private void awaitTermination() throws InterruptedException {
     pipeline.join();
+    pipeline = null;
+    if (configs.getWorker().getCapabilities().isExecution()) {
+      initiateShutdown();
+    }
     if (server != null && !server.isTerminated()) {
       int retries = 5;
       while (retries > 0) {

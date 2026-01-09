@@ -68,9 +68,9 @@ backplane:
   workerChannel: WorkerChannel
   actionCachePrefix: ActionCache
   actionCacheExpire: 2419200 # 4 weeks
-  actionBlacklistPrefix: ActionBlacklist
-  actionBlacklistExpire: 3600 # 1 hour
-  invocationBlacklistPrefix: InvocationBlacklist
+  actionBlocklistPrefix: ActionBlocklist
+  actionBlocklistExpire: 3600 # 1 hour
+  invocationBlocklistPrefix: InvocationBlocklist
   operationPrefix: Operation
   operationExpire: 604800 # 1 week
   preQueuedOperationsListName: '{Arrival}:PreQueuedOperations'

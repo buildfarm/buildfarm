@@ -12,7 +12,7 @@ public class RedisSetMap extends RedisMap {
   private final boolean expireOnEach;
 
   public RedisSetMap(String name, int timeout_s, boolean expireOnEach) {
-    super(name, timeout_s);
+    super(name, new IdentityTranslator(), timeout_s);
     this.expireOnEach = expireOnEach;
   }
 

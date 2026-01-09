@@ -153,7 +153,7 @@ class ResultReporter implements Runnable {
             .addAuxiliaryMetadata(Any.pack(executionContext.workerExecutedMetadata.build()));
     putOperation(executionContext);
 
-    boolean blacklist = false;
+    boolean blocklist = false;
     Digest actionDigest = executionContext.queueEntry.getExecuteEntry().getActionDigest();
     try {
       workerContext.uploadOutputs(
@@ -175,7 +175,7 @@ class ResultReporter implements Runnable {
         }
         executeResponse.setStatus(status);
         if (isRetriable(status)) {
-          blacklist = true;
+          blocklist = true;
         }
       }
     } catch (InterruptedException | ClosedByInterruptException e) {
@@ -197,13 +197,13 @@ class ResultReporter implements Runnable {
     ExecuteResponse executeResponse = executionContext.executeResponse.build();
 
     ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
-    if (blacklist
+    if (blocklist
         || (!executionContext.action.getDoNotCache()
             && executeResponse.getStatus().getCode() == Code.OK.getNumber()
             && executeResponse.getResult().getExitCode() == 0)) {
       try {
-        if (blacklist) {
-          workerContext.blacklistAction(actionDigest.getHash());
+        if (blocklist) {
+          workerContext.blocklistAction(actionDigest.getHash());
         } else {
           workerContext.putActionResult(actionKey, executeResponse.getResult());
         }

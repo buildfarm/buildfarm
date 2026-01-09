@@ -204,20 +204,16 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     }
     ServerCallStreamObserver<Operation> serverCallStreamObserver =
         (ServerCallStreamObserver<Operation>) responseObserver;
-    try {
-      RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
-      withCancellation(
-          serverCallStreamObserver,
-          instance.execute(
-              actionDigest,
-              request.getSkipCacheLookup(),
-              request.getExecutionPolicy(),
-              request.getResultsCachePolicy(),
-              requestMetadata,
-              createWatcher(serverCallStreamObserver, requestMetadata)));
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+    RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
+    withCancellation(
+        serverCallStreamObserver,
+        instance.execute(
+            actionDigest,
+            request.getSkipCacheLookup(),
+            request.getExecutionPolicy(),
+            request.getResultsCachePolicy(),
+            requestMetadata,
+            createWatcher(serverCallStreamObserver, requestMetadata)));
   }
 
   private static MetricsPublisher getMetricsPublisher() {

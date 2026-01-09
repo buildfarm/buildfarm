@@ -68,7 +68,15 @@ class LocalCasWriter implements CasWriter {
             write.getOutput(/* deadlineAfter= */ 1, /* deadlineAfterUnits= */ DAYS, () -> {});
         InputStream in = suppliedStream.get()) {
       ByteStreams.copy(in, out);
-    } catch (IOException e) {
+    } catch (RuntimeException | IOException e) {
+      // https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/sun/nio/ch/ChannelOutputStream.java#L70
+      // this is an IO class that will throw a RuntimeException when it decides that the channel
+      // supporting it
+      // does not deserve to return <= 0, despite the interface indicating that it can return 0
+      // determine whether _this_ exception is the one in question, and then handle accordingly
+      if (e instanceof RuntimeException && !e.getMessage().equals("no bytes written")) {
+        throw e;
+      }
       if (!write.isComplete()) {
         write.reset(); // we will not attempt retry with current behavior, abandon progress
         throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
