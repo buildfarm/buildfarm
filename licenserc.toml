@@ -6,6 +6,12 @@ includes = [
     "*.sh",
 ]
 
+excludes = [
+    # The format script is checked by hawkeye, but on fresh CI clones the disk
+    # timestamp may differ from git modification year causing false positives.
+    ".bazelci/format.sh",
+]
+
 [git]
 attrs = 'auto'
 ignore = 'auto'
