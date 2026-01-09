@@ -16,7 +16,6 @@ java_library(
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:org_apache_commons_commons_pool2",
         "@buildfarm_maven//:org_projectlombok_lombok",
-        "@buildfarm_maven//:org_redisson_redisson",
         "@buildfarm_maven//:redis_clients_jedis",
         "@com_google_protobuf//java/core",
     ],
