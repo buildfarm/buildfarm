@@ -18,32 +18,62 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
 
-class Upload {
-  private static void main(String host, String instanceName, DigestUtil digestUtil, Path path)
-      throws Exception {
+/** Upload a file to the buildfarm CAS. */
+@Command(
+    name = "upload",
+    mixinStandardHelpOptions = true,
+    description = "Upload a file to the buildfarm CAS")
+class Upload implements Callable<Integer> {
+
+  @Parameters(
+      index = "0",
+      description =
+          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
+              + " 'grpcs://', or omitted (default 'grpc://')")
+  private String host;
+
+  @Parameters(index = "1", description = "The instance name")
+  private String instanceName;
+
+  @Parameters(index = "2", description = "The digest hash function (e.g., SHA256)")
+  private String hashFunction;
+
+  @Parameters(index = "3", description = "The path to the file to upload")
+  private Path path;
+
+  @Override
+  public Integer call() throws Exception {
+    DigestUtil digestUtil = DigestUtil.forHash(hashFunction);
+
     ManagedChannel channel = createChannel(host);
     Instance instance =
         new StubInstance(instanceName, "bf-upload", channel, Durations.fromDays(10));
 
-    Digest digest = digestUtil.compute(path);
-    Write write =
-        instance.getBlobWrite(
-            ZSTD, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-    try (OutputStream out = write.getOutput(0l, 10, TimeUnit.DAYS, () -> {});
-        InputStream in = new ZstdCompressingInputStream(Files.newInputStream(path))) {
-      ByteStreams.copy(in, out);
+    try {
+      Digest digest = digestUtil.compute(path);
+      Write write =
+          instance.getBlobWrite(
+              ZSTD, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+      try (OutputStream out = write.getOutput(0l, 10, TimeUnit.DAYS, () -> {});
+          InputStream in = new ZstdCompressingInputStream(Files.newInputStream(path))) {
+        ByteStreams.copy(in, out);
+      }
+      write.getFuture().get();
+      System.out.println("Completed uploading " + DigestUtil.toString(digest));
+    } finally {
+      instance.stop();
     }
-    write.getFuture().get();
-    System.out.println("Completed uploading " + DigestUtil.toString(digest));
+    return 0;
   }
 
-  public static void main(String[] args) throws Exception {
-    String host = args[0];
-    String instanceName = args[1];
-    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-    Path path = Path.of(args[3]);
-    main(host, instanceName, digestUtil, path);
+  public static void main(String[] args) {
+    int exitCode = new CommandLine(new Upload()).execute(args);
+    System.exit(exitCode);
   }
 }

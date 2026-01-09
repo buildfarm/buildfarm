@@ -21,9 +21,46 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
 
-class Hist {
+/** Display a live histogram of dispatched operations. */
+@Command(
+    name = "hist",
+    mixinStandardHelpOptions = true,
+    description = "Display a live histogram of dispatched operations")
+class Hist implements Callable<Integer> {
+
+  @Parameters(index = "0", description = "The instance name")
+  private String instanceName;
+
+  @Parameters(
+      index = "1",
+      description =
+          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
+              + " 'grpcs://', or omitted (default 'grpc://')")
+  private String host;
+
+  @Override
+  @SuppressWarnings("BusyWait")
+  public Integer call() throws Exception {
+    ManagedChannel channel = createChannel(host);
+    Instance instance = new StubInstance(instanceName, /* digestUtil= */ null, channel);
+    try {
+      //noinspection InfiniteLoopStatement
+      for (; ; ) {
+        printHistogram(instance);
+        Thread.sleep(500);
+      }
+    } catch (InterruptedException e) {
+      instance.stop();
+    }
+    return 0;
+  }
+
   @SuppressWarnings("ConstantConditions")
   private static void printHistogramValue(int dispatched) {
     StringBuilder s = new StringBuilder();
@@ -60,20 +97,8 @@ class Hist {
     printHistogramValue(dispatched.get());
   }
 
-  @SuppressWarnings("BusyWait")
-  public static void main(String[] args) throws Exception {
-    String instanceName = args[0];
-    String host = args[1];
-    ManagedChannel channel = createChannel(host);
-    Instance instance = new StubInstance(instanceName, /* digestUtil= */ null, channel);
-    try {
-      //noinspection InfiniteLoopStatement
-      for (; ; ) {
-        printHistogram(instance);
-        Thread.sleep(500);
-      }
-    } catch (InterruptedException e) {
-      instance.stop();
-    }
+  public static void main(String[] args) {
+    int exitCode = new CommandLine(new Hist()).execute(args);
+    System.exit(exitCode);
   }
 }

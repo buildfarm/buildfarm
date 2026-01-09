@@ -65,10 +65,14 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Scanner;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
 
 class Executor {
   static class ExecutionObserver implements StreamObserver<Operation> {
@@ -223,7 +227,7 @@ class Executor {
     shutdownAndAwaitTermination(service, 1, SECONDS);
   }
 
-  private static void loadFilesIntoCAS(String instanceName, Channel channel, Path blobsDir)
+  static void loadFilesIntoCAS(String instanceName, Channel channel, Path blobsDir)
       throws Exception {
     ContentAddressableStorageBlockingStub casStub =
         ContentAddressableStorageGrpc.newBlockingStub(channel);
@@ -406,15 +410,37 @@ class Executor {
   }
 
   public static void main(String[] args) throws Exception {
-    String host = args[0];
-    String instanceName = args[1];
-    String blobsDir;
-    if (args.length == 3) {
-      blobsDir = args[2];
-    } else {
-      blobsDir = null;
-    }
+    int exitCode = new CommandLine(new ExecutorCommand()).execute(args);
+    System.exit(exitCode);
+  }
+}
 
+/** Command-line interface for Executor. */
+@Command(
+    name = "executor",
+    mixinStandardHelpOptions = true,
+    description =
+        "Execute actions on the buildfarm server. Reads action digests from stdin (one per line).")
+class ExecutorCommand implements Callable<Integer> {
+
+  @Parameters(
+      index = "0",
+      description =
+          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
+              + " 'grpcs://', or omitted (default 'grpc://')")
+  private String host;
+
+  @Parameters(index = "1", description = "The instance name")
+  private String instanceName;
+
+  @Parameters(
+      index = "2",
+      arity = "0..1",
+      description = "Optional: Directory containing blobs to load into CAS before execution")
+  private String blobsDir;
+
+  @Override
+  public Integer call() throws Exception {
     Scanner scanner = new Scanner(System.in);
 
     ImmutableList.Builder<Digest> actionDigests = ImmutableList.builder();
@@ -426,14 +452,15 @@ class Executor {
 
     if (blobsDir != null) {
       System.out.println("Loading blobs into cas");
-      loadFilesIntoCAS(instanceName, channel, Path.of(blobsDir));
+      Executor.loadFilesIntoCAS(instanceName, channel, Path.of(blobsDir));
     }
 
     ExecutionStub execStub = ExecutionGrpc.newStub(channel);
 
-    executeActions(instanceName, actionDigests.build(), execStub);
+    Executor.executeActions(instanceName, actionDigests.build(), execStub);
 
     channel.shutdown();
     channel.awaitTermination(1, SECONDS);
+    return 0;
   }
 }

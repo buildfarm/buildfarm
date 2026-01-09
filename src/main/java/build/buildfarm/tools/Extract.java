@@ -52,17 +52,34 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import picocli.CommandLine;
+import picocli.CommandLine.Parameters;
 
-class Extract {
-  public static void main(String[] args) throws Exception {
-    String host = args[0];
-    String instanceName = args[1];
+/** Extract action contents from buildfarm CAS by reading action digests from stdin. */
+@CommandLine.Command(
+    name = "extract",
+    mixinStandardHelpOptions = true,
+    description = "Extract action contents from buildfarm CAS by reading action digests from stdin")
+class Extract implements Callable<Integer> {
 
+  @Parameters(
+      index = "0",
+      description =
+          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
+              + " 'grpcs://', or omitted (default 'grpc://')")
+  private String host;
+
+  @Parameters(index = "1", description = "The instance name")
+  private String instanceName;
+
+  @Override
+  public Integer call() throws Exception {
     Scanner scanner = new Scanner(System.in);
 
     ImmutableSet.Builder<Digest> actionDigests = ImmutableSet.builder();
@@ -77,6 +94,12 @@ class Extract {
     downloadActionContents(root, instanceName, actionDigests.build(), channel);
 
     channel.shutdown();
+    return 0;
+  }
+
+  public static void main(String[] args) {
+    int exitCode = new CommandLine(new Extract()).execute(args);
+    System.exit(exitCode);
   }
 
   static String blobName(String instanceName, Digest digest) {
