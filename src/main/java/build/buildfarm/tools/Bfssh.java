@@ -41,40 +41,49 @@ import build.buildfarm.v1test.Digest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.devtools.common.options.Option;
-import com.google.devtools.common.options.OptionsBase;
-import com.google.devtools.common.options.OptionsParser;
-import com.google.devtools.common.options.OptionsParsingException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
+import picocli.CommandLine;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 
-class Bfssh {
-  public static class BfsshOptions extends OptionsBase {
-    @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "false")
-    public boolean help;
+/** Execute remote commands on buildfarm workers via SSH-like interface. */
+@CommandLine.Command(
+    name = "bfssh",
+    mixinStandardHelpOptions = true,
+    description = "Execute remote commands on buildfarm workers via SSH-like interface")
+class Bfssh implements Callable<Integer> {
 
-    @Option(
-        name = "all",
-        abbrev = 'a',
-        help = "Send an execution for all workers",
-        defaultValue = "false")
-    public boolean all;
+  @Parameters(
+      index = "0",
+      description =
+          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
+              + " 'grpcs://', or omitted (default 'grpc://')")
+  private String host;
 
-    @Option(
-        name = "worker",
-        abbrev = 'w',
-        help = "Send an execution to a specific worker",
-        allowMultiple = true,
-        defaultValue = "")
-    public List<String> workers;
-  }
+  @Parameters(index = "1", description = "The instance name")
+  private String instanceName;
+
+  @Parameters(index = "2..*", description = "Command to execute on worker(s)", arity = "1..*")
+  private List<String> cmdArgs;
+
+  @Option(
+      names = {"-a", "--all"},
+      description = "Send an execution for all workers")
+  private boolean all;
+
+  @Option(
+      names = {"-w", "--worker"},
+      description = "Send an execution to a specific worker",
+      arity = "1")
+  private List<String> workers = ImmutableList.of();
 
   private static Digest uploadAction(
       Instance instance,
@@ -145,66 +154,41 @@ class Bfssh {
         instance.newBlobInput(Compressor.Value.IDENTITY, digest, 0, 10, SECONDS, requestMetadata));
   }
 
-  private static OptionsParser getOptionsParser(Class clazz, String[] args)
-      throws OptionsParsingException {
-    OptionsParser parser = OptionsParser.newOptionsParser(clazz);
-    parser.parse(args);
-    return parser;
-  }
-
-  private static Iterable<String> getAllWorkers(Instance stub) {
-    return stub.backplaneStatus().getActiveExecuteWorkersList();
-  }
-
-  private static void usage() {
-    System.err.println("Usage: bfssh <endpoint> <instanceName> [-a|-w workers] cmd...");
-    System.exit(1);
-  }
-
-  public static void main(String[] args) throws Exception {
-    String host = args[0];
-    String instanceName = args[1];
-
+  @Override
+  public Integer call() throws Exception {
     ManagedChannel channel = createChannel(host);
 
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
     DigestUtil digestUtil = DigestUtil.forHash("SHA256");
 
-    OptionsParser parser = getOptionsParser(BfsshOptions.class, args);
-    BfsshOptions options = parser.getOptions(BfsshOptions.class);
-
-    if (options.help) {
-      usage();
-    }
-
-    Iterable<String> cmdArgs = parser.getResidue().stream().skip(2).collect(Collectors.toList());
-
     Instance stub = new StubInstance(instanceName, channel);
 
-    Iterable<String> workers;
-    if (options.all) {
-      workers = getAllWorkers(stub);
-    } else if (options.workers.isEmpty()) {
+    Iterable<String> targetWorkers;
+    if (all) {
+      targetWorkers = stub.backplaneStatus().getActiveExecuteWorkersList();
+    } else if (workers.isEmpty()) {
       // trigger a single worker-agnostic submission
-      workers = ImmutableList.of("");
+      targetWorkers = ImmutableList.of("");
     } else {
-      workers = options.workers;
+      targetWorkers = workers;
     }
 
-    int exitCode;
     ExecutorService printExecutor = newSingleThreadExecutor();
     try {
       Iterable<ListenableFuture<ExecuteResponse>> responses =
-          runOnWorkers(stub, digestUtil, workers, cmdArgs, requestMetadata);
-      exitCode =
-          printResponses(
-              stub, responses, digestUtil.getDigestFunction(), requestMetadata, printExecutor);
+          runOnWorkers(stub, digestUtil, targetWorkers, cmdArgs, requestMetadata);
+      return printResponses(
+          stub, responses, digestUtil.getDigestFunction(), requestMetadata, printExecutor);
     } finally {
       printExecutor.shutdownNow();
       printExecutor.awaitTermination(1, SECONDS);
       channel.shutdown();
       channel.awaitTermination(1, SECONDS);
     }
+  }
+
+  public static void main(String[] args) {
+    int exitCode = new CommandLine(new Bfssh()).execute(args);
     System.exit(exitCode);
   }
 
