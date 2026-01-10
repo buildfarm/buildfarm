@@ -7,7 +7,7 @@ module(
 
 bazel_dep(name = "grpc", version = "1.74.1", repo_name = "com_github_grpc_grpc")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
-bazel_dep(name = "aspect_bazel_lib", version = "2.22.2")
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.4")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "blake3", version = "1.8.2")
 bazel_dep(name = "buildifier_prebuilt", version = "8.2.1.1")
