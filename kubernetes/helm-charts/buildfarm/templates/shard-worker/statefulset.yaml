@@ -37,6 +37,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "buildfarm.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.shardWorker.securityContext | nindent 8 }}
       containers:
         - name: buildfarm-worker
           image: "{{ .Values.shardWorker.image.repository }}:{{ .Values.shardWorker.image.tag | default .Chart.AppVersion }}"
@@ -75,10 +77,6 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.shardWorker.resources | nindent 12 }}
-          {{- with .Values.shardWorker.securityContext }}
-          securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
           volumeMounts:
             - mountPath: /config
               name: config
