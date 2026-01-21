@@ -3,3 +3,8 @@ dequeueMatchSettings:
   allowUnmatched: true
 linkedInputDirectories:
 - (?!external/)[^/]+
+limitGlobalExecution: true
+executeStageWidth: 8
+inputFetchStageWidth: 1
+reportResultStageWidth: 1
+defaultMaxCores: 1

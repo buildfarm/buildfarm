@@ -165,7 +165,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   private static Iterator<String> directoriesIterator(
       build.bazel.remote.execution.v2.Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex) {
-    Directory root = directoriesIndex.get(digest);
+    Directory root = checkNotNull(directoriesIndex.get(digest));
     return new Iterator<>() {
       boolean atEnd = root.getDirectoriesCount() == 0;
       Stack<String> path = new Stack<>();
@@ -205,7 +205,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       build.bazel.remote.execution.v2.Digest rootDigest) {
     // skip this search if all the directories are real
-    if (linkInputDirectories) {
+    if (linkInputDirectories && rootDigest.getSizeBytes() != 0) {
       ImmutableSet.Builder<String> builder = ImmutableSet.builder();
 
       Iterator<String> dirs = directoriesIterator(rootDigest, directoriesIndex);

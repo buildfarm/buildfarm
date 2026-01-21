@@ -16,6 +16,7 @@ package build.buildfarm.tools;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.grpc.Channels.createChannel;
+import static build.buildfarm.common.grpc.TracingMetadataUtils.attachMetadataInterceptor;
 import static build.buildfarm.common.io.Utils.stat;
 import static build.buildfarm.instance.stub.ByteStreamUploader.uploadResourceName;
 import static com.google.common.base.Preconditions.checkState;
@@ -37,6 +38,7 @@ import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.io.FileStatus;
@@ -105,13 +107,18 @@ class Executor {
     }
 
     void execute() {
-      execStub.execute(
-          ExecuteRequest.newBuilder()
-              .setInstanceName(instanceName)
-              .setActionDigest(DigestUtil.toDigest(actionDigest))
-              .setDigestFunction(actionDigest.getDigestFunction())
-              .setSkipCacheLookup(true)
-              .build(),
+      RequestMetadata requestMetadata = RequestMetadata.newBuilder()
+          .setCorrelatedInvocationsId("http://build.farm?MERGE_EXECUTIONS=false")
+          .build();
+      execStub
+          .withInterceptors(attachMetadataInterceptor(requestMetadata))
+          .execute(
+              ExecuteRequest.newBuilder()
+                  .setInstanceName(instanceName)
+                  .setActionDigest(DigestUtil.toDigest(actionDigest))
+                  .setDigestFunction(actionDigest.getDigestFunction())
+                  .setSkipCacheLookup(false)
+                  .build(),
           this);
       noticeFuture = service.schedule(this::printStillWaiting, 30, SECONDS);
     }

@@ -63,6 +63,7 @@ public class Worker {
   private boolean createSymlinkOutputs = false;
   private int zstdBufferPoolSize = 2048; /* * ZSTD_DStreamInSize (current is 128k) == 256MiB */
   private Set<String> persistentWorkerActionMnemonicAllowlist = Set.of("*");
+  private Set<String> ignoreMarketExecutionMnemonics = Set.of("TestRunner");
   // These limited resources are only for the individual worker.
   // An example would be hardware resources such as GPUs.
   // If you want GPU actions to run exclusively, define a single GPU resource.
@@ -71,6 +72,7 @@ public class Worker {
   private boolean errorOperationOutputSizeExceeded = false;
   private boolean legacyDirectoryFileCache = false;
   private boolean absolutizeCommandProgram = isWindows();
+  private boolean executionMarket = false;
 
   public List<ExecutionPolicy> getExecutionPolicies() {
     return executionPolicies;

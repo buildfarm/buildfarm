@@ -28,7 +28,7 @@ import lombok.Getter;
 
 public abstract class SuperscalarPipelineStage extends PipelineStage {
   private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
-  protected Set<String> operationNames = new HashSet<>();
+  protected final Set<String> operationNames = new HashSet<>();
   @Getter protected int width;
 
   protected final BlockingQueue<Object> claims;
@@ -83,10 +83,17 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     throw new UnsupportedOperationException("use getOperationNames on superscalar stages");
   }
 
+  @Override
+  public boolean isEmpty() {
+    return getSlotUsage() == 0;
+  }
+
+  @Override
   public int getSlotUsage() {
     return executor.getActiveCount();
   }
 
+  @Override
   public Iterable<String> getOperationNames() {
     synchronized (operationNames) {
       return new HashSet<>(operationNames);

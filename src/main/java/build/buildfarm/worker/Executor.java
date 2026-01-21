@@ -38,6 +38,7 @@ import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.common.config.ExecutionWrapper;
+import build.buildfarm.common.function.IOConsumer;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.persistent.PersistentExecutor;
@@ -59,7 +60,7 @@ import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
-import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -75,26 +76,48 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
-class Executor {
+public class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
+  private static final long SAMPLE_NANOS = 100_000_000;
 
   private final WorkerContext workerContext;
   private final ExecutionContext executionContext;
   private final ExecuteActionStage owner;
   private final java.util.concurrent.Executor pollerExecutor;
+  private final int shareFloor; // minimum number of cpu shares a process must have
+  private final int pctMinUnused; // percentage difference required to sell
+  private final int pctMinThrottled; // percentage difference required to buy
+  private final int minSharesSold;
+  private final int maxSharesSold;
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
   private boolean polling = false;
+  private int shareLimit = 0;
+  private volatile int shares;
 
   Executor(
       WorkerContext workerContext,
       ExecutionContext executionContext,
       ExecuteActionStage owner,
+      int shareFloor,
+      int pctMinUnused,
+      int pctMinThrottled,
+      int minSharesSold,
+      int maxSharesSold,
       java.util.concurrent.Executor pollerExecutor) {
     this.workerContext = workerContext;
     this.executionContext = executionContext;
     this.owner = owner;
     this.pollerExecutor = pollerExecutor;
+    this.shareFloor = shareFloor;
+    this.pctMinUnused = pctMinUnused;
+    this.pctMinThrottled = pctMinThrottled;
+    this.minSharesSold = minSharesSold;
+    this.maxSharesSold = maxSharesSold;
+  }
+
+  public String name() {
+    return executionContext.operation.getName();
   }
 
   // ensure that only one error put attempt occurs
@@ -285,8 +308,8 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    String operationName = executionContext.operation.getName();
-    log.log(Level.FINER, "Executor: Operation " + operationName + " Executing command");
+    String executionName = executionContext.operation.getName();
+    log.log(Level.FINER, format("Executor: Operation %s Executing command", executionName));
 
     Command command = executionContext.command;
     Path workingDirectory = executionContext.execDir;
@@ -311,7 +334,7 @@ class Executor {
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
-            operationName,
+            executionName,
             executionContext.claim.owner(),
             arguments,
             executionContext.command,
@@ -339,11 +362,12 @@ class Executor {
 
       statusCode =
           executeCommand(
-              operationName,
+              executionName,
               workingDirectory,
               arguments.build(),
               command.getEnvironmentVariablesList(),
               limits,
+              resource,
               timeout,
               // executingMetadata.getStdoutStreamName(),
               // executingMetadata.getStderrStreamName(),
@@ -369,7 +393,7 @@ class Executor {
             .setMessage("command resources were referenced after execution completed");
       }
     } catch (IOException e) {
-      log.log(Level.SEVERE, format("error executing operation %s", operationName), e);
+      log.log(Level.SEVERE, format("error executing %s", executionName), e);
       executionContext.poller.pause();
       putError();
       return 0;
@@ -399,7 +423,7 @@ class Executor {
         Level.FINER,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
-            operationName, executionContext.executeResponse.getResultBuilder().getExitCode()));
+            executionName, executionContext.executeResponse.getResultBuilder().getExitCode()));
 
     executionContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
     boolean claimed = owner.output().claim(executionContext);
@@ -412,7 +436,7 @@ class Executor {
         throw e;
       }
     } else {
-      log.log(Level.FINER, "Executor: Operation " + operationName + " Failed to claim output");
+      log.log(Level.FINER, "Executor: Execution " + executionName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
         putError();
@@ -427,9 +451,10 @@ class Executor {
   }
 
   public void run(ResourceLimits limits) {
+    shareLimit = limits.cpu.claimed * ExecuteActionStage.SHARES_PER_SLOT;
     long stallUSecs = 0;
     Stopwatch stopwatch = Stopwatch.createStarted();
-    String operationName = executionContext.operation.getName();
+    String executionName = executionContext.operation.getName();
     try {
       stallUSecs = runInterruptible(stopwatch, limits);
     } catch (InterruptedException e) {
@@ -437,24 +462,24 @@ class Executor {
       try {
         putError();
       } catch (InterruptedException errorEx) {
-        log.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
+        log.log(Level.SEVERE, format("interrupted while erroring %s", executionName), errorEx);
       } finally {
         Thread.currentThread().interrupt();
       }
     } catch (Exception e) {
       // clear interrupt flag for error put
       boolean wasInterrupted = Thread.interrupted();
-      log.log(Level.SEVERE, format("errored during execution of %s", operationName), e);
+      log.log(Level.SEVERE, format("errored during execution of %s", executionName), e);
       try {
         putError();
       } catch (InterruptedException errorEx) {
         log.log(
             Level.SEVERE,
-            format("interrupted while erroring %s after error", operationName),
+            format("interrupted while erroring %s after error", executionName),
             errorEx);
       } catch (Exception errorEx) {
         log.log(
-            Level.SEVERE, format("errored while erroring %s after error", operationName), errorEx);
+            Level.SEVERE, format("errored while erroring %s after error", executionName), errorEx);
       }
       if (wasInterrupted) {
         Thread.currentThread().interrupt();
@@ -467,8 +492,7 @@ class Executor {
         // resources.
         executionContext.claim.release(EXECUTE_ACTION_STAGE);
         owner.releaseExecutor(
-            operationName,
-            limits.cpu.claimed,
+            executionName,
             stopwatch.elapsed(MICROSECONDS),
             stallUSecs,
             exitCode);
@@ -504,11 +528,12 @@ class Executor {
 
   @SuppressWarnings("ConstantConditions")
   private Code executeCommand(
-      String operationName,
+      String executionName,
       Path execDir,
       List<String> arguments,
       List<EnvironmentVariable> environmentVariables,
       ResourceLimits limits,
+      IOResource resource,
       Duration timeout,
       ActionResult.Builder resultBuilder)
       throws IOException, InterruptedException {
@@ -522,16 +547,26 @@ class Executor {
     }
     environment.putAll(limits.extraEnvironmentVariables);
 
+    return executeProcess(executionName, execDir, processBuilder, limits, resource, timeout, resultBuilder);
+  }
+
+  private Code executeProcess(
+      String executionName,
+      Path execDir,
+      ProcessBuilder processBuilder,
+      ResourceLimits limits,
+      IOResource resource,
+      Duration timeout,
+      ActionResult.Builder resultBuilder)
+      throws IOException, InterruptedException {
     // allow debugging before an execution
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
     }
+
     if (shouldRunOnPersistentWorker(limits)) {
       // RBE Client suggests to run this Action as persistent...
-      log.fine(
-          "usePersistentWorker (mnemonic="
-              + executionContext.metadata.getRequestMetadata().getActionMnemonic()
-              + ")");
+      log.fine(format("usePersistentWorker (mnemonic=%s)", executionContext.metadata.getRequestMetadata().getActionMnemonic()));
 
       Tree execTree = executionContext.tree;
 
@@ -540,9 +575,9 @@ class Executor {
 
       return PersistentExecutor.runOnPersistentWorker(
           filesContext,
-          operationName,
-          ImmutableList.copyOf(arguments),
-          ImmutableMap.copyOf(environment),
+          executionName,
+          ImmutableList.copyOf(processBuilder.command()),
+          ImmutableMap.copyOf(processBuilder.environment()),
           limits,
           timeout,
           PersistentExecutor.defaultWorkRootsDir,
@@ -559,19 +594,90 @@ class Executor {
       settings.executionContext = executionContext;
       settings.execDir = execDir;
       settings.limits = limits;
-      settings.envVars = environment;
+      settings.envVars = processBuilder.environment();
       settings.timeout = timeout;
-      settings.arguments = arguments;
+      settings.arguments = processBuilder.command();
 
       return DockerExecutor.runActionWithDocker(dockerClient, settings, resultBuilder);
     }
-    long startNanoTime = System.nanoTime();
+
+    return executeNativeProcessAndDebug(executionName, execDir, processBuilder, limits, resource, timeout, resultBuilder);
+  }
+
+  private Code executeNativeProcessAndDebug(
+      String executionName,
+      Path execDir,
+      ProcessBuilder processBuilder,
+      ResourceLimits limits,
+      IOResource resource,
+      Duration timeout,
+      ActionResult.Builder resultBuilder)
+      throws IOException, InterruptedException {
+    Code code = executeNativeProcess(executionName, processBuilder, resource, timeout, resultBuilder);
+
+    // allow debugging after an execution
+    if (limits.debugAfterExecution) {
+      // Obtain execution statistics recorded while the action executed.
+      // Currently we can only source this data when using the sandbox.
+      ExecutionStatistics executionStatistics = ExecutionStatistics.getDefaultInstance();
+      if (limits.useLinuxSandbox) {
+        try (InputStream in = Files.newInputStream(execDir.resolve("action_execution_statistics"))) {
+          executionStatistics = ExecutionStatistics.newBuilder().mergeFrom(in).build();
+        }
+      }
+
+      code = ExecutionDebugger.performAfterExecutionDebug(
+          processBuilder, exitCode, limits, executionStatistics, resultBuilder);
+    }
+
+    return code;
+  }
+
+  private int getAdjustment(
+      int currentShares,
+      int effectiveShares,
+      long nsPeriod,
+      long nsDeltaUsed,
+      long nsDeltaThrottled) {
+    // our budget - the available shares we could buy based on limits
+    int pctUnused = 100 - (int) (nsDeltaUsed * 100 / (currentShares * nsPeriod));
+    int shareDifference = (int) (((effectiveShares * nsPeriod) - nsDeltaUsed) / nsPeriod);
+    long pctThrottle = nsDeltaThrottled * 100 / nsPeriod;
+    // System.out.println(String.format("pctUnused: %d, shareDifference %d, pctThrottle %d", pctUnused, shareDifference, pctThrottle));
+    shareDifference = Math.min(shareDifference, currentShares - shareFloor);
+    if (pctUnused >= pctMinUnused && shareDifference > minSharesSold && shareDifference < currentShares && maxSharesSold != 0) {
+      int sharesToSell = maxSharesSold < 0 ? shareDifference : Math.min(shareDifference, maxSharesSold);
+      return -sharesToSell;
+    }
+    if (pctThrottle >= pctMinThrottled) {
+      return shareLimit - currentShares;
+    }
+    return 0;
+  }
+
+  public int cpuShares() {
+    return shares;
+  }
+
+  private Code executeNativeProcess(
+      String executionName,
+      ProcessBuilder processBuilder,
+      IOResource resource,
+      Duration timeout,
+      ActionResult.Builder resultBuilder)
+      throws IOException, InterruptedException {
+    // consider necessity here...
+    CPULease cpuLease = (CPULease) executionContext.claim.get(Market.RESOURCE_NAME);
+    shares = cpuLease.amount();
+    resource.setCpu(shares * 100);
+
+    long nsStart = System.nanoTime();
     Process process;
     try {
       process = ProcessUtils.threadSafeStart(processBuilder);
       process.getOutputStream().close();
     } catch (IOException e) {
-      log.log(Level.SEVERE, format("error starting process for %s", operationName), e);
+      log.log(Level.SEVERE, format("error starting process for %s", executionName), e);
       // again, should we do something else here??
       resultBuilder.setExitCode(INCOMPLETE_EXIT_CODE);
       // The openjdk IOException for an exec failure here includes the working
@@ -607,36 +713,111 @@ class Executor {
 
     Code statusCode = Code.OK;
     boolean processCompleted = false;
+
+    long nsLastElapsed = 0;
+    long usLastCpuUsed = 0;
+    long usLastCpuThrottled = 0;
+    Order order = Order.COMPLETE;
+    boolean marketExecution = executionContext.marketExecution;
     try {
-      if (timeout == null) {
+      if (timeout == null && !marketExecution) {
         exitCode = process.waitFor();
+        executionContext.workerExecutedMetadata.putAllUsage(resource.sample());
         processCompleted = true;
       } else {
-        long timeoutNanos = Durations.toNanos(timeout);
-        long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
-        if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
-          exitCode = process.exitValue();
-          processCompleted = true;
-        } else {
-          log.log(
-              Level.INFO,
-              format(
-                  "process timed out for %s after %ds",
-                  operationName, Durations.toSeconds(timeout)));
-          statusCode = Code.DEADLINE_EXCEEDED;
+        long nsTimeout = Durations.toNanos(timeout);
+        while (!processCompleted) {
+          long nsElapsed = System.nanoTime() - nsStart;
+          long nsWait = nsTimeout - nsElapsed;
+          if (marketExecution) {
+            nsWait = Math.min(nsWait, SAMPLE_NANOS);
+          }
+          if (process.waitFor(nsWait, TimeUnit.NANOSECONDS)) {
+            executionContext.workerExecutedMetadata.putAllUsage(resource.sample());
+            processCompleted = true;
+            exitCode = process.exitValue();
+          } else {
+            // after wait, recompute time
+            nsElapsed = System.nanoTime() - nsStart;
+            if (nsElapsed > nsTimeout) {
+              if (!marketExecution) {
+                log.log(
+                    Level.INFO,
+                    format(
+                        "process timed out for %s after %ds",
+                        executionName, Durations.toSeconds(timeout)));
+                statusCode = Code.DEADLINE_EXCEEDED;
+                break;
+              }
+
+              // we may want to consider whether anything was ever sold, or if any throttle was actually experienced
+
+              // the process could have been throttled throughout
+              // extend the timeout to the original time from now
+              nsTimeout += nsElapsed;
+              // turn off throttles and fail after next timeout elapsed
+              marketExecution = false;
+              // and issue a buy order for the current limit
+              order.cancel();
+              order = workerContext.market().buy(shareLimit - shares, cpuLease::accumulate);
+            }
+
+            if (marketExecution) {
+              Map<String, Long> sample = resource.sample();
+              long nsSampleElapsed = nsElapsed;
+
+              long usCpuUsed = sample.get("cpu.usage_usec");
+              long usCpuThrottled = sample.get("cpu.throttled_usec");
+              long nsPeriod = nsSampleElapsed - nsLastElapsed;
+              long nsDeltaUsed = (usCpuUsed - usLastCpuUsed) * 1000 /* us -> ns */ * ExecuteActionStage.SHARES_PER_SLOT /* shares per cpu */;
+              long nsDeltaThrottled = (usCpuThrottled - usLastCpuThrottled) * 1000 /* us -> ns */;
+
+              int effectiveShares = shares;
+              int currentShares = cpuLease.amount();
+              if (effectiveShares != currentShares) {
+                // a buy occurred in the last sample
+                shares = currentShares;
+                resource.setCpu(shares * 100);
+              }
+
+              // we can't miss samples in this process
+              // use the previous share count to ensure we don't think we've bought when we just bumped
+              int adjustment = getAdjustment(shares, effectiveShares, nsPeriod, nsDeltaUsed, nsDeltaThrottled);
+              if (adjustment > 0) {
+                // might recommend a different value, but we're already buying...
+                if (order.balance() == 0) {
+                  order = workerContext.market().buy(adjustment, cpuLease::accumulate);
+                }
+              } else {
+                order.cancel();
+                if (adjustment < 0) {
+                  workerContext.market().sell(-adjustment);
+                  cpuLease.deplete(-adjustment);
+                  shares += adjustment;
+                  resource.setCpu(shares * 100);
+                }
+              }
+
+              nsLastElapsed = nsSampleElapsed;
+              usLastCpuUsed = usCpuUsed;
+              usLastCpuThrottled = usCpuThrottled;
+            }
+          }
         }
       }
     } finally {
+      order.cancel();
       if (!processCompleted) {
         process.destroy();
         int waitMillis = 1000;
         while (!process.waitFor(waitMillis, TimeUnit.MILLISECONDS)) {
           log.log(
               Level.INFO,
-              format("process did not respond to termination for %s, killing it", operationName));
+              format("process did not respond to termination for %s, killing it", executionName));
           process.destroyForcibly();
           waitMillis = 100;
         }
+        executionContext.workerExecutedMetadata.putAllUsage(resource.sample());
       }
     }
 
@@ -648,29 +829,11 @@ class Executor {
       stderrReaderThread.join();
       stdout = stdoutReader.getData();
       stderr = stderrReader.getData();
-
     } catch (Exception e) {
-      log.log(Level.SEVERE, "error extracting stdout/stderr: ", e.getMessage());
+      log.log(Level.SEVERE, "error extracting stdout/stderr", e);
     }
 
     resultBuilder.setExitCode(exitCode).setStdoutRaw(stdout).setStderrRaw(stderr);
-
-    // allow debugging after an execution
-    if (limits.debugAfterExecution) {
-      // Obtain execution statistics recorded while the action executed.
-      // Currently we can only source this data when using the sandbox.
-      ExecutionStatistics executionStatistics = ExecutionStatistics.newBuilder().build();
-      if (limits.useLinuxSandbox) {
-        executionStatistics =
-            ExecutionStatistics.newBuilder()
-                .mergeFrom(
-                    new FileInputStream(execDir.resolve("action_execution_statistics").toString()))
-                .build();
-      }
-
-      return ExecutionDebugger.performAfterExecutionDebug(
-          processBuilder, exitCode, limits, executionStatistics, resultBuilder);
-    }
 
     return statusCode;
   }

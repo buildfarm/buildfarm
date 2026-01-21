@@ -25,6 +25,12 @@ public interface Claim {
     REPORT_RESULT_STAGE,
   }
 
+  public interface Lease {
+    String name();
+    int amount();
+    Stage stage();
+  }
+
   void release(Stage stage);
 
   void release();
@@ -32,4 +38,8 @@ public interface Claim {
   @Nullable UserPrincipal owner();
 
   Iterable<Entry<String, List<Object>>> getPools();
+
+  void add(Lease lease);
+
+  Lease get(String name);
 }

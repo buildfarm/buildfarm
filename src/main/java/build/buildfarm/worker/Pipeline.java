@@ -80,6 +80,10 @@ public class Pipeline implements Iterable<PipelineStage> {
    */
   public boolean isEmpty() {
     for (PipelineStage stage : stageClosePriorities.keySet()) {
+      if (!stage.isEmpty()) {
+        return false;
+      }
+      /*
       // InputFetchStage
       if (stage instanceof InputFetchStage) {
         int slotUsage = ((InputFetchStage) stage).getSlotUsage();
@@ -101,6 +105,7 @@ public class Pipeline implements Iterable<PipelineStage> {
           return false;
         }
       }
+      */
     }
     return true;
   }

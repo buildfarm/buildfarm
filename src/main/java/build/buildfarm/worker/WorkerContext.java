@@ -21,6 +21,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
@@ -48,6 +49,10 @@ public interface WorkerContext {
     void close() throws IOException;
 
     boolean isReferenced();
+
+    Map<String, Long> sample();
+
+    void setCpu(int cores_us) throws IOException;
   }
 
   String getName();
@@ -145,4 +150,12 @@ public interface WorkerContext {
   int commandExecutionClaims(Command command);
 
   ResourceLimits commandExecutionSettings(Command command);
+
+  default Market market() {
+    return null;
+  }
+
+  default boolean shouldMarketExecution(RequestMetadata requestMetadata) {
+    return false;
+  }
 }

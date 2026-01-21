@@ -38,6 +38,7 @@ public final class ExecutionContext {
   final QueueEntry queueEntry;
   public final Claim claim;
   final WorkerExecutedMetadata.Builder workerExecutedMetadata;
+  final boolean marketExecution;
 
   private ExecutionContext(
       ExecuteResponse.Builder executeResponse,
@@ -50,7 +51,8 @@ public final class ExecutionContext {
       Tree tree,
       QueueEntry queueEntry,
       Claim claim,
-      WorkerExecutedMetadata.Builder workerExecutedMetadata) {
+      WorkerExecutedMetadata.Builder workerExecutedMetadata,
+      boolean marketExecution) {
     this.executeResponse = executeResponse;
     this.operation = operation;
     this.metadata = metadata;
@@ -62,6 +64,7 @@ public final class ExecutionContext {
     this.queueEntry = queueEntry;
     this.claim = claim;
     this.workerExecutedMetadata = workerExecutedMetadata;
+    this.marketExecution = marketExecution;
   }
 
   public static final class Builder {
@@ -76,6 +79,7 @@ public final class ExecutionContext {
     private QueueEntry queueEntry;
     private Claim claim;
     private WorkerExecutedMetadata.Builder workerExecutedMetadata;
+    private boolean marketExecution;
 
     private Builder(
         ExecuteResponse.Builder executeResponse,
@@ -88,7 +92,8 @@ public final class ExecutionContext {
         Tree tree,
         QueueEntry queueEntry,
         Claim claim,
-        WorkerExecutedMetadata.Builder workerExecutedMetadata) {
+        WorkerExecutedMetadata.Builder workerExecutedMetadata,
+        boolean marketExecution) {
       this.executeResponse = executeResponse;
       this.operation = operation;
       this.metadata = metadata;
@@ -100,6 +105,7 @@ public final class ExecutionContext {
       this.queueEntry = queueEntry;
       this.claim = claim;
       this.workerExecutedMetadata = workerExecutedMetadata;
+      this.marketExecution = marketExecution;
     }
 
     public Builder setOperation(Operation operation) {
@@ -147,6 +153,11 @@ public final class ExecutionContext {
       return this;
     }
 
+    public Builder setMarketExecution(boolean marketExecution) {
+      this.marketExecution = marketExecution;
+      return this;
+    }
+
     public ExecutionContext build() {
       return new ExecutionContext(
           executeResponse,
@@ -159,7 +170,8 @@ public final class ExecutionContext {
           tree,
           queueEntry,
           claim,
-          workerExecutedMetadata);
+          workerExecutedMetadata,
+          marketExecution);
     }
   }
 
@@ -175,7 +187,8 @@ public final class ExecutionContext {
         /* tree= */ null,
         /* queueEntry= */ null,
         /* claim= */ null,
-        /* workerExecutedMetadata= */ WorkerExecutedMetadata.newBuilder());
+        /* workerExecutedMetadata= */ WorkerExecutedMetadata.newBuilder(),
+        /* marketExecution= */ false);
   }
 
   public Builder toBuilder() {
@@ -190,6 +203,7 @@ public final class ExecutionContext {
         tree,
         queueEntry,
         claim,
-        workerExecutedMetadata);
+        workerExecutedMetadata,
+        marketExecution);
   }
 }
