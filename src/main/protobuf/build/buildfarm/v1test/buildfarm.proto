@@ -595,6 +595,22 @@ message StageInformation {
   int32 slots_used = 3;
 
   repeated string operation_names = 4;
+
+  repeated WorkerExecution executions = 5;
+}
+
+message WorkerExecution {
+  // longrunning operation name
+  string name = 1;
+
+  repeated Resource resources = 2;
+}
+
+message Resource {
+  // retained resource name for execution
+  string name = 1;
+
+  int32 amount = 2;
 }
 
 message BatchWorkerProfilesResponse {
@@ -735,4 +751,9 @@ message WorkerExecutedMetadata {
   int64 fetched_bytes = 1;
 
   repeated string linked_input_directories = 2;
+
+  // variable resource-defined usage keys mapped to quantified usage consumed
+  // by an execution during worker processing. May include cpu, io, ram with
+  // descriptive prefixes.
+  map<string, int64> usage = 3;
 }

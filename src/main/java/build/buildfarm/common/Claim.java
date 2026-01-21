@@ -14,6 +14,7 @@
 
 package build.buildfarm.common;
 
+import build.buildfarm.v1test.Resource;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -23,9 +24,27 @@ public interface Claim {
     REPORT_RESULT_STAGE,
   }
 
+  interface Lease {
+    String name();
+
+    int amount();
+
+    Stage stage();
+
+    static Resource toResource(Lease lease) {
+      return Resource.newBuilder().setName(lease.name()).setAmount(lease.amount()).build();
+    }
+  }
+
   void release(Stage stage);
 
   void release();
 
   Iterable<Entry<String, List<Object>>> getPools();
+
+  void add(Lease lease);
+
+  Lease get(String name);
+
+  Iterable<Resource> resources();
 }

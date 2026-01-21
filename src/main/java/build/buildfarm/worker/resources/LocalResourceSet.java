@@ -15,6 +15,7 @@
 package build.buildfarm.worker.resources;
 
 import build.buildfarm.common.Claim.Stage;
+import build.buildfarm.common.Resource;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
@@ -30,7 +31,22 @@ import java.util.concurrent.Semaphore;
  *     resources are specific to the individual worker.
  */
 public class LocalResourceSet {
-  public record SemaphoreResource(Semaphore semaphore, Stage stage) {}
+  public record SemaphoreResource(Semaphore semaphore, Stage stage) implements Resource {
+    @Override
+    public void release(int amount) {
+      semaphore().release(amount);
+    }
+
+    @Override
+    public int availablePermits() {
+      return semaphore().availablePermits();
+    }
+
+    @Override
+    public boolean tryAcquire(int amount) {
+      return semaphore().tryAcquire(amount);
+    }
+  }
 
   public record PoolResource(Queue<Object> pool, Stage stage) {}
 
@@ -39,7 +55,7 @@ public class LocalResourceSet {
    * @brief A set containing resource semaphores organized by name.
    * @details Key is name, and value contains current usage amount.
    */
-  public Map<String, SemaphoreResource> resources = new HashMap<>();
+  public Map<String, Resource> resources = new HashMap<>();
 
   public Map<String, PoolResource> poolResources = new HashMap<>();
 }

@@ -28,6 +28,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.OperationFailer;
 import build.buildfarm.common.ProxyDirectoriesIndex;
@@ -331,12 +332,15 @@ public class InputFetcher implements Runnable {
         Thread.currentThread()::interrupt,
         Deadline.after(10, DAYS),
         pollerExecutor);
+    RequestMetadata requestMetadata =
+        executionContext.queueEntry.getExecuteEntry().getRequestMetadata();
     ExecutionContext fetchedExecutionContext =
         executionContext.toBuilder()
             .setExecDir(execDir)
             .setAction(action)
             .setCommand(command)
             .setTree(tree)
+            .setMarketExecution(workerContext.shouldMarketExecution(requestMetadata))
             .build();
     boolean claimed;
     // PMD exemption false positive: unused variable

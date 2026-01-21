@@ -787,12 +787,14 @@ public final class Worker extends LoggingMain {
             configs.getWorker().isAllowBringYourOwnContainer(),
             configs.getWorker().isErrorOperationRemainingResources(),
             configs.getWorker().isErrorOperationOutputSizeExceeded(),
+            configs.getWorker().isExecutionMarket(),
+            configs.getWorker().getIgnoreMarketExecutionMnemonics(),
             resourceSet,
             writer);
 
     pipeline = new Pipeline();
     SuperscalarPipelineStage inputFetchStage = null;
-    SuperscalarPipelineStage executeActionStage = null;
+    ExecuteActionStage executeActionStage = null;
     SuperscalarPipelineStage reportResultStage = null;
     PutOperationStage completeStage = null;
     if (configs.getWorker().getCapabilities().isExecution()) {
