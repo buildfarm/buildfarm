@@ -46,7 +46,7 @@ RECOMMENDED_JVM_FLAGS = [
     "-XX:+HeapDumpOnOutOfMemoryError",
 ]
 
-DEFAULT_LOGGING_CONFIG = ["-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties"]
+DEFAULT_LOGGING_CONFIG = ["-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties"]
 
 def ensure_accurate_metadata():
     return select({
