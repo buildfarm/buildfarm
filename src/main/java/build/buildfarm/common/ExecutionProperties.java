@@ -297,4 +297,44 @@ public class ExecutionProperties {
    * @details See https://github.com/bazelbuild/bazel/issues/10091
    */
   public static final String PERSISTENT_WORKER_COMMAND = "persistentWorkerCommand";
+
+  /**
+   * @field CPU_SHARE_FLOOR
+   * @brief minimum number of cpu shares an execution must own
+   * @details Prevent available cpu from being reduced beyond this amount Must not be <= 0 for
+   *     market interactions
+   */
+  public static final String CPU_SHARE_FLOOR = "cpuShareFloor";
+
+  /**
+   * @field PCT_MIN_UNUSED
+   * @brief Percentage of owned shares that must be unused before sale
+   * @details Headroom for per-sample volatility of use before its cpu may be sold Must not be <= 0.
+   *     Values should be between <code>0 < x < 1</code> for market interactions
+   */
+  public static final String PCT_MIN_UNUSED = "pctMinUnused";
+
+  /**
+   * @field PCT_MIN_THROTTLE
+   * @brief Percentage of throttle that must be observed before buying cpu shares
+   * @details Headroom for per-sample volatility of throttle before cpu may be bought Must not be <=
+   *     0 for market interactions
+   */
+  public static final String PCT_MIN_THROTTLED = "pctMinThrottled";
+
+  /**
+   * @field MIN_SHARES_SOLD
+   * @brief CPU Shares minimum threshold sold
+   * @details Headroom for per-sample volatility of use before its cpu may be sold Must not be <= 0
+   *     for market interactions
+   */
+  public static final String MIN_SHARES_SOLD = "minSharesSold";
+
+  /**
+   * @field MAX_SHARES_SOLD
+   * @brief CPU Shares maximum sold clamp
+   * @details Headroom for per-sample volatility of unuse that may be sold Must not be <= 0 for
+   *     market interactions
+   */
+  public static final String MAX_SHARES_SOLD = "maxSharesSold";
 }

@@ -163,4 +163,43 @@ public class ResourceLimits {
    * @details See https://github.com/bazelbuild/bazel/issues/10091
    */
   public String persistentWorkerKey = "";
+
+  /**
+   * @field cpuShareFloor
+   * @brief minimum number of cpu shares an execution must own, there are 1000 shares per cpu
+   * @details Prevent available cpu from being reduced beyond this amount Must not be <= 0 for
+   *     market interactions
+   */
+  public int cpuShareFloor = 100;
+
+  /**
+   * @field pctMinUnused
+   * @brief Percentage of owned shares that must be unused before sale
+   * @details Headroom for per-sample volatility of use before its cpu may be sold Must not be <= 0
+   *     for market interactions
+   */
+  public int pctMinUnused = 10;
+
+  /**
+   * @field pctMinThrottled
+   * @brief Percentage of throttled that must be observed before buying cpu shares
+   * @details Headroom for per-sample volatility of throttle before cpu may be bought Must not be <=
+   *     0 for market interactions
+   */
+  public int pctMinThrottled = 10;
+
+  /**
+   * @field minSharesSold
+   * @brief Minimum Unused CPU Shares to sell
+   * @details Headroom for per-sample volatility of use before its cpu may be sold Must not be <= 0
+   *     for market interactions
+   */
+  public int minSharesSold = 10;
+
+  /**
+   * @field maxSharesSold
+   * @brief Maximum Unused CPU Shares to sell
+   * @details Control the sale rate of unused shares Must not be <= 0 for market interactions
+   */
+  public int maxSharesSold = -1;
 }

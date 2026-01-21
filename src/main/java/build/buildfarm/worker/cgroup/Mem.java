@@ -14,7 +14,9 @@
 
 package build.buildfarm.worker.cgroup;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Map;
 
 public class Mem extends Controller {
   Mem(Group group) {
@@ -24,6 +26,11 @@ public class Mem extends Controller {
   @Override
   public String getControllerName() {
     return "memory";
+  }
+
+  @Override
+  public Map<String, Long> sample() {
+    return ImmutableMap.of();
   }
 
   public long getMemoryLimit() throws IOException {
@@ -44,5 +51,10 @@ public class Mem extends Controller {
   public void setMemorySwapLimit(long limitBytes) throws IOException {
     open();
     writeLong("memory.memsw.limit_in_bytes", limitBytes);
+  }
+
+  @Override
+  public void setCpu(int cpu_us) {
+    throw new UnsupportedOperationException();
   }
 }
