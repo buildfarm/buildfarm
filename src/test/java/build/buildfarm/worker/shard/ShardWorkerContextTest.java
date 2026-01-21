@@ -158,7 +158,6 @@ public class ShardWorkerContextTest {
 
   @Test
   public void dequeueMatchSettingsPlatformRejectsInvalidQueueEntry() throws Exception {
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
     WorkerContext context = createTestContext();
     Platform matchPlatform =
@@ -185,7 +184,6 @@ public class ShardWorkerContextTest {
 
   @Test
   public void dequeueMatchSettingsPlatformAcceptsValidQueueEntry() throws Exception {
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
     Platform testOSPlatform =
         Platform.newBuilder()
