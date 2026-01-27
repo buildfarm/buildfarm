@@ -172,7 +172,7 @@ tasks:
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
     - export TEST_ARG1=--remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--remote_grpc_log='./grpc2.log'
-    - export SHA1_TOOLS_REMOTE=8abbff48ada653a42dfef977e6ba91d31e900fd5
+    - export SHA1_TOOLS_REMOTE=bc6975dcb71d090a7185f323d2905cbf1c926f52
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/cache_test.sh
 
