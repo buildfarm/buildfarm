@@ -285,7 +285,7 @@ public class RedisShardSubscriptionTest {
 
     subscription.run();
 
-    assertThat(Thread.currentThread().isInterrupted());
+    assertThat(Thread.currentThread().isInterrupted()).isTrue();
     verifyNoInteractions(onReset);
   }
 }

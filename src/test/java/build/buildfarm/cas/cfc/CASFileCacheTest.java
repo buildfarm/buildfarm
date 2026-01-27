@@ -336,7 +336,7 @@ class CASFileCacheTest {
 
     // check the current state to ensure no files were processed
     assertThat(Files.exists(path)).isFalse();
-    assertThat(storage.isEmpty());
+    assertThat(storage).isEmpty();
   }
 
   @Test
@@ -378,8 +378,8 @@ class CASFileCacheTest {
 
     // check the current state to ensure our two files were processed
     assertThat(storage).isEmpty();
-    assertThat(Files.exists(path));
-    assertThat(Files.exists(execPath));
+    assertThat(Files.exists(path)).isFalse();
+    assertThat(Files.exists(execPath)).isFalse();
   }
 
   @Test
