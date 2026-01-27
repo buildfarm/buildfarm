@@ -354,15 +354,6 @@ public final class BuildfarmConfigs {
         new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getProcessWrapper())),
         new ArrayList<String>(Arrays.asList(ExecutionProperties.PROCESS_WRAPPER)));
 
-    wrapperProperties.mapping.put(
-        new ArrayList<String>(
-            Arrays.asList(
-                configs.getExecutionWrappers().getSkipSleep(),
-                configs.getExecutionWrappers().getSkipSleepPreload(),
-                configs.getExecutionWrappers().getDelay())),
-        new ArrayList<String>(
-            Arrays.asList(ExecutionProperties.SKIP_SLEEP, ExecutionProperties.TIME_SHIFT)));
-
     return wrapperProperties;
   }
 

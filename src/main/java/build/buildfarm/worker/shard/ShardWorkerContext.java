@@ -956,20 +956,6 @@ class ShardWorkerContext implements WorkerContext {
     if (configs.getWorker().getSandboxSettings().isAlwaysUseAsNobody() || limits.fakeUsername) {
       arguments.add(configs.getExecutionWrappers().getAsNobody());
     }
-
-    if (limits.time.skipSleep) {
-      arguments.add(configs.getExecutionWrappers().getSkipSleep());
-
-      // we set these values very high because we want sleep calls to return immediately.
-      arguments.add("90000000"); // delay factor
-      arguments.add("90000000"); // time factor
-      arguments.add(configs.getExecutionWrappers().getSkipSleepPreload());
-
-      if (limits.time.timeShift != 0) {
-        arguments.add(configs.getExecutionWrappers().getDelay());
-        arguments.add(String.valueOf(limits.time.timeShift));
-      }
-    }
     return resource;
   }
 

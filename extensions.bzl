@@ -15,15 +15,6 @@ def archive_dependencies(third_party):
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
         },
-
-        # Optional execution wrappers
-        {
-            "name": "skip_sleep",
-            "build_file": "%s:BUILD.skip_sleep" % third_party,
-            "sha256": "03980702e8e9b757df68aa26493ca4e8573770f15dd8a6684de728b9cb8549f1",
-            "strip_prefix": "TARDIS-f54fa4743e67763bb1ad77039b3d15be64e2e564",
-            "url": "https://github.com/Unilang/TARDIS/archive/f54fa4743e67763bb1ad77039b3d15be64e2e564.zip",
-        },
     ]
 
 def _buildfarm_extension_impl(_ctx):

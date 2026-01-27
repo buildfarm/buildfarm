@@ -100,23 +100,6 @@ public class ExecutionProperties {
   public static final String ENV_VAR = "env-var";
 
   /**
-   * @field SKIP_SLEEP
-   * @brief The exec_property and platform property prefix name for skipping sleep calls in the
-   *     action.
-   * @details This affects the following syscalls: nanosleep, clock_nanosleep, select, poll,
-   *     gettimeofday, clock_gettime, time. This useful for finding artificially slow actions.
-   */
-  public static final String SKIP_SLEEP = "skip-sleep";
-
-  /**
-   * @field TIME_SHIFT
-   * @brief The exec_property and platform property prefix name for shifting time before running an
-   *     action.
-   * @details Currently only supports shifting time into the future.
-   */
-  public static final String TIME_SHIFT = "time-shift";
-
-  /**
    * @field DEBUG_BEFORE_EXECUTION
    * @brief The exec_property and platform property name for indicating whether a user wants to
    *     debug the before action state of an execution.
