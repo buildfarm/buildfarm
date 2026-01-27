@@ -34,6 +34,8 @@ import org.junit.runners.JUnit4;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
+@SuppressWarnings(
+    "ReturnValueIgnored") // ErrorProne doesn't like the Path.of() in the mockito mock.
 @RunWith(JUnit4.class)
 public class CGroupVersionProviderTest {
   @Before
