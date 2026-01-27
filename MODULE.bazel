@@ -29,11 +29,12 @@ bazel_dep(name = "grpc-java", version = "1.78.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20260109-6145b5ff")
 single_version_override(
     module_name = "googleapis",
+    patch_strip = 1,
     patches = [
         "//third_party:googleapis.patch",
     ],
-    patch_strip = 1,
 )
+
 bazel_dep(name = "googleapis-grpc-java", version = "1.0.0")
 bazel_dep(name = "grpc-proto", version = "0.0.0-20240627-ec30f58.bcr.1", repo_name = "io_grpc_grpc_proto")
 bazel_dep(name = "hermetic_cc_toolchain", version = "4.1.0")
@@ -52,16 +53,17 @@ bazel_dep(
     dev_dependency = True,
 )
 
-bazel_dep(name = "bazel_remote_apis", version = "e94a7ece2a1e8da1dcf278a0baf2edfe7baafb94", repo_name = "remoteapis")
+bazel_dep(name = "bazel_remote_apis", version = "b02e15a6d354e2fb553216132ccec79f3f5b39cb", repo_name = "remoteapis")
 archive_override(
     module_name = "bazel_remote_apis",
-    integrity = "sha256-ZDtGnl29H5spbghbCEbMF/wOKzq8td40CVnXuD2nvZo=",
+    integrity = "sha256-6/f8P1tElIJnbGlKyYjWfu4GicS/Ai/ECay+Uqy/JyY=",
+    patch_args = ["-p1"],
     patches = [
-        "//third_party:remote_apis_grpc.patch",
+        "//third_party:remote-apis.patch",
     ],
-    strip_prefix = "remote-apis-e94a7ece2a1e8da1dcf278a0baf2edfe7baafb94",
+    strip_prefix = "remote-apis-b02e15a6d354e2fb553216132ccec79f3f5b39cb",
     urls = [
-        "https://github.com/bazelbuild/remote-apis/archive/e94a7ece2a1e8da1dcf278a0baf2edfe7baafb94.zip",
+        "https://github.com/bazelbuild/remote-apis/archive/b02e15a6d354e2fb553216132ccec79f3f5b39cb.zip",
     ],
 )
 
