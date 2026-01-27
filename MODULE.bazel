@@ -5,7 +5,6 @@ module(
     repo_name = "build_buildfarm",
 )
 
-bazel_dep(name = "grpc", version = "1.74.1", repo_name = "com_github_grpc_grpc")
 bazel_dep(name = "protobuf", version = "33.4", repo_name = "com_google_protobuf")
 archive_override(
     module_name = "protobuf",
@@ -20,6 +19,7 @@ archive_override(
     ],
 )
 
+bazel_dep(name = "grpc", version = "1.76.0.bcr.1", repo_name = "com_github_grpc_grpc")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.4")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "blake3", version = "1.8.2")
