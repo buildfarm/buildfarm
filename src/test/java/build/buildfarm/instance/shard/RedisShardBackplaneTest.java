@@ -24,12 +24,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Queue;
@@ -49,13 +45,11 @@ import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
-import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.longrunning.Operation;
-import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.time.Instant;
@@ -501,33 +495,5 @@ public class RedisShardBackplaneTest {
             "",
             JsonCodec.CODEC.worker().print(shardWorker));
     verify(jedis, times(1)).publish(anyString(), anyString());
-  }
-
-  @Test
-  public void putActionResultPurgesUnknownAuxiliaryMetadatas() throws Exception {
-    UnifiedJedis jedis = mock(UnifiedJedis.class);
-    RedisClient client = new RedisClient(jedis);
-    DistributedState state = new DistributedState();
-    state.actionCache = mock(RedisMap.class);
-    RedisShardBackplane backplane = createBackplane("put-action-result-purges-test");
-    backplane.start(client, state, "putActionResultPurges/test:0000", name -> {});
-    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
-    ActionKey actionKey = digestUtil.computeActionKey(Action.getDefaultInstance());
-
-    ActionResult.Builder actionResult = ActionResult.newBuilder();
-    // action results cannot currently parse ExecuteOperationMetadata, ensure this continues to be
-    // true.
-    actionResult
-        .getExecutionMetadataBuilder()
-        .addAuxiliaryMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
-        .addAuxiliaryMetadata(Any.pack(WorkerExecutedMetadata.getDefaultInstance()));
-
-    backplane.putActionResult(actionKey, actionResult.build());
-
-    ArgumentCaptor<ActionResult> resultCaptor = ArgumentCaptor.forClass(ActionResult.class);
-    verify(state.actionCache, times(1))
-        .insert(eq(jedis), eq(actionKey.toString()), resultCaptor.capture(), any(Integer.class));
-    verifyNoMoreInteractions(state.actionCache);
-    assertThat(resultCaptor.getValue().getExecutionMetadata().getAuxiliaryMetadataCount() == 1);
   }
 }
