@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.redis;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
 import com.google.common.collect.Iterables;
@@ -89,6 +90,10 @@ public class RedisMap<T> {
     this.expiration_s = timeout_s;
   }
 
+  private String printNotNull(T value) {
+    return checkNotNull(translator.print(value), value);
+  }
+
   /**
    * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
    * @details If the key already exists, then the value is replaced.
@@ -99,7 +104,7 @@ public class RedisMap<T> {
    * @note Overloaded.
    */
   public void insert(UnifiedJedis jedis, String key, T value, int timeout_s) {
-    jedis.setex(createKeyName(key), timeout_s, translator.print(value));
+    jedis.setex(createKeyName(key), timeout_s, printNotNull(value));
   }
 
   /**
@@ -114,7 +119,7 @@ public class RedisMap<T> {
   public void insert(UnifiedJedis jedis, String key, T value, long timeout_s) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
-    jedis.setex(createKeyName(key), (int) timeout_s, translator.print(value));
+    jedis.setex(createKeyName(key), (int) timeout_s, printNotNull(value));
   }
 
   /**
@@ -129,12 +134,12 @@ public class RedisMap<T> {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
     SetParams setParams = SetParams.setParams().ex(expiration_s);
-    jedis.set(createKeyName(key), translator.print(value), setParams);
+    jedis.set(createKeyName(key), printNotNull(value), setParams);
   }
 
   public boolean putIfAbsent(UnifiedJedis jedis, String key, T value) {
     SetParams setParams = SetParams.setParams().nx().ex(expiration_s);
-    return "OK".equals(jedis.set(createKeyName(key), translator.print(value), setParams));
+    return "OK".equals(jedis.set(createKeyName(key), printNotNull(value), setParams));
   }
 
   /**
