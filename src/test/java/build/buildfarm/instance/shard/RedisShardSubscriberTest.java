@@ -480,13 +480,13 @@ public class RedisShardSubscriberTest {
 
   @Test
   public void workerRemovedCallsOnWorkerRemoved() throws Exception {
+    String removeWorkerName = "removeWorkerName";
+
     Map<String, ShardWorker> workers = new HashMap<>();
-    workers.put("removeWorkerName", ShardWorker.getDefaultInstance());
+    workers.put(removeWorkerName, ShardWorker.getDefaultInstance());
     Consumer<String> onWorkerRemoved = mock(Consumer.class);
     RedisShardSubscriber operationSubscriber =
         createSubscriber(null, workers, directExecutor(), onWorkerRemoved, JsonCodec.CODEC);
-
-    String removeWorkerName = "removed-worker";
 
     WorkerChange workerRemove =
         WorkerChange.newBuilder()
@@ -497,7 +497,7 @@ public class RedisShardSubscriberTest {
     operationSubscriber.onMessage(
         WORKER_CHANNEL, JsonCodec.CODEC.workerChange().print(workerRemove));
     verify(onWorkerRemoved, times(1)).accept(removeWorkerName);
-    assertThat(workers.isEmpty());
+    assertThat(workers).isEmpty();
 
     // validate callback regardless of map status, now missing the worker
     operationSubscriber.onMessage(
