@@ -233,7 +233,6 @@ use_repo(
     build_deps,
     "bazel",
     "opentelemetry",
-    "skip_sleep",
     "tini",
     "tini_arm64v8",
 )

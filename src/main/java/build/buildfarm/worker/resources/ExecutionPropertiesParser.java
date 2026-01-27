@@ -57,8 +57,6 @@ public class ExecutionPropertiesParser {
     parser.put(ExecutionProperties.MAX_MEM, ExecutionPropertiesParser::storeMaxMem);
     parser.put(ExecutionProperties.ENV_VAR, ExecutionPropertiesParser::storeEnvVar);
     parser.put(ExecutionProperties.ENV_VARS, ExecutionPropertiesParser::storeEnvVars);
-    parser.put(ExecutionProperties.SKIP_SLEEP, ExecutionPropertiesParser::storeSkipSleep);
-    parser.put(ExecutionProperties.TIME_SHIFT, ExecutionPropertiesParser::storeTimeShift);
     parser.put(ExecutionProperties.CONTAINER_IMAGE, ExecutionPropertiesParser::storeContainerImage);
     parser.put(
         ExecutionProperties.DEBUG_BEFORE_EXECUTION,

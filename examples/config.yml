@@ -176,6 +176,3 @@ executionWrappers:
   linuxSandbox: /app/build_buildfarm/linux-sandbox
   asNobody: /app/build_buildfarm/as-nobody
   processWrapper: /app/build_buildfarm/process-wrapper
-  skipSleep: /app/build_buildfarm/skip_sleep
-  skipSleepPreload: /app/build_buildfarm/skip_sleep_preload.so
-  delay: /app/build_buildfarm/delay.sh
