@@ -1,0 +1,26 @@
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -235,6 +235,7 @@
+ 
+ maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+ maven.install(
++    name = "protobuf_maven",
+     artifacts = PROTOBUF_MAVEN_ARTIFACTS,
+     lock_file = "//:maven_install.json",
+     repositories = [
+diff --git a/upb/mini_table/extension_registry.c b/upb/mini_table/extension_registry.c
+index 047aa38e9..659d34e82 100644
+--- a/upb/mini_table/extension_registry.c
++++ b/upb/mini_table/extension_registry.c
+@@ -89,7 +89,10 @@ failure:
+   return status;
+ }
+ 
+-#ifdef UPB_LINKARR_DECLARE
++// TODO: Temporarily disable this. I don't really understand the details, but it seems
++// like this is just used for PHP and Ruby and we do not use it.
++// See https://github.com/protocolbuffers/protobuf/issues/21755.
++#if 0
+ 
+ UPB_LINKARR_DECLARE(upb_AllExts, const upb_MiniTableExtension);
+ 
