@@ -41,6 +41,8 @@ public class CGroupVersionProviderTest {
     Assume.assumeFalse(isWindows());
   }
 
+  @SuppressWarnings(
+      "ReturnValueIgnored") // ErrorProne doesn't like the Path.of() in the mockito mock.
   private void testDetectCGroups(String type, CGroupVersion detectedVersion) throws IOException {
     // Create a mock FileStore that returns `type` as the type
     FileStore mockFileStore = mock(FileStore.class);
@@ -97,6 +99,8 @@ public class CGroupVersionProviderTest {
     testDetectCGroups("cgroup2", CGroupVersion.CGROUPS_V2);
   }
 
+  @SuppressWarnings(
+      "ReturnValueIgnored") // ErrorProne doesn't like the Path.of() in the mockito mock.
   @Test
   public void testNoCGroupsWhenDirectoryDoesntExist() {
     try (MockedStatic<Files> mockedFiles = Mockito.mockStatic(Files.class);
