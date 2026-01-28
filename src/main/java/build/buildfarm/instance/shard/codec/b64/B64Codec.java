@@ -23,18 +23,22 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import com.google.longrunning.Operation;
+import java.util.logging.Level;
 
 public final class B64Codec {
-  public static final Codec CODEC =
-      new Codec(
-          new B64Translator<>(ActionResult.parser(), "ActionResult"),
-          new B64Translator<>(ExecuteEntry.parser(), "ExecuteEntry"),
-          new B64Translator<>(QueueEntry.parser(), "QueueEntry"),
-          new B64Translator<>(Operation.parser(), "Operation"),
-          new B64Translator<>(OperationChange.parser(), "OperationChange"),
-          new B64Translator<>(DispatchedOperation.parser(), "DispatchedOperation"),
-          new B64Translator<>(ShardWorker.parser(), "ShardWorker"),
-          new B64Translator<>(WorkerChange.parser(), "WorkerChange"));
+  public static final Codec CODEC = create(Level.SEVERE);
+
+  public static Codec create(Level level) {
+    return new Codec(
+        new B64Translator<>(ActionResult.parser(), "ActionResult", level),
+        new B64Translator<>(ExecuteEntry.parser(), "ExecuteEntry", level),
+        new B64Translator<>(QueueEntry.parser(), "QueueEntry", level),
+        new B64Translator<>(Operation.parser(), "Operation", level),
+        new B64Translator<>(OperationChange.parser(), "OperationChange", level),
+        new B64Translator<>(DispatchedOperation.parser(), "DispatchedOperation", level),
+        new B64Translator<>(ShardWorker.parser(), "ShardWorker", level),
+        new B64Translator<>(WorkerChange.parser(), "WorkerChange", level));
+  }
 
   private B64Codec() {}
 }

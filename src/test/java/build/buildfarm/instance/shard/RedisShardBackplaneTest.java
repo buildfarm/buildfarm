@@ -113,7 +113,7 @@ public class RedisShardBackplaneTest {
     verify(jedis, times(1))
         .publish(eq(configs.getBackplane().getWorkerChannel()), changeCaptor.capture());
     String json = changeCaptor.getValue();
-    WorkerChange workerChange = ShardCodec.DEFAULT_CODEC.workerChange().parse(json);
+    WorkerChange workerChange = ShardCodec.DEFAULT_CODEC.workerChange().parse(json).value();
     assertThat(workerChange.getName()).isEqualTo(worker.getEndpoint());
     assertThat(workerChange.getTypeCase()).isEqualTo(WorkerChange.TypeCase.REMOVE);
   }
@@ -121,14 +121,14 @@ public class RedisShardBackplaneTest {
   OperationChange verifyChangePublished(String channel, UnifiedJedis jedis) throws IOException {
     ArgumentCaptor<String> changeCaptor = ArgumentCaptor.forClass(String.class);
     verify(jedis, times(1)).publish(eq(channel), changeCaptor.capture());
-    return ShardCodec.DEFAULT_CODEC.operationChange().parse(changeCaptor.getValue());
+    return ShardCodec.DEFAULT_CODEC.operationChange().parse(changeCaptor.getValue()).value();
   }
 
   OperationChange verifyChangePublished(String channel, AbstractPipeline pipeline)
       throws IOException {
     ArgumentCaptor<String> changeCaptor = ArgumentCaptor.forClass(String.class);
     verify(pipeline, times(1)).publish(eq(channel), changeCaptor.capture());
-    return ShardCodec.DEFAULT_CODEC.operationChange().parse(changeCaptor.getValue());
+    return ShardCodec.DEFAULT_CODEC.operationChange().parse(changeCaptor.getValue()).value();
   }
 
   String operationName(String name) {
@@ -254,7 +254,7 @@ public class RedisShardBackplaneTest {
             args -> {
               // Extract the operation that was dispatched
               DispatchedOperation dispatchedOperation =
-                  ShardCodec.DEFAULT_CODEC.dispatchedExecution().parse(args.getArgument(2));
+                  ShardCodec.DEFAULT_CODEC.dispatchedExecution().parse(args.getArgument(2)).value();
 
               assertThat(dispatchedOperation.getQueueEntry().getRequeueAttempts())
                   .isEqualTo(REQUEUE_AMOUNT_WHEN_DISPATCHED);
@@ -336,7 +336,7 @@ public class RedisShardBackplaneTest {
             args -> {
               // Extract the operation that was dispatched
               DispatchedOperation dispatchedOperation =
-                  ShardCodec.DEFAULT_CODEC.dispatchedExecution().parse(args.getArgument(2));
+                  ShardCodec.DEFAULT_CODEC.dispatchedExecution().parse(args.getArgument(2)).value();
 
               assertThat(dispatchedOperation.getQueueEntry().getRequeueAttempts())
                   .isEqualTo(REQUEUE_AMOUNT_WHEN_DISPATCHED);

@@ -38,13 +38,13 @@ class TranslatedQueue<E extends Message> implements Queue<E> {
   // java.util.BlockingQueue-ish
   @Override
   public E take(Duration timeout) throws InterruptedException {
-    return translator.parse(queue.take(timeout));
+    return translator.parse(queue.take(timeout)).value();
   }
 
   // java.util.Queue
   @Override
   public E poll() {
-    return translator.parse(queue.poll());
+    return translator.parse(queue.poll()).value();
   }
 
   @Override
@@ -72,12 +72,12 @@ class TranslatedQueue<E extends Message> implements Queue<E> {
   // maybe switch to iterator?
   @Override
   public void visit(Visitor<E> visitor) {
-    queue.visit(value -> visitor.visit(translator.parse(value)));
+    queue.visit(value -> visitor.visit(translator.parse(value).value()));
   }
 
   @Override
   public void visitDequeue(Visitor<E> visitor) {
-    queue.visitDequeue(value -> visitor.visit(translator.parse(value)));
+    queue.visitDequeue(value -> visitor.visit(translator.parse(value).value()));
   }
 
   @Override
@@ -94,7 +94,7 @@ class TranslatedQueue<E extends Message> implements Queue<E> {
   public ScanResult<E> scan(String cursor, int count, String match) {
     ScanResult<String> scanResults = queue.scan(cursor, count, match);
     List<E> results =
-        newArrayList(transform(scanResults.getResult(), value -> translator.parse(value)));
+        newArrayList(transform(scanResults.getResult(), value -> translator.parse(value).value()));
     return new ScanResult<>(scanResults.getCursor(), results);
   }
 }

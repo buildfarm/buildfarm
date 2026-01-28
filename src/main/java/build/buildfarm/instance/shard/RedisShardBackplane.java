@@ -192,7 +192,8 @@ public class RedisShardBackplane implements Backplane {
               // persist the flag for at least an hour, and at most 10 times longer than the timeout
               // the key identifies so that we don't loop with the flag expired, resetting the
               // unaccounted for operation
-              long expire_s = Math.max(3600, Time.millisecondsToSeconds(processingTimeout_ms) * 10);
+              int expire_s =
+                  (int) Math.max(3600l, Time.millisecondsToSeconds(processingTimeout_ms) * 10l);
               state.processingExecutions.insert(jedis, executionName, expiresAt, expire_s);
             }
 
@@ -226,8 +227,8 @@ public class RedisShardBackplane implements Backplane {
               // persist the flag for at least an hour, and at most 10 times longer than the timeout
               // the key identifies so that we don't loop with the flag expired, resetting the
               // unaccounted for operation
-              long expire_s =
-                  Math.max(3600, Time.millisecondsToSeconds(dispatchingTimeout_ms) * 10);
+              int expire_s =
+                  (int) Math.max(3600l, Time.millisecondsToSeconds(dispatchingTimeout_ms) * 10l);
               state.dispatchingExecutions.insert(jedis, executionName, expiresAt, expire_s);
             }
 

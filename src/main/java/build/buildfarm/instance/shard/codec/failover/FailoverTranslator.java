@@ -27,15 +27,20 @@ class FailoverTranslator<T extends Message> implements StringTranslator<T> {
   }
 
   @Override
-  public T parse(String value) {
-    T t = null;
-    if (value != null) {
-      t = initial.parse(value);
-      if (t == null) {
-        t = next.parse(value);
-      }
+  public Result<T> parse(String value) {
+    if (value == null) {
+      return new Result<>(null, /* dirty= */ false);
     }
-    return t;
+    Result<T> result = initial.parse(value);
+    if (result.value() != null) {
+      return result;
+    }
+
+    result = next.parse(value);
+    if (result.value() == null) {
+      return result;
+    }
+    return new Result<>(result.value(), /* dirty= */ result.value() != null);
   }
 
   @Override

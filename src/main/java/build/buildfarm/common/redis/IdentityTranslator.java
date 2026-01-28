@@ -21,7 +21,7 @@ public class IdentityTranslator implements StringTranslator<String> {
   }
 
   @Override
-  public String parse(String value) {
-    return value;
+  public Result<String> parse(String value) {
+    return new Result<>(value, /* dirty= */ false);
   }
 }

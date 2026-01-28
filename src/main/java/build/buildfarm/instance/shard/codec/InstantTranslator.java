@@ -28,14 +28,14 @@ public class InstantTranslator implements StringTranslator<Instant> {
   }
 
   @Override
-  public Instant parse(String value) {
+  public Result<Instant> parse(String value) {
     if (value != null) {
       try {
-        return Instant.ofEpochMilli(Long.parseLong(value));
+        return new Result<>(Instant.ofEpochMilli(Long.parseLong(value)), /* dirty= */ false);
       } catch (NumberFormatException e) {
         log.severe(format("invalid instant %s", value));
       }
     }
-    return null;
+    return new Result<>(null, /* dirty= */ false);
   }
 }

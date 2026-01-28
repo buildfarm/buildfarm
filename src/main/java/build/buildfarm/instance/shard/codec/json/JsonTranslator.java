@@ -45,17 +45,17 @@ abstract class JsonTranslator<T extends Message> implements StringTranslator<T> 
   }
 
   @Override
-  public T parse(String json) {
+  public Result<T> parse(String json) {
     if (json != null) {
       try {
         Message.Builder message = builder();
         parser.merge(json, message);
-        return (T) message.build();
+        return new Result<>((T) message.build(), /* dirty= */ false);
       } catch (InvalidProtocolBufferException e) {
         log.log(Level.SEVERE, "error parsing " + name + " from " + json, e);
       }
     }
-    return null;
+    return new Result<>(null, /* dirty= */ false);
   }
 
   @Override
@@ -64,7 +64,7 @@ abstract class JsonTranslator<T extends Message> implements StringTranslator<T> 
       try {
         return printer.print(value);
       } catch (InvalidProtocolBufferException e) {
-        log.log(Level.SEVERE, "error parsing " + name + " from " + value, e);
+        log.log(Level.SEVERE, "error printing " + name + " from " + value, e);
       }
     }
     return null;

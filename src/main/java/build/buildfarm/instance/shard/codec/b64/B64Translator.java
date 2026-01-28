@@ -30,22 +30,24 @@ class B64Translator<T extends Message> implements StringTranslator<T> {
   private static final Base64.Encoder ENCODER = Base64.getEncoder();
   private final Parser<T> parser;
   private final String name;
+  private final Level level;
 
-  B64Translator(Parser<T> parser, String name) {
+  B64Translator(Parser<T> parser, String name, Level level) {
     this.parser = parser;
     this.name = name;
+    this.level = level;
   }
 
   @Override
-  public T parse(String b64) {
+  public Result<T> parse(String b64) {
     if (b64 != null) {
       try {
-        return parser.parseFrom(DECODER.decode(b64));
+        return new Result<>(parser.parseFrom(DECODER.decode(b64)), /* dirty= */ false);
       } catch (IllegalArgumentException | InvalidProtocolBufferException e) {
-        log.log(Level.SEVERE, "error parsing " + name + " from " + b64, e);
+        log.log(level, "error parsing " + name + " from " + b64, e);
       }
     }
-    return null;
+    return new Result<>(null, /* dirty= */ false);
   }
 
   @Override
