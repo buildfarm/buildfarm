@@ -62,7 +62,6 @@ import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
-import build.buildfarm.worker.cgroup.CGroupVersion;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
@@ -960,10 +959,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private String getCgroups() {
-    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
-      return configs.getExecutionWrappers().getCgroups2();
-    }
-    return configs.getExecutionWrappers().getCgroups1();
+    return configs.getExecutionWrappers().getCgroups2();
   }
 
   IOResource limitSpecifiedExecution(

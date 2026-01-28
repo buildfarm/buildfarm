@@ -28,7 +28,6 @@ import io.grpc.Deadline;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -51,11 +50,11 @@ import lombok.extern.java.Log;
 /**
  * Represents a cgroup abstraction.
  *
- * <p>For cgroups v2, we do an evacuation dance. For cgroups v2, it's not possible to have child
- * groups (with processes) when parent groups also have processes when subtree controllers are
- * enabled. Only "leaf cgroups" can have processes in them. So we move all the processes in the
- * current cgroup into a child cgroup named "evacuation". When running with cgroups enabled, you
- * will have two child cgroups of the starting cgroup:
+ * <p>We do an evacuation dance. It's not possible to have child groups (with processes) when parent
+ * groups also have processes when subtree controllers are enabled. Only "leaf cgroups" can have
+ * processes in them. So we move all the processes in the current cgroup into a child cgroup named
+ * "evacuation". When running with cgroups enabled, you will have two child cgroups of the starting
+ * cgroup:
  *
  * <ul>
  *   <li><b>evacuation</b> - where buildfarm, tini, and whatever else was in the cgroup when
@@ -65,8 +64,6 @@ import lombok.extern.java.Log;
  *
  * At shutdown, we make every effort to undo this re-arrangement in the {@link #onShutdown()}
  * method.
- *
- * <p>All cgroupv1 support is temporary; please migrate to v2 as quickly as possible.
  */
 @Log
 public final class Group {
@@ -91,10 +88,7 @@ public final class Group {
   @Getter private final Cpu cpu;
   @Getter private final Mem mem;
 
-  @SuppressWarnings(
-      "PMD.MutableStaticState") // Unit tests set this. When CGroups v1 support is gone, this will
-  // go away, too.
-  public static CGroupVersion VERSION;
+  private static CGroupVersion VERSION;
 
   static {
     // Must be done in order
@@ -103,18 +97,33 @@ public final class Group {
   }
 
   /**
+   * Get the CGroup version.
+   *
+   * @return CGroup version
+   */
+  public static CGroupVersion getVersion() {
+    return VERSION;
+  }
+
+  /**
+   * Set the CGroup version for testing purposes only.
+   *
+   * @param version CGroup version to set
+   */
+  @VisibleForTesting
+  static void setVersionForTesting(CGroupVersion version) {
+    VERSION = version;
+  }
+
+  /**
    * Find our own cgroup.
    *
-   * <p>For cgroups v1, preserve old behavior of always assuming `/sys/fs/cgroup/ is the root, And
-   * look for controller-specific files at <code>/sys/fs/cgroups/&lt;controller&gt;/cgroup.*</code>
-   *
-   * @return
+   * @return Path to our cgroup or /sys/fs/cgroup if not found
    */
   static Path getSelfCgroup(CGroupVersion version) {
     if (version == CGroupVersion.CGROUPS_V2) {
       try {
         // For cgroups v2, there's only one line, and it always starts with `0::`
-        // For v1, there's other lines for cgroup subsystem managers.
         List<String> myCgroups = Files.readAllLines(Paths.get("/proc/self/cgroup"));
 
         Optional<String> selfCgroup =
@@ -138,7 +147,7 @@ public final class Group {
         log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
       }
     }
-    // cgroup v1 or NONE always assume /sys/fs/cgroup
+    // Fallback to /sys/fs/cgroup
     return Paths.get("/sys/fs/cgroup");
   }
 
@@ -177,61 +186,8 @@ public final class Group {
     return parent.getHierarchy() + "/" + getName();
   }
 
-  /**
-   * Get hierarchy of this cgroup and all parents. Includes the controller name.
-   *
-   * <p>This is for CGroups v1 only.
-   *
-   * @param controllerName
-   * @return
-   */
-  String getHierarchy(String controllerName) {
-    if (parent != null) {
-      return parent.getHierarchy(controllerName) + "/" + getName();
-    }
-    if (VERSION == CGroupVersion.CGROUPS_V2) {
-      return "";
-    } else {
-      return controllerName;
-    }
-  }
-
-  /**
-   * Get the path for a given Controller Name
-   *
-   * <p>This is for cgroups v1 only
-   *
-   * @param controllerName
-   * @return
-   */
-  @Deprecated(forRemoval = true)
-  Path getPath(String controllerName) {
-    if (VERSION == CGroupVersion.CGROUPS_V1) {
-      return rootPath.resolve(getHierarchy(controllerName));
-    }
-    return getPath();
-  }
-
-  /* use for cgroups v2 */
   Path getPath() {
     return rootPath.resolve(getHierarchy());
-  }
-
-  /**
-   * Determine if the controller is applied to any processes
-   *
-   * @param controllerName The CGroup v1 controller
-   * @return <c>true</c> if there are any processes under control of the given controller name in
-   *     this cgroup, <c>false</c> otherwise.
-   */
-  @Deprecated
-  boolean isEmpty(String controllerName) throws IOException {
-    if (VERSION == CGroupVersion.CGROUPS_V1) {
-      return getPids(controllerName).isEmpty();
-    } else if (VERSION == CGroupVersion.CGROUPS_V2) {
-      return isEmpty();
-    }
-    throw new IllegalStateException("Not cgroups 1 or 2!");
   }
 
   boolean isEmpty() throws IOException {
@@ -247,20 +203,6 @@ public final class Group {
   private void killAllProcesses(Iterable<Integer> processIds) {
     Streams.stream(processIds)
         .forEach(processId -> posix.kill(processId, Signal.SIGKILL.intValue()));
-  }
-
-  /**
-   * Get the list of Process IDs in a given CGroup by name.
-   *
-   * @param controllerName cgroup name, relative to cgroup root.
-   * @return Set of process IDs or empty set if the CGroup is currently empty.
-   */
-  @VisibleForTesting
-  @Nonnull
-  @Deprecated
-  Set<Integer> getPids(String controllerName) {
-    checkState(VERSION == CGroupVersion.CGROUPS_V1, "Only applicable for cgroups v1");
-    return getPids(getPath(controllerName));
   }
 
   @VisibleForTesting
@@ -319,10 +261,6 @@ public final class Group {
   /* package */ void killUntilEmpty(@Nullable String controllerName) throws IOException {
     if (VERSION == CGroupVersion.CGROUPS_V2) {
       killUntilEmpty(this::getPids);
-    } else if (VERSION == CGroupVersion.CGROUPS_V1) {
-      // CGroups v1 below:
-      checkNotNull(controllerName, "Controller name is null");
-      killUntilEmpty(() -> getPids(controllerName));
     } else if (VERSION == CGroupVersion.NONE) {
       throw new RuntimeException("Cannot kill empty group without CGroups support!");
     }
@@ -433,37 +371,23 @@ public final class Group {
 
   void create(@Nonnull String controllerName) throws IOException {
     /* root already has all controllers created */
-    if (VERSION == CGroupVersion.CGROUPS_V2 && !root.isEmpty(controllerName)) {
+    if (VERSION == CGroupVersion.CGROUPS_V2 && !root.isEmpty()) {
       Group evacuation = root.getChild(EVACUATION_CGROUP_NAME);
       log.log(
           Level.FINE,
-          "beginning evacuation of root cgroup for cgroups v2 from "
-              + rootPath
-              + " to "
-              + evacuation.getPath());
-      if (Files.exists(evacuation.getPath(controllerName))) {
+          "beginning evacuation of root cgroup from " + rootPath + " to " + evacuation.getPath());
+      if (Files.exists(evacuation.getPath())) {
         // Clean it up.
-        Files.delete(evacuation.getPath(controllerName));
+        Files.delete(evacuation.getPath());
       }
-      Files.createDirectories(evacuation.getPath(controllerName));
+      Files.createDirectories(evacuation.getPath());
       evacuation.adoptPids(root.getPids());
       verify(root.isEmpty(), "tried to evacuate root cgroup but there were processes remaining");
-      ensureControllerIsEnabled(
-          root.getPath(controllerName), REQUIRED_CGROUP_CONTROLLER_NAMES, true);
+      ensureControllerIsEnabled(root.getPath(), REQUIRED_CGROUP_CONTROLLER_NAMES, true);
     }
     if (parent != null) {
       parent.create(controllerName);
-      if (VERSION == CGroupVersion.CGROUPS_V1) {
-        Path path = getPath(controllerName);
-        try {
-          if (!Files.exists(path)) {
-            Files.createDirectories(path);
-          }
-        } catch (FileAlreadyExistsException e) {
-          // per the avoidance above, we don't care that this already
-          // exists and we lost a race to create it
-        }
-      } else if (VERSION == CGroupVersion.CGROUPS_V2) {
+      if (VERSION == CGroupVersion.CGROUPS_V2) {
         // Write "cgroup.subtree_control" file with content like this:
         // +<controller1_name> +<controller2_name>
         // (if you wish to remove a controller, prefix with `-` instead of `+`)
