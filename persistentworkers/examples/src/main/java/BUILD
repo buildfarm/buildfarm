@@ -1,5 +1,4 @@
-load("@rules_java//java:java_binary.bzl", "java_binary")
-load("@rules_java//java:java_library.bzl", "java_library")
+load("//bazel/rules:java.bzl", "java_binary", "java_library")
 
 java_library(
     name = "adder-lib",

@@ -1,6 +1,6 @@
 load("@com_google_protobuf//bazel:java_proto_library.bzl", "java_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
-load("@rules_java//java:java_library.bzl", "java_library")
+load("//bazel/rules:java.bzl", "java_library")
 
 package(default_visibility = ["//visibility:public"])
 
