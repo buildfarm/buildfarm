@@ -61,11 +61,28 @@ class TextLRUDB implements LRUDB {
 
   @Override
   public void save(Iterator<SizeEntry> entries, Path path) throws IOException {
-    try (BufferedWriter writer = Files.newBufferedWriter(path)) {
+    // Write to temporary file first for atomic save
+    Path tmpPath = path.resolveSibling(path.getFileName() + ".tmp");
+
+    // Write all data to the temporary file
+    try (BufferedWriter writer = Files.newBufferedWriter(tmpPath)) {
       while (entries.hasNext()) {
         SizeEntry entry = entries.next();
         writer.write(format("%s,%d\n", entry.key(), entry.size()));
       }
     }
+
+    // Remove existing file if it exists, ignore exceptions
+    try {
+      Files.delete(path);
+    } catch (IOException e) {
+      // Ignore - file may not exist
+    }
+
+    // Hard link temporary file to target location
+    Files.createLink(path, tmpPath);
+
+    // Remove temporary file
+    Files.delete(tmpPath);
   }
 }
