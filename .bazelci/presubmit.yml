@@ -1,4 +1,4 @@
-buildifier: 8.0.0
+buildifier: 8.2.1
 tasks:
 
   # Linting jobs
