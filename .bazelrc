@@ -42,3 +42,21 @@ build:windows --sandbox_add_mount_pair=C:\Temp
 # To continue using it until then, use the flag --define=protobuf_allow_msvc=true.
 # For feedback or discussion, see github.com/protocolbuffers/protobuf/issues/20085.
 build:windows --define=protobuf_allow_msvc=true
+# NullAway: plugin is always loaded via //bazel/rules:java.bzl wrapper,
+# but disabled by default. Enable with: bazel build --config=nullaway //...
+# In JSpecifyMode, only @NullMarked classes/packages are checked.
+# AnnotatedPackages uses a placeholder; actual checking scope comes from @NullMarked.
+
+build --javacopt=-XDcompilePolicy=simple
+build --javacopt=-XepDisableWarningsInGeneratedCode
+# Choose one of "AnnotatedPackages" OR "OnlyNullMarked", cannot choose both.
+build --javacopt=-XepOpt:NullAway:AnnotatedPackages=build.buildfarm
+#build --javacopt=-XepOpt:NullAway:OnlyNullMarked
+
+build --javacopt=-XepOpt:NullAway:TreatGeneratedAsUnannotated=true
+build --javacopt=-XepOpt:NullAway:CheckOptionalEmptiness=true
+build --javacopt=-XepOpt:NullAway:SuggestSuppressions=true
+# NullAway can run in "WARN" or "ERROR" mode (blocking) or "OFF" mode.
+build --javacopt=-Xep:NullAway:WARN
+build:nullaway --javacopt=-Xep:NullAway:ERROR
+build:silence_nullaway --javacopt=-Xep:NullAway:OFF
