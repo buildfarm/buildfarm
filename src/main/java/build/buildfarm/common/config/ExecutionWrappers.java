@@ -33,14 +33,6 @@ public class ExecutionWrappers {
   private String cgroups2 = "/app/build_buildfarm/cgexec-wrapper";
 
   /**
-   * @field cgroups1
-   * @brief The program to use when running actions under cgroups v1.
-   * @details This program is expected to be packaged with the worker image.
-   */
-  @Deprecated(forRemoval = true)
-  private String cgroups1 = "/usr/bin/cgexec";
-
-  /**
    * @field unshare
    * @brief The program to use when desiring to unshare namespaces from the action.
    * @details This program is expected to be packaged with the worker image.

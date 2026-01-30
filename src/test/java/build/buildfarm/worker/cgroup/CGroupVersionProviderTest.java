@@ -84,14 +84,15 @@ public class CGroupVersionProviderTest {
   }
 
   @Test
-  public void testDetectCGroupsV1() throws IOException {
-    testDetectCGroups("cgroup", CGroupVersion.CGROUPS_V1);
+  public void testDetectCGroupsV1NotSupported() throws IOException {
+    // v1 is no longer supported, so it should return NONE
+    testDetectCGroups("cgroup", CGroupVersion.NONE);
   }
 
   @Test
-  public void testDetectCGroupsV1tmpfs() throws IOException {
-    /* Sometimes it is mounted as tmpfs inside k8s */
-    testDetectCGroups("tmpfs", CGroupVersion.CGROUPS_V1);
+  public void testDetectCGroupsV1tmpfsNotSupported() throws IOException {
+    /* Sometimes it is mounted as tmpfs inside k8s - but v1 is no longer supported */
+    testDetectCGroups("tmpfs", CGroupVersion.NONE);
   }
 
   @Test

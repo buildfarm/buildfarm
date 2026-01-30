@@ -35,13 +35,13 @@ public class CGroupVersionProvider implements Supplier<CGroupVersion> {
         if (fsType.equals("cgroup2")) {
           return CGroupVersion.CGROUPS_V2;
         } else {
-          /* fsType=cgroup or fsType=tmpfs */
+          /* fsType=cgroup or fsType=tmpfs indicates v1, which is no longer supported */
           log.log(
-              Level.WARNING,
-              "cgroups v1 detected at /sys/fs/cgroup ! This is the last Buildfarm version to"
-                  + " support v1 - Please upgrade your host to cgroups v2! See also"
-                  + " https://github.com/buildfarm/buildfarm/issues/2205");
-          return CGroupVersion.CGROUPS_V1;
+              Level.SEVERE,
+              "cgroups v1 detected at /sys/fs/cgroup! Buildfarm no longer supports cgroups v1. "
+                  + "Please upgrade your host to cgroups v2. See also "
+                  + "https://github.com/buildfarm/buildfarm/issues/2205");
+          return CGroupVersion.NONE;
         }
       }
     } catch (IOException e) {
