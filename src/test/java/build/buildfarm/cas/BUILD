@@ -1,5 +1,5 @@
-load("@rules_java//java:java_test.bzl", "java_test")
 load("//:jvm_flags.bzl", "add_opens_sun_nio_fs", "ensure_accurate_metadata")
+load("//bazel/rules:java.bzl", "java_test")
 
 java_test(
     name = "tests",
