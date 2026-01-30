@@ -1,4 +1,4 @@
-load("@rules_java//java:java_test.bzl", "java_test")
+load("//bazel/rules:java.bzl", "java_test")
 
 config_setting(
     name = "fuse",

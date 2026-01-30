@@ -1,5 +1,5 @@
-load("@rules_java//java:java_binary.bzl", "java_binary")
 load("//:jvm_flags.bzl", "add_opens_sun_nio_fs", "ensure_accurate_metadata")
+load("//bazel/rules:java.bzl", "java_binary")
 
 package(
     default_visibility = ["//src:__subpackages__"],
