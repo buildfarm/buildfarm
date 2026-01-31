@@ -215,18 +215,26 @@ use_repo(
 pull = use_repo_rule("@rules_img//img:pull.bzl", "pull")
 
 # Server base image
+# Note: layer_handling = "lazy" is required for container_structure_test to work
+# as it needs access to layer blobs for creating OCI layouts. While "lazy" is
+# marked as EXPERIMENTAL, it's necessary for the test infrastructure.
 pull(
     name = "amazon_corretto_java_image_base",
     digest = "sha256:53463affec61309c62bf118c2d8cbc5d1b4b11e6f456e9f2a71e4f0a4b27f037",
+    layer_handling = "lazy",
     registry = "public.ecr.aws",
     repository = "amazoncorretto/amazoncorretto",
     tag = "21",
 )
 
 # Worker base image
+# Note: layer_handling = "lazy" is required for container_structure_test to work
+# as it needs access to layer blobs for creating OCI layouts. While "lazy" is
+# marked as EXPERIMENTAL, it's necessary for the test infrastructure.
 pull(
     name = "ubuntu_noble",
     digest = "sha256:a1da084ca1429dd84a71e364e88985b4b85934f3d8717bfdc00f2fd06170158a",
+    layer_handling = "lazy",
     registry = "index.docker.io",
     repository = "bazelbuild/buildfarm-worker-base",
     tag = "noble",
