@@ -39,8 +39,9 @@ public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
     numberOfRemoteInvocations.inc();
     responseObserver.onNext(
         instance.getCapabilities().toBuilder()
-            .setLowApiVersion(SemVer.newBuilder().setMajor(2))
-            .setHighApiVersion(SemVer.newBuilder().setMajor(2))
+            .setDeprecatedApiVersion(SemVer.newBuilder().setMajor(2))
+            .setLowApiVersion(SemVer.newBuilder().setMajor(2).setMinor(3))
+            .setHighApiVersion(SemVer.newBuilder().setMajor(2).setMinor(11))
             .build());
     responseObserver.onCompleted();
   }
