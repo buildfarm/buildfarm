@@ -213,6 +213,10 @@ image_manifest(
         ":_layer_telemetry_tools_server",
         ":_layer_buildfarm_server_jar",
     ],
+    platform = select({
+        "@platforms//cpu:aarch64": "@rules_img//img/private/platforms:linux_arm64",
+        "//conditions:default": "@rules_img//img/private/platforms:linux_amd64",
+    }),
     tags = ["container"],
     visibility = ["//container:__subpackages__"],
 )
@@ -275,6 +279,10 @@ image_manifest(
         ":_layer_telemetry_tools_worker",
         ":_layer_buildfarm_worker_jar",
     ],
+    platform = select({
+        "@platforms//cpu:aarch64": "@rules_img//img/private/platforms:linux_arm64",
+        "//conditions:default": "@rules_img//img/private/platforms:linux_amd64",
+    }),
     tags = ["container"],
     visibility = ["//container:__subpackages__"],
 )
