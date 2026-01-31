@@ -1325,8 +1325,6 @@ public abstract class NodeInstance extends InstanceBase {
       Set<String> inputDirectories,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       PreconditionFailure.Builder preconditionFailure) {
-    validatePlatform(command.getPlatform(), preconditionFailure);
-
     // FIXME should input/output collisions (through directories) be another
     // invalid action?
     filesUniqueAndSortedPrecondition(command.getOutputFilesList(), preconditionFailure);
@@ -1395,6 +1393,13 @@ public abstract class NodeInstance extends InstanceBase {
     ImmutableSet.Builder<String> inputDirectoriesBuilder = ImmutableSet.builder();
     ImmutableSet.Builder<String> inputFilesBuilder = ImmutableSet.builder();
 
+    if (action.hasPlatform()) {
+      // version 2.2: clients SHOULD set these platform properties as well
+      // as those in the [Command][build.bazel.remote.execution.v2.Command]. Servers
+      // SHOULD prefer those set here.
+      validatePlatform(action.getPlatform(), preconditionFailure);
+    }
+
     inputDirectoriesBuilder.add(ACTION_INPUT_ROOT_DIRECTORY_PATH);
     boolean allowSymlinkTargetAbsolute =
         getCacheCapabilities().getSymlinkAbsolutePathStrategy()
@@ -1421,6 +1426,9 @@ public abstract class NodeInstance extends InstanceBase {
                       DigestUtil.fromDigest(action.getCommandDigest(), digestFunction)))
           .setDescription(MISSING_COMMAND);
     } else {
+      if (!action.hasPlatform()) {
+        validatePlatform(command.getPlatform(), preconditionFailure);
+      }
       validateCommand(
           command,
           action.getInputRootDigest(),
