@@ -1844,6 +1844,15 @@ public class ServerInstance extends NodeInstance {
         .build();
   }
 
+  // version specification: low 2.0, high >= 2.2
+  // Servers SHOULD prefer those set [in Action]
+  private Platform queuedOperationPlatform(QueuedOperation queuedOperation) {
+    if (queuedOperation.getAction().hasPlatform()) {
+      return queuedOperation.getAction().getPlatform();
+    }
+    return queuedOperation.getCommand().getPlatform();
+  }
+
   private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
       DigestUtil digestUtil,
       QueuedOperation queuedOperation,
@@ -1863,7 +1872,7 @@ public class ServerInstance extends NodeInstance {
         QueueEntry.newBuilder()
             .setExecuteEntry(executeEntry)
             .setQueuedOperationDigest(queuedOperationDigest)
-            .setPlatform(queuedOperation.getCommand().getPlatform())
+            .setPlatform(queuedOperationPlatform(queuedOperation))
             .build();
     return transform(
         retryWriteBlobFuture(
@@ -2866,7 +2875,7 @@ public class ServerInstance extends NodeInstance {
                     .setExecuteEntry(executeEntry)
                     .setQueuedOperationDigest(queuedOperationMetadata.getQueuedOperationDigest())
                     .setPlatform(
-                        profiledQueuedMetadata.getQueuedOperation().getCommand().getPlatform())
+                        queuedOperationPlatform(profiledQueuedMetadata.getQueuedOperation()))
                     .build();
             try {
               ensureCanQueue(stopwatch);

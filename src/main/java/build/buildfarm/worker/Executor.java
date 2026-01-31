@@ -167,7 +167,7 @@ class Executor {
     if (limits.useExecutionPolicies) {
       policies =
           ExecutionPolicies.forPlatform(
-              executionContext.command.getPlatform(), workerContext::getExecutionPolicies);
+              executionContext.queueEntry.getPlatform(), workerContext::getExecutionPolicies);
     }
     // since pools mandate injection of resources, each pool claim must require a policy
     // could probably do this with just the properties and the pool resource sets, but this is
@@ -297,7 +297,7 @@ class Executor {
     // similar to the policy selection here
     Map<String, Interpolator> interpolations =
         createInterpolations(
-            executionContext.claim, executionContext.command.getPlatform().getPropertiesList());
+            executionContext.claim, executionContext.queueEntry.getPlatform().getPropertiesList());
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
