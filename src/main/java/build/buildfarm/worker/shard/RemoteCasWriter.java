@@ -38,7 +38,6 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
@@ -163,7 +162,7 @@ public class RemoteCasWriter implements CasWriter {
               try {
                 FeedbackOutputStream outStream = (FeedbackOutputStream) write;
                 while (outStream.isReady()) {
-                  if (!copyBytes(in, outStream, chunkSizeBytes)) {
+                  if (ByteStreams.copy(ByteStreams.limit(in, chunkSizeBytes), outStream) == 0) {
                     return;
                   }
                 }
@@ -202,18 +201,5 @@ public class RemoteCasWriter implements CasWriter {
             directExecutor());
 
     return writtenFuture;
-  }
-
-  /**
-   * Copy some limited bytes from <code>in</code> to <code>out</code>.
-   *
-   * @param in Input source, must not be null
-   * @param out Output sink, must be write-able
-   * @param bytesAmount Bytes to write, must be non-negative
-   * @return <code>true</code> if at least one byte was written.
-   * @throws IOException
-   */
-  private boolean copyBytes(InputStream in, OutputStream out, int bytesAmount) throws IOException {
-    return ByteStreams.copy(ByteStreams.limit(in, bytesAmount), out) > 0;
   }
 }
