@@ -3,10 +3,10 @@ package build.buildfarm.cas.cfc;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
 
+import build.buildfarm.common.io.AtomicFileWriter;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -61,7 +61,8 @@ class TextLRUDB implements LRUDB {
 
   @Override
   public void save(Iterator<SizeEntry> entries, Path path) throws IOException {
-    try (BufferedWriter writer = Files.newBufferedWriter(path)) {
+    try (AtomicFileWriter atomicWriter = new AtomicFileWriter(path)) {
+      BufferedWriter writer = atomicWriter.getWriter();
       while (entries.hasNext()) {
         SizeEntry entry = entries.next();
         writer.write(format("%s,%d\n", entry.key(), entry.size()));
