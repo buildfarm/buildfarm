@@ -113,7 +113,7 @@ maven.install(
         "com.google.errorprone:error_prone_annotations:2.41.0",
         "com.google.errorprone:error_prone_core:2.41.0",
         "com.google.guava:failureaccess:1.0.3",
-        "com.google.guava:guava:33.4.8-jre",
+        "com.google.guava:guava:33.5.0-jre",
         "com.google.j2objc:j2objc-annotations:3.1",
         "com.google.protobuf:protobuf-java:4.32.1",
         "com.google.protobuf:protobuf-java-util:4.32.1",
