@@ -37,15 +37,13 @@ import java.util.UUID;
  * } // Automatic atomic swap and cleanup on close
  * }</pre>
  *
- * Note: This resource must be told, prior to the close block, that it
- * was successfully completed, in order to accomplish the file being
- * presented at the target. This is because there is no ability in the
- * AutoClosable to detect the exceptional state of closure.
- * If success is not indicated with an 'onSuccess' call at the time of
- * the first close call, the temp file will be deleted and no
- * interaction with the target will occur.
+ * Note: This resource must be told, prior to the close block, that it was successfully completed,
+ * in order to accomplish the file being presented at the target. This is because there is no
+ * ability in the AutoClosable to detect the exceptional state of closure. If success is not
+ * indicated with an 'onSuccess' call at the time of the first close call, the temp file will be
+ * deleted and no interaction with the target will occur.
  *
- * No thread safety of onSuccess() and close() is guaranteed.
+ * <p>No thread safety of onSuccess() and close() is guaranteed.
  */
 public class AtomicFileWriter extends BufferedWriter {
   private final Path target;

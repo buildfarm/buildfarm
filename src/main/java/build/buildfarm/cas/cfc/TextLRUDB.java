@@ -5,7 +5,6 @@ import static java.lang.String.format;
 
 import build.buildfarm.common.io.AtomicFileWriter;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Iterator;
