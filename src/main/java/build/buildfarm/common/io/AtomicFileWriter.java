@@ -14,16 +14,17 @@
 
 package build.buildfarm.common.io;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.UUID;
-import java.util.logging.Level;
-import lombok.extern.java.Log;
 
 /**
- * An AutoCloseable writer that atomically writes to a file.
+ * A writer that atomically presents a target file only on successful close.
  *
  * <p>Writes are performed to a temporary file with a unique UUID suffix. On successful close(), the
  * target file is atomically replaced via hard link, and the temporary file is deleted.
@@ -31,40 +32,52 @@ import lombok.extern.java.Log;
  * <p>Usage:
  *
  * <pre>{@code
- * try (AtomicFileWriter atomicWriter = new AtomicFileWriter(targetPath)) {
- *   BufferedWriter writer = atomicWriter.getWriter();
+ * try (AtomicFileWriter atomicWriter = new AtomicFileWriter(target)) {
  *   writer.write("data");
  * } // Automatic atomic swap and cleanup on close
  * }</pre>
+ *
+ * Note: This resource must be told, prior to the close block, that it
+ * was successfully completed, in order to accomplish the file being
+ * presented at the target. This is because there is no ability in the
+ * AutoClosable to detect the exceptional state of closure.
+ * If success is not indicated with an 'onSuccess' call at the time of
+ * the first close call, the temp file will be deleted and no
+ * interaction with the target will occur.
+ *
+ * No thread safety of onSuccess() and close() is guaranteed.
  */
-@Log
-public class AtomicFileWriter implements AutoCloseable {
-  private final Path targetPath;
-  private final Path tempPath;
-  private final BufferedWriter writer;
+public class AtomicFileWriter extends BufferedWriter {
+  private final Path target;
+  private final Path temp;
   private boolean closed = false;
+  private boolean success = false;
+
+  private static Path createSiblingRandomUUIDTemp(Path target) {
+    String suffix = UUID.randomUUID().toString();
+    String filename = target.getFileName().toString();
+    return target.resolveSibling(filename + ".tmp." + suffix);
+  }
 
   /**
    * Creates an AtomicFileWriter for the specified target path.
    *
-   * @param targetPath the final destination path for the file
+   * @param target the final destination path for the file
    * @throws IOException if the temporary file cannot be created
    */
-  public AtomicFileWriter(Path targetPath) throws IOException {
-    this.targetPath = targetPath;
-    String suffix = UUID.randomUUID().toString();
-    String filename = targetPath.getFileName().toString();
-    this.tempPath = targetPath.resolveSibling(filename + ".tmp." + suffix);
-    this.writer = Files.newBufferedWriter(tempPath);
+  public AtomicFileWriter(Path target) throws IOException {
+    this(target, createSiblingRandomUUIDTemp(target));
   }
 
-  /**
-   * Returns the BufferedWriter for writing to the temporary file.
-   *
-   * @return the BufferedWriter
-   */
-  public BufferedWriter getWriter() {
-    return writer;
+  private AtomicFileWriter(Path target, Path temp) throws IOException {
+    super(Files.newBufferedWriter(temp));
+    checkState(!target.equals(temp));
+    this.target = target;
+    this.temp = temp;
+  }
+
+  public void onSuccess() {
+    success = true;
   }
 
   /**
@@ -90,48 +103,27 @@ public class AtomicFileWriter implements AutoCloseable {
     }
     closed = true;
 
-    // Track exceptions to ensure cleanup happens
-    IOException primaryException = null;
-
-    // Close writer first
     try {
-      writer.close();
-    } catch (IOException e) {
-      primaryException = e;
-    }
-
-    // Only attempt atomic swap if writer closed successfully
-    if (primaryException == null) {
-      try {
-        // Delete target file (ignore if doesn't exist)
-        try {
-          Files.delete(targetPath);
-        } catch (IOException e) {
-          // Ignore - file may not exist
-        }
-
-        // Create hard link to atomically replace
-        Files.createLink(targetPath, tempPath);
-      } catch (IOException e) {
-        primaryException = e;
+      // Close writer first
+      super.close();
+      // Only attempt atomic swap if writer closed successfully
+      if (success) {
+        replace();
       }
+    } finally {
+      Files.delete(temp);
     }
+  }
 
-    // Always try to delete temp file (aggressive cleanup)
+  private void replace() throws IOException {
+    // Delete target file (ignore if doesn't exist)
     try {
-      Files.delete(tempPath);
-    } catch (IOException e) {
-      // Log but don't suppress primary exception
-      if (primaryException != null) {
-        log.log(Level.FINE, "Failed to delete temporary file: " + tempPath, e);
-      } else {
-        log.log(Level.WARNING, "Failed to delete temporary file: " + tempPath, e);
-      }
+      Files.delete(target);
+    } catch (NoSuchFileException e) {
+      // Ignore - file may not exist
     }
 
-    // Rethrow primary exception if any
-    if (primaryException != null) {
-      throw primaryException;
-    }
+    // Create hard link to atomically replace
+    Files.createLink(target, temp);
   }
 }

@@ -61,12 +61,12 @@ class TextLRUDB implements LRUDB {
 
   @Override
   public void save(Iterator<SizeEntry> entries, Path path) throws IOException {
-    try (AtomicFileWriter atomicWriter = new AtomicFileWriter(path)) {
-      BufferedWriter writer = atomicWriter.getWriter();
+    try (AtomicFileWriter writer = new AtomicFileWriter(path)) {
       while (entries.hasNext()) {
         SizeEntry entry = entries.next();
         writer.write(format("%s,%d\n", entry.key(), entry.size()));
       }
+      writer.onSuccess();
     }
   }
 }
