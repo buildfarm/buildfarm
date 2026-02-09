@@ -219,7 +219,7 @@ shardWorker:
   tolerations: []
   affinity: {}
 
-  ## Security Context
+  ## Security Context (applied at both pod and container level)
   ## https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
   ##
   securityContext: {}
