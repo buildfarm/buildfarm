@@ -14,10 +14,10 @@ jobs:
     permissions:
       pages: write
     steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd   # v5.0.1
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
 
       # Use GitHub Actions' cache to cache dependencies on servers
-    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830   # v4.3.0
+    - uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306   # v5.0.3
       with:
         path: vendor/bundle
         key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile.lock') }}
