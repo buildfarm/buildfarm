@@ -11,7 +11,4 @@ public class Admin {
 
   private DEPLOYMENT_ENVIRONMENT deploymentEnvironment;
   private String clusterEndpoint;
-  // This configuration is deprecated but is left here for backwards compatibility. Use
-  // worker:gracefulShutdownSeconds instead.
-  private boolean enableGracefulShutdown;
 }
