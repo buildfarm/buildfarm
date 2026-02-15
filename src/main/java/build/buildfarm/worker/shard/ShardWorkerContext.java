@@ -789,6 +789,8 @@ class ShardWorkerContext implements WorkerContext {
       @Nullable UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
+    // Set the tags from worker configuration
+    workerExecutedMetadata.addAllTags(configs.getWorker().getTags());
     return execFileSystem.createExecDir(
         operationName,
         directoriesIndex,
