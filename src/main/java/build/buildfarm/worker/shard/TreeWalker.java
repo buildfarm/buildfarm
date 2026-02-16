@@ -73,7 +73,6 @@ class TreeWalker extends SimpleFileVisitor<Path> {
   }
 
   private final Stack<OutputDirectoryContext> path = new Stack<>();
-  private final boolean createSymlinkOutputs;
   private final DigestUtil digestUtil;
   private final IOConsumer<DigestPath> fileObserver;
   private Tree.Builder treeBuilder = null;
@@ -81,9 +80,7 @@ class TreeWalker extends SimpleFileVisitor<Path> {
   private Tree tree = null;
   private Path root = null;
 
-  TreeWalker(
-      boolean createSymlinkOutputs, DigestUtil digestUtil, IOConsumer<DigestPath> fileObserver) {
-    this.createSymlinkOutputs = createSymlinkOutputs;
+  TreeWalker(DigestUtil digestUtil, IOConsumer<DigestPath> fileObserver) {
     this.digestUtil = digestUtil;
     this.fileObserver = fileObserver;
   }
@@ -95,7 +92,7 @@ class TreeWalker extends SimpleFileVisitor<Path> {
 
   @Override
   public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-    if (createSymlinkOutputs && attrs.isSymbolicLink()) {
+    if (attrs.isSymbolicLink()) {
       visitSymbolicLink(file);
     } else {
       visitRegularFile(file);

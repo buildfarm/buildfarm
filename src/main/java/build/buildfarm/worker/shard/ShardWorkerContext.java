@@ -88,14 +88,17 @@ import io.prometheus.client.Counter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
@@ -103,6 +106,9 @@ import lombok.extern.java.Log;
 
 @Log
 class ShardWorkerContext implements WorkerContext {
+  private static Set<FileVisitOption> NOFOLLOW_LINKS = EnumSet.noneOf(FileVisitOption.class);
+  private static Set<FileVisitOption> FOLLOW_LINKS = EnumSet.of(FileVisitOption.FOLLOW_LINKS);
+
   static final String EXEC_OWNER_RESOURCE_NAME = "exec-owner";
   private static final Platform.Property EXEC_OWNER_PROPERTY =
       Platform.Property.newBuilder().setName(EXEC_OWNER_RESOURCE_NAME).setValue("1").build();
@@ -705,9 +711,10 @@ class ShardWorkerContext implements WorkerContext {
                         + "the maximum size of an entry");
           }
         };
-    TreeWalker treeWalker =
-        new TreeWalker(configs.getWorker().isCreateSymlinkOutputs(), digestUtil, fileObserver);
-    Files.walkFileTree(outputDirPath, treeWalker);
+    Set<FileVisitOption> options =
+        configs.getWorker().isCreateSymlinkOutputs() ? NOFOLLOW_LINKS : FOLLOW_LINKS;
+    TreeWalker treeWalker = new TreeWalker(digestUtil, fileObserver);
+    Files.walkFileTree(outputDirPath, options, Integer.MAX_VALUE, treeWalker);
     ByteString treeBlob = treeWalker.getTree().toByteString();
     Digest treeDigest = digestUtil.compute(treeBlob);
     insertBlob(treeDigest, treeBlob);
