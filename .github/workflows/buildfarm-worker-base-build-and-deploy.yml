@@ -25,11 +25,11 @@ jobs:
         # QEMU needed for the ARM variant.
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435   # v3.11.1
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f   # v3.12.0
         # Docker Buildx needed for the ARM variant.
 
     - name: Login to Bazelbuild Docker Hub
-      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef   # v3.6.0
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9   # v3.7.0
       with:
         username: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
         password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
@@ -37,7 +37,7 @@ jobs:
 
     - name: Build Jammy Docker image
         # AKA Ubuntu 22
-      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83   # v6.18.0
+      uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8   # v6.19.2
       with:
         context: .
         file: ./ci/base-worker-image/jammy/Dockerfile
@@ -46,7 +46,7 @@ jobs:
 
     - name: Build Lunar Docker image
         # AKA Ubuntu 23
-      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83   # v6.18.0
+      uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8   # v6.19.2
       with:
         context: .
         file: ./ci/base-worker-image/lunar/Dockerfile
@@ -55,7 +55,7 @@ jobs:
 
     - name: Build Multi-arch Noble Docker image
         # AKA Ubuntu 24
-      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83   # v6.18.0
+      uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8   # v6.19.2
       with:
         context: .
         platforms: linux/amd64,linux/arm64/v8
