@@ -183,6 +183,7 @@ class ResultReporter implements Runnable {
       return 0;
     } catch (IOException e) {
       log.log(Level.SEVERE, String.format("error uploading outputs for %s", operationName), e);
+      owner.error().put(executionContext);
       return 0;
     }
 
