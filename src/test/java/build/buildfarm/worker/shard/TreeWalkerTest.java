@@ -33,9 +33,12 @@ import com.google.common.jimfs.Jimfs;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -51,9 +54,9 @@ public class TreeWalkerTest {
     Files.createDirectory(treeRoot);
     Files.createDirectories(treeRoot.resolve("empty_subdir"));
     DigestUtil digestUtil = DigestUtil.forHash("BLAKE3");
-    TreeWalker treeWalker =
-        new TreeWalker(/* createSymlinkOutputs= */ false, digestUtil, digestPath -> {});
-    Files.walkFileTree(treeRoot, treeWalker);
+    TreeWalker treeWalker = new TreeWalker(digestUtil, digestPath -> {});
+    Set<FileVisitOption> followOptions = EnumSet.of(FileVisitOption.FOLLOW_LINKS);
+    Files.walkFileTree(treeRoot, followOptions, Integer.MAX_VALUE, treeWalker);
     Tree tree = treeWalker.getTree();
     DirectoryNode directoryNode = Iterables.getOnlyElement(tree.getRoot().getDirectoriesList());
     assertThat(directoryNode.getName()).isEqualTo("empty_subdir");
@@ -71,17 +74,21 @@ public class TreeWalkerTest {
     Digest digest = digestUtil.compute(content);
 
     IOConsumer<DigestPath> fileObserver = mock(IOConsumer.class);
-    TreeWalker treeWalker =
-        new TreeWalker(/* createSymlinkOutputs= */ false, digestUtil, fileObserver);
+    TreeWalker treeWalker = new TreeWalker(digestUtil, fileObserver);
     Path treeRoot = root.resolve("tree_root");
     Files.createDirectory(treeRoot);
+    Path subdir = treeRoot.resolve("dir");
+    Files.createDirectory(subdir);
     Path filePath = treeRoot.resolve("file");
     try (OutputStream out = Files.newOutputStream(filePath)) {
       content.writeTo(out);
     }
     Path symlinkPath = treeRoot.resolve("symlink_to_file");
     Files.createSymbolicLink(symlinkPath, treeRoot.relativize(filePath));
-    Files.walkFileTree(treeRoot, treeWalker);
+    Path symlinkDirPath = treeRoot.resolve("symlink_to_dir");
+    Files.createSymbolicLink(symlinkDirPath, treeRoot.relativize(subdir));
+    Set<FileVisitOption> followOptions = EnumSet.of(FileVisitOption.FOLLOW_LINKS);
+    Files.walkFileTree(treeRoot, followOptions, Integer.MAX_VALUE, treeWalker);
     Tree tree = treeWalker.getTree();
     Directory rootDirectory = tree.getRoot();
     List<FileNode> files = rootDirectory.getFilesList();
@@ -98,8 +105,7 @@ public class TreeWalkerTest {
   public void visitsSymlinksWhenConfigured() throws IOException {
     DigestUtil digestUtil = DigestUtil.forHash("BLAKE3");
 
-    TreeWalker treeWalker =
-        new TreeWalker(/* createSymlinkOutputs= */ true, digestUtil, digestPath -> {});
+    TreeWalker treeWalker = new TreeWalker(digestUtil, digestPath -> {});
     Path treeRoot = root.resolve("tree_root");
     Files.createDirectory(treeRoot);
     Path filePath = treeRoot.resolve("file");
@@ -114,19 +120,22 @@ public class TreeWalkerTest {
   }
 
   @Test
-  public void ignoresDeadSymlinksWhenConfigured() throws IOException {
+  public void deadSymlinksAppearWhenPresent() throws IOException {
     DigestUtil digestUtil = DigestUtil.forHash("BLAKE3");
 
-    TreeWalker treeWalker =
-        new TreeWalker(/* createSymlinkOutputs= */ false, digestUtil, digestPath -> {});
+    TreeWalker treeWalker = new TreeWalker(digestUtil, digestPath -> {});
     Path treeRoot = root.resolve("tree_root");
     Files.createDirectory(treeRoot);
     Path filePath = treeRoot.resolve("file");
     Files.createSymbolicLink(treeRoot.resolve("dead_symlink"), treeRoot.relativize(filePath));
-    Files.walkFileTree(treeRoot, treeWalker);
+    Set<FileVisitOption> followOptions = EnumSet.of(FileVisitOption.FOLLOW_LINKS);
+    Files.walkFileTree(treeRoot, followOptions, Integer.MAX_VALUE, treeWalker);
     Tree tree = treeWalker.getTree();
     Directory rootDirectory = tree.getRoot();
-    assertThat(rootDirectory.getSymlinksCount()).isEqualTo(0);
+    assertThat(rootDirectory.getSymlinksCount()).isEqualTo(1);
+    SymlinkNode deadSymlink = rootDirectory.getSymlinks(0);
+    assertThat(deadSymlink.getName()).isEqualTo("dead_symlink");
+    assertThat(deadSymlink.getTarget()).isEqualTo(treeRoot.relativize(filePath).toString());
     assertThat(rootDirectory.getFilesCount()).isEqualTo(0);
   }
 }
