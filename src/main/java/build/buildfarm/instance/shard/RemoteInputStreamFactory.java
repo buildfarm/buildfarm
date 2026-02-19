@@ -28,6 +28,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ServerInstance.WorkersCallback;
 import build.buildfarm.instance.stub.StubInstance;
@@ -151,7 +152,12 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
   public InputStream newInput(Compressor.Value compressor, Digest blobDigest, long offset)
       throws IOException {
     return newInput(
-        compressor, blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
+        compressor,
+        blobDigest,
+        offset,
+        BuildfarmConfigs.getInstance().getServer().getCasReadTimeout(),
+        SECONDS,
+        RequestMetadata.getDefaultInstance());
   }
 
   public InputStream newInput(
