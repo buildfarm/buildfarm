@@ -23,6 +23,11 @@ public class Server {
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
   private int casWriteTimeout = 3600;
   private int bytestreamTimeout = 3600;
+  private int casReadTimeout = 60;
+  private int expectTimeout = 60;
+  private int cacheCheckTimeout = 60;
+  private int queueTimeout = 60;
+  private int requeueTimeout = 60;
   private String sslCertificatePath = null;
   private String sslPrivateKeyPath = null;
   private boolean runDispatchedMonitor = true;

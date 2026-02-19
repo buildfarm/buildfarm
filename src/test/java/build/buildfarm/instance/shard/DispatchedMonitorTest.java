@@ -67,7 +67,11 @@ public class DispatchedMonitorTest {
     Scannable<DispatchedOperation> location = mock(Scannable.class);
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
-            /* shouldStop= */ () -> true, location, requeuer, /* intervalSeconds= */ 0);
+            /* shouldStop= */ () -> true,
+            location,
+            requeuer,
+            /* intervalSeconds= */ 0,
+            Durations.fromSeconds(1));
 
     dispatchedMonitor.run();
     verifyNoInteractions(location);
@@ -102,7 +106,11 @@ public class DispatchedMonitorTest {
     Scannable<DispatchedOperation> location = new IterableScannable(dispatchedOperations);
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
-            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
+            /* shouldStop= */ () -> false,
+            location,
+            requeuer,
+            /* intervalSeconds= */ 0,
+            Durations.fromSeconds(1));
     dispatchedMonitor.iterate();
     verifyNoInteractions(requeuer);
   }
@@ -123,9 +131,13 @@ public class DispatchedMonitorTest {
     when(requeuer.apply(eq(queueEntry), any(Duration.class))).thenReturn(immediateFuture(null));
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
-            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
+            /* shouldStop= */ () -> false,
+            location,
+            requeuer,
+            /* intervalSeconds= */ 0,
+            Durations.fromSeconds(1));
     dispatchedMonitor.iterate();
-    verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(60));
+    verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(1));
   }
 
   @Test
@@ -135,7 +147,11 @@ public class DispatchedMonitorTest {
         .thenThrow(new IOException("transient error condition"));
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
-            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
+            /* shouldStop= */ () -> false,
+            location,
+            requeuer,
+            /* intervalSeconds= */ 0,
+            Durations.fromSeconds(1));
     dispatchedMonitor.iterate();
     verifyNoInteractions(requeuer);
     verify(location, times(1)).scan(any(Integer.class), any(String.class), any(Consumer.class));
@@ -159,9 +175,13 @@ public class DispatchedMonitorTest {
         .thenReturn(immediateFailedFuture(new Exception("error during requeue")));
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
-            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
+            /* shouldStop= */ () -> false,
+            location,
+            requeuer,
+            /* intervalSeconds= */ 0,
+            Durations.fromSeconds(1));
     dispatchedMonitor.iterate();
-    verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(60));
+    verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(1));
   }
 
   @Test
@@ -178,7 +198,11 @@ public class DispatchedMonitorTest {
 
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
-            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
+            /* shouldStop= */ () -> false,
+            location,
+            requeuer,
+            /* intervalSeconds= */ 0,
+            Durations.fromSeconds(1));
     Thread thread = new Thread(dispatchedMonitor);
     thread.start();
     while (!readyForInterrupt.get()) {
@@ -196,7 +220,8 @@ public class DispatchedMonitorTest {
     BooleanSupplier shouldStop = mock(BooleanSupplier.class);
     when(shouldStop.getAsBoolean()).thenReturn(false).thenReturn(true);
     DispatchedMonitor dispatchedMonitor =
-        new DispatchedMonitor(shouldStop, location, requeuer, /* intervalSeconds= */ 0);
+        new DispatchedMonitor(
+            shouldStop, location, requeuer, /* intervalSeconds= */ 0, Durations.fromSeconds(1));
     dispatchedMonitor.run();
     verify(location, atLeastOnce())
         .scan(any(Integer.class), any(String.class), any(Consumer.class));

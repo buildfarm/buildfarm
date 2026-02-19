@@ -297,9 +297,6 @@ public class ServerInstance extends NodeInstance {
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  // TODO: move to config
-  private static final Duration queueTimeout = Durations.fromSeconds(60);
-
   private static Backplane createBackplane(String identifier) throws ConfigurationException {
     if (configs.getBackplane().getType().equals(SHARD)) {
       return new RedisShardBackplane(
@@ -534,7 +531,8 @@ public class ServerInstance extends NodeInstance {
                   backplane::isStopped,
                   dispatchedOperations,
                   this::requeueOperation,
-                  dispatchedMonitorIntervalSeconds));
+                  dispatchedMonitorIntervalSeconds,
+                  Durations.fromSeconds(configs.getServer().getRequeueTimeout())));
     } else {
       dispatchedMonitor = null;
     }
@@ -603,7 +601,11 @@ public class ServerInstance extends NodeInstance {
                       transformPollerExecutor);
                   try {
                     log.log(Level.FINER, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
+                    ListenableFuture<Void> queueFuture =
+                        queue(
+                            executeEntry,
+                            poller,
+                            Durations.fromSeconds(configs.getServer().getQueueTimeout()));
                     addCallback(
                         queueFuture,
                         new FutureCallback<>() {
@@ -1694,7 +1696,9 @@ public class ServerInstance extends NodeInstance {
       Executor executor,
       RequestMetadata requestMetadata) {
     Context.CancellableContext withDeadline =
-        Context.current().withDeadlineAfter(60, SECONDS, contextDeadlineScheduler);
+        Context.current()
+            .withDeadlineAfter(
+                configs.getServer().getExpectTimeout(), SECONDS, contextDeadlineScheduler);
     Context previousContext = withDeadline.attach();
     try {
       ListenableFuture<T> future = super.expect(digest, parser, executor, requestMetadata);
@@ -2622,7 +2626,9 @@ public class ServerInstance extends NodeInstance {
     }
 
     Context.CancellableContext withDeadline =
-        Context.current().withDeadlineAfter(60, SECONDS, contextDeadlineScheduler);
+        Context.current()
+            .withDeadlineAfter(
+                configs.getServer().getCacheCheckTimeout(), SECONDS, contextDeadlineScheduler);
     try {
       return checkCacheFutureCancellable(actionKey, operation, requestMetadata, withDeadline);
     } catch (RuntimeException e) {

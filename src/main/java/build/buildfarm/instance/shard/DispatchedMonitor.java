@@ -25,7 +25,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.Duration;
-import com.google.protobuf.util.Durations;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +50,7 @@ class DispatchedMonitor implements Runnable {
   private final Scannable<DispatchedOperation> location;
   private final BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
   private final int intervalSeconds;
+  private final Duration requeueDelay;
 
   /**
    * Constructs a new DispatchedMonitor.
@@ -59,16 +59,19 @@ class DispatchedMonitor implements Runnable {
    * @param location scannable source of dispatched operations to monitor
    * @param requeuer function that requeues a queue entry with a specified delay duration
    * @param intervalSeconds number of seconds to wait between monitoring iterations
+   * @param requeueDelay delay to use when requeuing overdue operations
    */
   DispatchedMonitor(
       BooleanSupplier shouldStop,
       Scannable<DispatchedOperation> location,
       BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer,
-      int intervalSeconds) {
+      int intervalSeconds,
+      Duration requeueDelay) {
     this.shouldStop = shouldStop;
     this.location = location;
     this.requeuer = requeuer;
     this.intervalSeconds = intervalSeconds;
+    this.requeueDelay = requeueDelay;
   }
 
   /**
@@ -86,7 +89,7 @@ class DispatchedMonitor implements Runnable {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
 
     logOverdueOperation(o, now);
-    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry, Durations.fromSeconds(60));
+    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry, requeueDelay);
     long startTime = System.nanoTime();
     requeuedFuture.addListener(
         () -> {
