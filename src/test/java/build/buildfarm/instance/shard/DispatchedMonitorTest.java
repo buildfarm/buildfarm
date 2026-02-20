@@ -202,7 +202,7 @@ public class DispatchedMonitorTest {
             location,
             requeuer,
             /* intervalSeconds= */ 0,
-            /* requeueDelay=*/ Durations.fromSeconds(1));
+            /* requeueDelay= */ Durations.fromSeconds(1));
     Thread thread = new Thread(dispatchedMonitor);
     thread.start();
     while (!readyForInterrupt.get()) {
