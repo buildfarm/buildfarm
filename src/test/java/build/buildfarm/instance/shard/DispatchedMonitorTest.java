@@ -71,7 +71,7 @@ public class DispatchedMonitorTest {
             location,
             requeuer,
             /* intervalSeconds= */ 0,
-            Durations.fromSeconds(1));
+            /* requeueDelay= */ Durations.fromSeconds(1));
 
     dispatchedMonitor.run();
     verifyNoInteractions(location);
@@ -110,7 +110,7 @@ public class DispatchedMonitorTest {
             location,
             requeuer,
             /* intervalSeconds= */ 0,
-            Durations.fromSeconds(1));
+            /* requeueDelay= */ Durations.fromSeconds(1));
     dispatchedMonitor.iterate();
     verifyNoInteractions(requeuer);
   }
@@ -135,7 +135,7 @@ public class DispatchedMonitorTest {
             location,
             requeuer,
             /* intervalSeconds= */ 0,
-            Durations.fromSeconds(1));
+            /* requeueDelay= */ Durations.fromSeconds(1));
     dispatchedMonitor.iterate();
     verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(1));
   }
@@ -151,7 +151,7 @@ public class DispatchedMonitorTest {
             location,
             requeuer,
             /* intervalSeconds= */ 0,
-            Durations.fromSeconds(1));
+            /* requeueDelay= */ Durations.fromSeconds(1));
     dispatchedMonitor.iterate();
     verifyNoInteractions(requeuer);
     verify(location, times(1)).scan(any(Integer.class), any(String.class), any(Consumer.class));
@@ -179,7 +179,7 @@ public class DispatchedMonitorTest {
             location,
             requeuer,
             /* intervalSeconds= */ 0,
-            Durations.fromSeconds(1));
+            /* requeueDelay= */ Durations.fromSeconds(1));
     dispatchedMonitor.iterate();
     verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(1));
   }
@@ -202,7 +202,7 @@ public class DispatchedMonitorTest {
             location,
             requeuer,
             /* intervalSeconds= */ 0,
-            Durations.fromSeconds(1));
+            /* requeueDelay=*/ Durations.fromSeconds(1));
     Thread thread = new Thread(dispatchedMonitor);
     thread.start();
     while (!readyForInterrupt.get()) {
