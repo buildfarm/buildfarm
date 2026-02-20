@@ -91,7 +91,8 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
           .setCasUnreferencedEntryCount(storage.unreferencedEntryCount())
           .setCasDirectoryEntryCount(storage.directoryStorageCount())
           .setCasEvictedEntryCount(storage.getEvictedCount())
-          .setCasEvictedEntrySize(storage.getEvictedSize());
+          .setCasEvictedEntrySize(storage.getEvictedSize())
+          .setCasReadOnly(storage.isReadOnly());
     }
 
     // get slots configured and used of superscalar stages

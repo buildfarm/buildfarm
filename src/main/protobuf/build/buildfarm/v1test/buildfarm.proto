@@ -636,6 +636,9 @@ message WorkerProfileMessage {
   // the total size of evicted Entries since last profile request
   int64 cas_evicted_entry_size = 6;
 
+  // If the CAS is in read-only mode
+  bool cas_read_only = 17;
+
   // used for removed fields representing composed used/configured slots
   reserved 7 to 8;
 
