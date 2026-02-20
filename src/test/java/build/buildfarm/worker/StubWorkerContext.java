@@ -212,12 +212,22 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
+  public IOResource applyCgroupsLimitation(
+      String operationName,
+      UserPrincipal owner,
+      ImmutableList.Builder<String> arguments,
+      Command command) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public IOResource limitExecution(
       String operationName,
       UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
-      Path workingDirectory) {
+      Path workingDirectory,
+      IOResource cgroupResource) {
     throw new UnsupportedOperationException();
   }
 

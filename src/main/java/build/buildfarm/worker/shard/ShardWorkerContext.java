@@ -920,29 +920,75 @@ class ShardWorkerContext implements WorkerContext {
   // This has become an extremely awkward mechanism
   // an exec dir should be associatable with all of these parameters
   // and the arguments should be more structured and less susceptible to ordering details
+
+  /**
+   * Apply cgroups limitation wrapper first, before any privilege-dropping wrappers. This is
+   * required for cgroupsv2 where the wrapper needs to write to cgroup.procs as root. This method
+   * MUST be called before any prioritized execution policies that drop privileges.
+   */
+  @Override
+  public IOResource applyCgroupsLimitation(
+      String operationName,
+      @Nullable UserPrincipal owner,
+      ImmutableList.Builder<String> arguments,
+      Command command) {
+    ResourceLimits limits = commandExecutionSettings(command);
+    if (!shouldLimitCoreUsage() || !limits.cgroups) {
+      return null;
+    }
+
+    String operationId = getOperationId(operationName);
+    final Group group = operationsGroup.getChild(operationId);
+    ArrayList<IOResource> resources = new ArrayList<>();
+    ArrayList<String> usedGroups = new ArrayList<>();
+
+    // Possibly set core restrictions.
+    if (limits.cpu.limit) {
+      log.log(Level.FINEST, "Applying CPU limit {0}", limits.cpu);
+      applyCpuLimits(group, owner, limits, resources);
+      usedGroups.add(group.getCpu().getControllerName());
+    }
+
+    // Possibly set memory restrictions.
+    if (limits.mem.limit) {
+      log.log(Level.FINEST, "Applying Mem limit {0}", limits.mem);
+      applyMemLimits(group, owner, limits, resources);
+      usedGroups.add(group.getMem().getControllerName());
+    }
+
+    // Decide the CLI for running under cgroups
+    // This MUST be added first, before privilege-dropping wrappers
+    if (!usedGroups.isEmpty()) {
+      arguments.add(getCgroups(), "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
+    }
+
+    // Return the combined resource if we have any
+    return resources.isEmpty() ? null : combineResources(resources);
+  }
+
   @Override
   public IOResource limitExecution(
       String operationName,
       @Nullable UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
-      Path workingDirectory) {
+      Path workingDirectory,
+      @Nullable IOResource cgroupResource) {
     ResourceLimits limits = commandExecutionSettings(command);
-    IOResource resource;
-    if (shouldLimitCoreUsage()) {
-      resource = limitSpecifiedExecution(limits, operationName, owner, arguments, workingDirectory);
-    } else {
-      resource =
-          new IOResource() {
-            @Override
-            public void close() {}
 
-            @Override
-            public boolean isReferenced() {
-              return false;
-            }
-          };
-    }
+    // Use the cgroup resource if provided, otherwise create a no-op resource
+    IOResource resource =
+        cgroupResource != null
+            ? cgroupResource
+            : new IOResource() {
+              @Override
+              public void close() {}
+
+              @Override
+              public boolean isReferenced() {
+                return false;
+              }
+            };
 
     // Possibly set network restrictions.
     // This is not the ideal implementation of block-network.
@@ -967,48 +1013,6 @@ class ShardWorkerContext implements WorkerContext {
 
   private String getCgroups() {
     return configs.getExecutionWrappers().getCgroups2();
-  }
-
-  IOResource limitSpecifiedExecution(
-      ResourceLimits limits,
-      String operationName,
-      @Nullable UserPrincipal owner,
-      ImmutableList.Builder<String> arguments,
-      Path workingDirectory) {
-    // The decision to apply resource restrictions has already been decided within the
-    // ResourceLimits object. We apply the cgroup settings to file resources
-    // and collect group names to use on the CLI.
-    String operationId = getOperationId(operationName);
-    ArrayList<IOResource> resources = new ArrayList<>();
-    if (limits.cgroups) {
-      final Group group = operationsGroup.getChild(operationId);
-      ArrayList<String> usedGroups = new ArrayList<>();
-
-      // Possibly set core restrictions.
-      if (limits.cpu.limit) {
-        log.log(Level.FINEST, "Applying CPU limit {0}", limits.cpu);
-        applyCpuLimits(group, owner, limits, resources);
-        usedGroups.add(group.getCpu().getControllerName());
-      }
-
-      // Possibly set memory restrictions.
-      if (limits.mem.limit) {
-        log.log(Level.FINEST, "Applying Mem limit {0}", limits.mem);
-        applyMemLimits(group, owner, limits, resources);
-        usedGroups.add(group.getMem().getControllerName());
-      }
-
-      // Decide the CLI for running under cgroups
-      if (!usedGroups.isEmpty()) {
-        arguments.add(
-            getCgroups(), "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
-      }
-    }
-
-    // The executor expects a single IOResource.
-    // However, we may have multiple IOResources due to using multiple cgroup groups.
-    // We construct a single IOResource to account for this.
-    return combineResources(resources);
   }
 
   private LinuxSandboxOptions decideLinuxSandboxOptions(

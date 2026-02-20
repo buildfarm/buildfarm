@@ -81,17 +81,12 @@ abstract class Controller implements IOResource {
     }
   }
 
-  private void setOwner(String propertyName, UserPrincipal owner) throws IOException {
-    Path path = getPath().resolve(propertyName);
-    if (Files.exists(path)) {
-      Files.setOwner(path, owner);
-    }
-  }
-
   public void setOwner(UserPrincipal owner) throws IOException {
     // an execution owner must be able to join a cgroup through group task/proc ownership
     open();
-    setOwner("cgroup.procs", owner);
+    // We do NOT set ownership of cgroup.procs because:
+    // 1. cgexec-wrapper joins the cgroup while still running as root (before privilege drop)
+    // 2. Setting ownership to a non-root user prevents root from writing due to cgroupv2 delegation
   }
 
   protected void writeInt(String propertyName, int value) throws IOException {
