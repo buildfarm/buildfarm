@@ -97,9 +97,8 @@ public class Backplane {
         return uri;
       }
       return uri.replace(password, "<HIDDEN>");
-    } catch (ArrayIndexOutOfBoundsException e) {
-      // JedisURIHelper.getPassword did not find the password (e.g. only username in
-      // uri.getUserInfo)
+    } catch (IllegalArgumentException e) {
+      // JedisURIHelper.getPassword throws when no password is in the URI
       return uri;
     }
   }
@@ -148,9 +147,8 @@ public class Backplane {
       if (!Strings.isNullOrEmpty(JedisURIHelper.getPassword(redisProperUri))) {
         return JedisURIHelper.getPassword(redisProperUri);
       }
-    } catch (ArrayIndexOutOfBoundsException e) {
-      // JedisURIHelper.getPassword did not find the password (e.g. only username in
-      // uri.getUserInfo)
+    } catch (IllegalArgumentException e) {
+      // JedisURIHelper.getPassword throws when no password is in the URI
     }
 
     if (!Strings.isNullOrEmpty(redisCredentialFile)) {
