@@ -35,8 +35,11 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.SettableFuture;
+import java.io.IOException;
+import java.net.InetAddress;
 import java.util.List;
 import java.util.function.Consumer;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -47,6 +50,8 @@ import redis.clients.jedis.exceptions.JedisException;
 
 @RunWith(JUnit4.class)
 public class RedisShardSubscriptionTest {
+  private RedisServer server;
+
   RedisShardSubscriber getDefaultRedisSubscriber() {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
@@ -55,14 +60,45 @@ public class RedisShardSubscriptionTest {
         watchers, null, 1, "worker-channel", workerName -> {}, null, JsonCodec.CODEC);
   }
 
+  /**
+   * Creates a jedis-mock server bound explicitly to the IPv4 loopback address. Using the no-arg
+   * {@code newRedisServer()} causes {@code getHost()} to return "localhost", which on macOS may
+   * resolve to {@code ::1} (IPv6) while the server socket is IPv4-only, resulting in the Jedis
+   * client connecting to a different protocol stack than the server is listening on.
+   */
+  private RedisServer startServer() throws IOException {
+    server = RedisServer.newRedisServer(0, InetAddress.getByName("localhost")).start();
+    return server;
+  }
+
+  private RedisServer startServer(ServiceOptions options) throws IOException {
+    server =
+        RedisServer.newRedisServer(0, InetAddress.getByName("localhost"))
+            .setOptions(options)
+            .start();
+    return server;
+  }
+
+  private UnifiedJedis createJedis(RedisServer server) {
+    return new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+  }
+
+  @After
+  public void tearDown() throws IOException {
+    if (server != null) {
+      server.stop();
+      server = null;
+    }
+  }
+
   @Test
   public void runReturnsWhenStopped() throws Exception {
-    RedisServer server = RedisServer.newRedisServer().start();
+    RedisServer server = startServer();
 
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     List<String> subscriptions = ImmutableList.of("test");
-    UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+    UnifiedJedis jedis = createJedis(server);
     RedisShardSubscriber redisSubscriber = getDefaultRedisSubscriber();
 
     RedisShardSubscription subscription =
@@ -89,17 +125,15 @@ public class RedisShardSubscriptionTest {
   public void onResetWhenUnavailable() throws Exception {
     SettableFuture<Void> broken = SettableFuture.create();
     RedisServer server =
-        RedisServer.newRedisServer()
-            .setOptions(
-                ServiceOptions.withInterceptor(
-                    (state, roName, params) -> {
-                      if (roName.equalsIgnoreCase("subscribe") && !broken.isDone()) {
-                        broken.set(null);
-                        return MockExecutor.breakConnection(state);
-                      }
-                      return MockExecutor.proceed(state, roName, params);
-                    }))
-            .start();
+        startServer(
+            ServiceOptions.withInterceptor(
+                (state, roName, params) -> {
+                  if (roName.equalsIgnoreCase("subscribe") && !broken.isDone()) {
+                    broken.set(null);
+                    return MockExecutor.breakConnection(state);
+                  }
+                  return MockExecutor.proceed(state, roName, params);
+                }));
     SettableFuture<Void> reset = SettableFuture.create();
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
@@ -111,7 +145,7 @@ public class RedisShardSubscriptionTest {
         .when(onReset)
         .accept(any(UnifiedJedis.class));
     List<String> subscriptions = ImmutableList.of("test");
-    UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+    UnifiedJedis jedis = createJedis(server);
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
@@ -137,17 +171,15 @@ public class RedisShardSubscriptionTest {
   public void exceptionOnStopTImeout() throws Exception {
     SettableFuture<Void> broken = SettableFuture.create();
     RedisServer server =
-        RedisServer.newRedisServer()
-            .setOptions(
-                ServiceOptions.withInterceptor(
-                    (state, roName, params) -> {
-                      if (roName.equalsIgnoreCase("subscribe") && !broken.isDone()) {
-                        broken.set(null);
-                        return MockExecutor.breakConnection(state);
-                      }
-                      return MockExecutor.proceed(state, roName, params);
-                    }))
-            .start();
+        startServer(
+            ServiceOptions.withInterceptor(
+                (state, roName, params) -> {
+                  if (roName.equalsIgnoreCase("subscribe") && !broken.isDone()) {
+                    broken.set(null);
+                    return MockExecutor.breakConnection(state);
+                  }
+                  return MockExecutor.proceed(state, roName, params);
+                }));
     SettableFuture<Void> reset = SettableFuture.create();
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
@@ -159,7 +191,7 @@ public class RedisShardSubscriptionTest {
         .when(onReset)
         .accept(any(UnifiedJedis.class));
     List<String> subscriptions = ImmutableList.of("test");
-    UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+    UnifiedJedis jedis = createJedis(server);
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
@@ -192,21 +224,19 @@ public class RedisShardSubscriptionTest {
   public void exceptionOnStopWhenNotSubscribed() throws Exception {
     SettableFuture<Void> broken = SettableFuture.create();
     RedisServer server =
-        RedisServer.newRedisServer()
-            .setOptions(
-                ServiceOptions.withInterceptor(
-                    (state, roName, params) -> {
-                      if (roName.equalsIgnoreCase("subscribe") && !broken.isDone()) {
-                        broken.set(null);
-                        return MockExecutor.breakConnection(state);
-                      }
-                      return MockExecutor.proceed(state, roName, params);
-                    }))
-            .start();
+        startServer(
+            ServiceOptions.withInterceptor(
+                (state, roName, params) -> {
+                  if (roName.equalsIgnoreCase("subscribe") && !broken.isDone()) {
+                    broken.set(null);
+                    return MockExecutor.breakConnection(state);
+                  }
+                  return MockExecutor.proceed(state, roName, params);
+                }));
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     List<String> subscriptions = ImmutableList.of("test");
-    UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+    UnifiedJedis jedis = createJedis(server);
     RedisShardSubscriber redisSubscriber = getDefaultRedisSubscriber();
 
     RedisShardSubscription subscription =
@@ -225,20 +255,18 @@ public class RedisShardSubscriptionTest {
   @Test
   public void onUnsubscribeOnRecognizedException() throws Exception {
     RedisServer server =
-        RedisServer.newRedisServer()
-            .setOptions(
-                ServiceOptions.withInterceptor(
-                    (state, roName, params) -> {
-                      if (roName.equalsIgnoreCase("subscribe")) {
-                        return Response.error("unknown");
-                      }
-                      return MockExecutor.proceed(state, roName, params);
-                    }))
-            .start();
+        startServer(
+            ServiceOptions.withInterceptor(
+                (state, roName, params) -> {
+                  if (roName.equalsIgnoreCase("subscribe")) {
+                    return Response.error("unknown");
+                  }
+                  return MockExecutor.proceed(state, roName, params);
+                }));
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     List<String> subscriptions = ImmutableList.of("test");
-    UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+    UnifiedJedis jedis = createJedis(server);
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
@@ -257,23 +285,21 @@ public class RedisShardSubscriptionTest {
   @Test
   public void threadInterruptedIfOnUnsubscribedInterrupted() throws Exception {
     RedisServer server =
-        RedisServer.newRedisServer()
-            .setOptions(
-                ServiceOptions.withInterceptor(
-                    (state, roName, params) -> {
-                      if (roName.equalsIgnoreCase("subscribe")) {
-                        return Response.error("unknown");
-                      }
-                      return MockExecutor.proceed(state, roName, params);
-                    }))
-            .start();
+        startServer(
+            ServiceOptions.withInterceptor(
+                (state, roName, params) -> {
+                  if (roName.equalsIgnoreCase("subscribe")) {
+                    return Response.error("unknown");
+                  }
+                  return MockExecutor.proceed(state, roName, params);
+                }));
     InterruptingRunnable onUnsubscribe =
         () -> {
           throw new InterruptedException();
         };
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     List<String> subscriptions = ImmutableList.of("test");
-    UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+    UnifiedJedis jedis = createJedis(server);
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
