@@ -32,6 +32,7 @@ import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.StreamEntryID;
 import redis.clients.jedis.params.XAddParams;
+import redis.clients.jedis.params.XAutoClaimParams;
 import redis.clients.jedis.params.XPendingParams;
 import redis.clients.jedis.params.XReadGroupParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -249,6 +250,58 @@ public class RedisStreamQueue implements Queue<String> {
       pipeline.eval(
           REMOVE_BY_VALUE_SCRIPT, ImmutableList.of(name), ImmutableList.of(GROUP_NAME, val));
     }
+  }
+
+  /**
+   * Reclaim stale messages from the Pending Entries List using XAUTOCLAIM. Messages that have been
+   * pending longer than {@code minIdleMillis} are re-enqueued as new stream entries, and the old
+   * entries are acknowledged and deleted.
+   *
+   * @param minIdleMillis minimum idle time in milliseconds before a message is reclaimed.
+   * @return the number of messages reclaimed.
+   */
+  @Override
+  public int reclaimStaleMessages(long minIdleMillis) {
+    ensureGroupExists();
+    int reclaimed = 0;
+    StreamEntryID startId = new StreamEntryID(0, 0);
+
+    while (true) {
+      Map.Entry<StreamEntryID, List<StreamEntry>> result =
+          jedis.xautoclaim(
+              name,
+              GROUP_NAME,
+              CONSUMER_NAME,
+              minIdleMillis,
+              startId,
+              new XAutoClaimParams().count(100));
+
+      StreamEntryID nextCursor = result.getKey();
+      List<StreamEntry> claimed = result.getValue();
+
+      if (claimed != null) {
+        for (StreamEntry entry : claimed) {
+          String value = entry.getFields().get(VALUE_FIELD);
+          if (value != null) {
+            offer(value);
+            jedis.xack(name, GROUP_NAME, entry.getID());
+            jedis.xdel(name, entry.getID());
+            reclaimed++;
+          }
+        }
+      }
+
+      // A cursor of "0-0" means no more stale entries to process
+      if (nextCursor == null
+          || (nextCursor.getTime() == 0 && nextCursor.getSequence() == 0)
+          || claimed == null
+          || claimed.isEmpty()) {
+        break;
+      }
+      startId = nextCursor;
+    }
+
+    return reclaimed;
   }
 
   /**

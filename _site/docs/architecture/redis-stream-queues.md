@@ -78,6 +78,8 @@ backplane:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `streamQueue` | `false` | Use Redis Streams instead of Redis Lists for all operation queues (prequeue and execution queues) |
+| `streamPelMonitorIntervalSeconds` | `30` | How often (seconds) the StreamPelMonitor checks for stale PEL entries |
+| `streamPelMinIdleMillis` | `60000` | Minimum idle time (ms) before a pending entry is reclaimed via XAUTOCLAIM |
 
 The `streamQueue` setting applies to both the prequeue (arrival queue) and all provisioned execution queues. Queue names, provision matching, and balanced distribution across Redis cluster nodes all work identically to list-based queues.
 
@@ -135,6 +137,25 @@ redis-cli XINFO GROUPS "{06S}{Execution}:QueuedOperations_stream"
 # List consumers in the group
 redis-cli XINFO CONSUMERS "{06S}{Execution}:QueuedOperations_stream" buildfarm
 ```
+
+## PEL Recovery via XAUTOCLAIM
+
+When a server crashes between `XREADGROUP` (which places a message into the PEL) and `XACK` (which acknowledges it), the message becomes orphaned in the Pending Entries List. The `DispatchedMonitor` cannot recover these messages because they never made it into the `dispatchedExecutions` hash.
+
+The `StreamPelMonitor` addresses this gap. It runs as a background thread on each server instance and periodically uses the Redis `XAUTOCLAIM` command (Redis 6.2+) to find and reclaim stale PEL entries:
+
+1. **Scan**: `XAUTOCLAIM` finds messages in the PEL that have been idle longer than `streamPelMinIdleMillis`
+2. **Re-enqueue**: Each stale message is re-added to the stream as a new entry via `XADD`
+3. **Clean up**: The old PEL entry is acknowledged (`XACK`) and deleted (`XDEL`)
+
+This is **complementary** to `DispatchedMonitor` — they address different failure windows:
+
+| Monitor | Failure Window | Recovery Mechanism |
+|---------|---------------|-------------------|
+| `DispatchedMonitor` | Worker crashes after dispatch | Scans `dispatchedExecutions` hash, requeues overdue operations |
+| `StreamPelMonitor` | Server crashes between XREADGROUP and XACK | Scans stream PEL via XAUTOCLAIM, re-enqueues stale entries |
+
+The monitor uses cursor-based pagination to efficiently process large PELs without blocking, and logs the number of reclaimed entries at each interval.
 
 ## Limitations
 

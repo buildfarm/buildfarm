@@ -54,6 +54,8 @@ public class Backplane {
   private int maxPreQueueDepth = 1000000;
   private boolean priorityQueue = false;
   private boolean streamQueue = false;
+  private int streamPelMonitorIntervalSeconds = 30;
+  private long streamPelMinIdleMillis = 60000; // 1 minute
   private Queue[] queues = {};
   private String redisCredentialFile;
   private String redisUsername;

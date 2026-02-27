@@ -87,6 +87,8 @@ backplane:
   maxPreQueueDepth: 1000000
   priorityQueue: false
   streamQueue: false # set to true to use Redis Streams instead of Lists for queues
+  streamPelMonitorIntervalSeconds: 30  # how often to check for stale PEL entries (stream queues only)
+  streamPelMinIdleMillis: 60000        # minimum idle time (ms) before XAUTOCLAIM reclaims an entry
   priorityPollIntervalMillis: 100
   timeout: 10000
   correlatedInvocationsIndexPrefix: CorrelatedInvocationsIndex

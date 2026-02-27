@@ -45,6 +45,7 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.StreamEntryID;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.params.XAddParams;
+import redis.clients.jedis.params.XAutoClaimParams;
 import redis.clients.jedis.params.XPendingParams;
 import redis.clients.jedis.params.XReadGroupParams;
 import redis.clients.jedis.resps.StreamEntry;
@@ -378,6 +379,116 @@ public class RedisStreamQueueMockTest {
     // Assert
     assertThat(result.getResult()).isEmpty();
     assertThat(result.getCursor()).isEqualTo("0");
+  }
+
+  @Test
+  public void reclaimStaleMessagesShouldXAutoClaim() {
+    // Arrange
+    arrangeGroupExists();
+    StreamEntryID entryId = new StreamEntryID(5000, 0);
+    Map<String, String> fields = new HashMap<>();
+    fields.put("v", "stale_value");
+    StreamEntry entry = new StreamEntry(entryId, fields);
+
+    // First call returns one stale entry with cursor "0-0" indicating done
+    Map.Entry<StreamEntryID, List<StreamEntry>> autoclaimResult =
+        new AbstractMap.SimpleEntry<>(new StreamEntryID(0, 0), ImmutableList.of(entry));
+    when(redis.xautoclaim(
+            eq("test"),
+            eq(RedisStreamQueue.GROUP_NAME),
+            anyString(),
+            eq(60000L),
+            any(StreamEntryID.class),
+            any(XAutoClaimParams.class)))
+        .thenReturn(autoclaimResult);
+
+    RedisStreamQueue queue = new RedisStreamQueue(redis, "test");
+
+    // Act
+    int reclaimed = queue.reclaimStaleMessages(60000L);
+
+    // Assert
+    assertThat(reclaimed).isEqualTo(1);
+    // Should re-enqueue the value
+    verify(redis, times(1)).xadd(eq("test"), any(XAddParams.class), any(Map.class));
+    // Should ack and delete the old entry
+    verify(redis, times(1)).xack("test", RedisStreamQueue.GROUP_NAME, entryId);
+    verify(redis, times(1)).xdel("test", entryId);
+  }
+
+  @Test
+  public void reclaimStaleMessagesReturnsZeroWhenNoneStale() {
+    // Arrange
+    arrangeGroupExists();
+    Map.Entry<StreamEntryID, List<StreamEntry>> autoclaimResult =
+        new AbstractMap.SimpleEntry<>(new StreamEntryID(0, 0), ImmutableList.of());
+    when(redis.xautoclaim(
+            anyString(),
+            anyString(),
+            anyString(),
+            eq(60000L),
+            any(StreamEntryID.class),
+            any(XAutoClaimParams.class)))
+        .thenReturn(autoclaimResult);
+
+    RedisStreamQueue queue = new RedisStreamQueue(redis, "test");
+
+    // Act
+    int reclaimed = queue.reclaimStaleMessages(60000L);
+
+    // Assert
+    assertThat(reclaimed).isEqualTo(0);
+    verify(redis, never()).xadd(eq("test"), any(XAddParams.class), any(Map.class));
+  }
+
+  @Test
+  public void reclaimStaleMessagesPaginatesThroughCursor() {
+    // Arrange
+    arrangeGroupExists();
+    StreamEntryID entryId1 = new StreamEntryID(1000, 0);
+    StreamEntryID entryId2 = new StreamEntryID(2000, 0);
+    Map<String, String> fields1 = new HashMap<>();
+    fields1.put("v", "stale1");
+    Map<String, String> fields2 = new HashMap<>();
+    fields2.put("v", "stale2");
+    StreamEntry entry1 = new StreamEntry(entryId1, fields1);
+    StreamEntry entry2 = new StreamEntry(entryId2, fields2);
+
+    // First call returns entry1 with a non-zero cursor indicating more entries
+    Map.Entry<StreamEntryID, List<StreamEntry>> firstResult =
+        new AbstractMap.SimpleEntry<>(new StreamEntryID(1500, 0), ImmutableList.of(entry1));
+    // Second call returns entry2 with cursor "0-0" indicating done
+    Map.Entry<StreamEntryID, List<StreamEntry>> secondResult =
+        new AbstractMap.SimpleEntry<>(new StreamEntryID(0, 0), ImmutableList.of(entry2));
+
+    when(redis.xautoclaim(
+            eq("test"),
+            eq(RedisStreamQueue.GROUP_NAME),
+            anyString(),
+            eq(60000L),
+            any(StreamEntryID.class),
+            any(XAutoClaimParams.class)))
+        .thenReturn(firstResult)
+        .thenReturn(secondResult);
+
+    RedisStreamQueue queue = new RedisStreamQueue(redis, "test");
+
+    // Act
+    int reclaimed = queue.reclaimStaleMessages(60000L);
+
+    // Assert
+    assertThat(reclaimed).isEqualTo(2);
+    // Two xautoclaim calls (pagination)
+    verify(redis, times(2))
+        .xautoclaim(
+            anyString(),
+            anyString(),
+            anyString(),
+            eq(60000L),
+            any(StreamEntryID.class),
+            any(XAutoClaimParams.class));
+    // Two offers (re-enqueues)
+    verify(redis, times(2)).xadd(eq("test"), any(XAddParams.class), any(Map.class));
   }
 
   /** Arrange for xgroupCreate to succeed (group doesn't exist yet). */

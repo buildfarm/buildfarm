@@ -261,6 +261,7 @@ public class ServerInstance extends NodeInstance {
   private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final com.google.common.cache.LoadingCache<String, StubInstance> workerStubs;
   private final Thread dispatchedMonitor;
+  private Thread streamPelMonitor;
   private final Duration maxActionTimeout;
   private AsyncCache<build.buildfarm.v1test.Digest, Directory> directoryCache;
   private AsyncCache<build.buildfarm.v1test.Digest, Command> commandCache;
@@ -537,6 +538,16 @@ public class ServerInstance extends NodeInstance {
       dispatchedMonitor = null;
     }
 
+    if (configs.getBackplane().isStreamQueue()) {
+      streamPelMonitor =
+          new Thread(
+              new StreamPelMonitor(
+                  backplane::isStopped,
+                  backplane::reclaimStalePelEntries,
+                  configs.getBackplane().getStreamPelMonitorIntervalSeconds(),
+                  configs.getBackplane().getStreamPelMinIdleMillis()));
+    }
+
     if (runOperationQueuer) {
       transformPollerExecutor = newFixedThreadPool(TRANSFORM_TOKENS);
 
@@ -747,6 +758,9 @@ public class ServerInstance extends NodeInstance {
     if (dispatchedMonitor != null) {
       dispatchedMonitor.start();
     }
+    if (streamPelMonitor != null) {
+      streamPelMonitor.start();
+    }
     if (operationQueuer != null) {
       operationQueuer.start();
     }
@@ -771,6 +785,10 @@ public class ServerInstance extends NodeInstance {
     if (dispatchedMonitor != null) {
       dispatchedMonitor.interrupt();
       dispatchedMonitor.join();
+    }
+    if (streamPelMonitor != null) {
+      streamPelMonitor.interrupt();
+      streamPelMonitor.join();
     }
     if (prometheusMetricsThread != null) {
       prometheusMetricsThread.interrupt();
