@@ -53,6 +53,7 @@ public class Backplane {
   private int maxQueueDepth = 100000;
   private int maxPreQueueDepth = 1000000;
   private boolean priorityQueue = false;
+  private boolean streamQueue = false;
   private Queue[] queues = {};
   private String redisCredentialFile;
   private String redisUsername;

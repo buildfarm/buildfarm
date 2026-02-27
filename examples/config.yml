@@ -86,6 +86,7 @@ backplane:
   maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
   priorityQueue: false
+  streamQueue: false # set to true to use Redis Streams instead of Lists for queues
   priorityPollIntervalMillis: 100
   timeout: 10000
   correlatedInvocationsIndexPrefix: CorrelatedInvocationsIndex
