@@ -60,8 +60,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public class CFCLinkExecFileSystem extends CFCExecFileSystem {

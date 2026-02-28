@@ -20,9 +20,9 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import com.google.common.base.Stopwatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
+import org.jspecify.annotations.Nullable;
 
 public abstract class PipelineStage implements Runnable {
   @Getter protected final String name;

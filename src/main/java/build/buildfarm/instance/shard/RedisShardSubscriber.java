@@ -38,8 +38,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 import redis.clients.jedis.Connection;
 import redis.clients.jedis.JedisPubSub;
 

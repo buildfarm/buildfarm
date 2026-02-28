@@ -12,6 +12,7 @@ java_library(
         "@buildfarm_maven//:com_google_code_findbugs_jsr305",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:net_jcip_jcip_annotations",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@googleapis//google/longrunning:longrunning_java_proto",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",

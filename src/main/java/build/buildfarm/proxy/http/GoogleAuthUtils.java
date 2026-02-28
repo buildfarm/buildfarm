@@ -32,7 +32,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /** Utility methods for using {@link AuthAndTLSOptions} with Google Cloud. */
 public final class GoogleAuthUtils {

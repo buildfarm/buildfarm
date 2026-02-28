@@ -17,7 +17,7 @@ package build.buildfarm.common;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.List;
 import java.util.Map.Entry;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public interface Claim {
   enum Stage {
@@ -29,8 +29,7 @@ public interface Claim {
 
   void release();
 
-  @Nullable
-  UserPrincipal owner();
+  @Nullable UserPrincipal owner();
 
   Iterable<Entry<String, List<Object>>> getPools();
 }

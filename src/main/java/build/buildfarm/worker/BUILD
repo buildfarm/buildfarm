@@ -42,6 +42,7 @@ java_library(
         "@buildfarm_maven//:org_apache_commons_commons_compress",
         "@buildfarm_maven//:org_apache_commons_commons_lang3",
         "@buildfarm_maven//:org_jetbrains_annotations",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@googleapis//google/rpc:rpc_java_proto",
     ],

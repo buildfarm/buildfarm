@@ -27,7 +27,7 @@ import io.grpc.ServerInterceptor;
 import io.grpc.protobuf.ProtoUtils;
 import io.grpc.stub.MetadataUtils;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /** Utility functions to handle Metadata for remote Grpc calls. */
 public final class TracingMetadataUtils {

@@ -34,8 +34,8 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.jspecify.annotations.Nullable;
 
 /**
  * @class LocalResourceSetUtils

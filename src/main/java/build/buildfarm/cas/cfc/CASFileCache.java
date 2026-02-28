@@ -134,10 +134,10 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.Getter;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public abstract class CASFileCache implements ContentAddressableStorage {
@@ -400,7 +400,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private boolean contains(
       Digest digest,
       boolean isExecutable,
-      @Nullable build.bazel.remote.execution.v2.Digest.Builder result,
+      build.bazel.remote.execution.v2.Digest.@Nullable Builder result,
       Consumer<String> onContains) {
     String key = getKey(digest, isExecutable);
     Entry entry = getEntry(key);
@@ -484,7 +484,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   boolean containsLocal(
       Digest digest,
-      @Nullable build.bazel.remote.execution.v2.Digest.Builder result,
+      build.bazel.remote.execution.v2.Digest.@Nullable Builder result,
       Consumer<String> onContains) {
     /* maybe swap the order here if we're higher in ratio on one side */
     return contains(digest, false, result, onContains)
