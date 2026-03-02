@@ -21,7 +21,6 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.config.Metrics;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.v1test.OperationRequestMetadata;
 import com.google.longrunning.Operation;
@@ -66,7 +65,6 @@ public class MetricsPublisherTest {
   public void setUp() throws IOException {
     configs.getServer().setCloudRegion("test");
     configs.getServer().setClusterId("buildfarm-test");
-    configs.getServer().getMetrics().setPublisher(Metrics.PUBLISHER.LOG);
   }
 
   @Test
