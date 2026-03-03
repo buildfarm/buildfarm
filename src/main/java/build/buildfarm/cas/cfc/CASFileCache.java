@@ -137,6 +137,7 @@ import java.util.logging.Level;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.Getter;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @Log
@@ -266,12 +267,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return size;
   }
 
+  @NullMarked
   public record CacheScanResults(
       List<Path> computeDirs, List<Path> deleteFiles, Map<Object, Entry> fileKeys) {}
 
+  @NullMarked
   public record CacheLoadResults(
       boolean loadSkipped, CacheScanResults scan, List<Path> invalidDirectories) {}
 
+  @NullMarked
   public record StartupCacheResults(
       Path cacheDirectory, CacheLoadResults load, Duration startupTime) {}
 
@@ -2050,6 +2054,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return directory;
   }
 
+  @NullMarked
   public record PathResult(Path path, boolean isMissed) {}
 
   public abstract ListenableFuture<PathResult> putDirectory(
