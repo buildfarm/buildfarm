@@ -19,5 +19,6 @@ java_library(
     deps = [
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:junit_junit",
+        "@buildfarm_maven//:org_jspecify_jspecify",
     ],
 )
