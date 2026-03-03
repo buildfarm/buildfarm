@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -39,6 +40,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
@@ -65,17 +67,19 @@ public class RedisShardSubscriptionTest {
    * {@code newRedisServer()} causes {@code getHost()} to return "localhost", which on macOS may
    * resolve to {@code ::1} (IPv6) while the server socket is IPv4-only, resulting in the Jedis
    * client connecting to a different protocol stack than the server is listening on.
+   *
+   * @param options optional service options to configure the server, or {@code null} for default
+   *     configuration
+   * @return the started Redis server
+   * @throws IOException if the server fails to start
    */
-  private RedisServer startServer() throws IOException {
-    server = RedisServer.newRedisServer(0, InetAddress.getByName("localhost")).start();
-    return server;
-  }
-
-  private RedisServer startServer(ServiceOptions options) throws IOException {
-    server =
-        RedisServer.newRedisServer(0, InetAddress.getByName("localhost"))
-            .setOptions(options)
-            .start();
+  private RedisServer startServer(@Nullable ServiceOptions options) throws IOException {
+    checkState(server == null);
+    RedisServer redisServer = RedisServer.newRedisServer(0, InetAddress.getByName("localhost"));
+    if (options != null) {
+      redisServer = redisServer.setOptions(options);
+    }
+    server = redisServer.start();
     return server;
   }
 
@@ -93,7 +97,7 @@ public class RedisShardSubscriptionTest {
 
   @Test
   public void runReturnsWhenStopped() throws Exception {
-    RedisServer server = startServer();
+    RedisServer server = startServer(null);
 
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
