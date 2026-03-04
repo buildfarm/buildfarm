@@ -2,11 +2,11 @@ package build.buildfarm.common.redis;
 
 import java.util.concurrent.Executor;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Connection;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.JedisPooled;
-import redis.clients.jedis.PipelineBase;
 
 public class Pooled extends JedisPooled implements Unified {
   public Pooled(
@@ -17,7 +17,7 @@ public class Pooled extends JedisPooled implements Unified {
   }
 
   @Override
-  public PipelineBase pipelined(Executor executor) {
+  public AbstractPipeline pipelined(Executor executor) {
     return super.pipelined();
   }
 }

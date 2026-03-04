@@ -26,7 +26,7 @@ import com.google.longrunning.Operation;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import redis.clients.jedis.PipelineBase;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
 
@@ -47,7 +47,7 @@ public class ExecutionsTest {
             /* action_timeout_s= */ -1);
 
     Response<String> value = mock(Response.class);
-    PipelineBase pipeline = mock(PipelineBase.class);
+    AbstractPipeline pipeline = mock(AbstractPipeline.class);
     when(pipeline.get(anyString())).thenReturn(value);
 
     UnifiedJedis jedis = mock(UnifiedJedis.class);
