@@ -367,7 +367,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     Digest inputRootDigest = DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction);
     OutputDirectory outputDirectory = createOutputDirectory(command);
 
-    Path execDir = root().resolve(operationName);
+    Path opDir = root().resolve(operationName);
+    Path execDir = opDir.resolve("execroot/_main"); // See https://github.com/bazelbuild/bazel/issues/19733
     if (Files.exists(execDir)) {
       Directories.remove(execDir, fileStore);
     }

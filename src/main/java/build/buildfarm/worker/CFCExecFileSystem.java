@@ -348,7 +348,8 @@ public class CFCExecFileSystem implements ExecFileSystem {
       throws IOException, InterruptedException {
     OutputDirectory outputDirectory = createOutputDirectory(command);
 
-    Path execDir = root.resolve(operationName);
+    Path opDir = root().resolve(operationName);
+    Path execDir = opDir.resolve("execroot/_main"); // See https://github.com/bazelbuild/bazel/issues/19733
     checkState(!Files.exists(execDir));
 
     log.log(Level.FINER, operationName + " walking execTree");
