@@ -34,14 +34,10 @@ import picocli.CommandLine.Parameters;
     description = "Cancel operations on the buildfarm server")
 class Cancel implements Callable<Integer> {
 
-  @Parameters(
-      index = "0",
-      description =
-          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',"
-              + " 'grpcs://', or omitted (default 'grpc://')")
+  @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   private String host;
 
-  @Parameters(index = "1", description = "The instance name")
+  @Parameters(index = "1", description = CliConstants.INSTANCE_NAME)
   private String instanceName;
 
   @Parameters(

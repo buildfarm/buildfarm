@@ -4,7 +4,10 @@ load("@rules_java//java:java_plugin.bzl", "java_plugin")
 
 java_binary(
     name = "bf-mount",
-    srcs = ["Mount.java"],
+    srcs = [
+        "CliConstants.java",
+        "Mount.java",
+    ],
     main_class = "build.buildfarm.tools.Mount",
     visibility = ["//visibility:public"],
     deps = [
@@ -38,7 +41,10 @@ java_plugin(
 
 java_binary(
     name = "bfssh",
-    srcs = ["Bfssh.java"],
+    srcs = [
+        "Bfssh.java",
+        "CliConstants.java",
+    ],
     main_class = "build.buildfarm.tools.Bfssh",
     visibility = ["//visibility:public"],
     deps = [
@@ -67,7 +73,10 @@ java_binary(
 
 java_binary(
     name = "bf-executor",
-    srcs = ["Executor.java"],
+    srcs = [
+        "CliConstants.java",
+        "Executor.java",
+    ],
     main_class = "build.buildfarm.tools.Executor",
     visibility = ["//visibility:public"],
     deps = [
@@ -95,7 +104,10 @@ java_binary(
 
 java_binary(
     name = "bf-extractor",
-    srcs = ["Extract.java"],
+    srcs = [
+        "CliConstants.java",
+        "Extract.java",
+    ],
     main_class = "build.buildfarm.tools.Extract",
     visibility = ["//visibility:public"],
     deps = [
@@ -118,7 +130,10 @@ java_binary(
 
 java_binary(
     name = "bf-upload",
-    srcs = ["Upload.java"],
+    srcs = [
+        "CliConstants.java",
+        "Upload.java",
+    ],
     main_class = "build.buildfarm.tools.Upload",
     visibility = ["//visibility:public"],
     deps = [
@@ -220,7 +235,10 @@ java_binary(
 
 java_binary(
     name = "bf-ac",
-    srcs = ["Ac.java"],
+    srcs = [
+        "Ac.java",
+        "CliConstants.java",
+    ],
     data = [
         "//examples:example_properties",
     ],
@@ -262,7 +280,10 @@ java_binary(
 
 java_binary(
     name = "bf-hist",
-    srcs = ["Hist.java"],
+    srcs = [
+        "CliConstants.java",
+        "Hist.java",
+    ],
     main_class = "build.buildfarm.tools.Hist",
     visibility = ["//visibility:public"],
     deps = [
@@ -317,7 +338,10 @@ java_binary(
 
 java_binary(
     name = "bf-cancel",
-    srcs = ["Cancel.java"],
+    srcs = [
+        "Cancel.java",
+        "CliConstants.java",
+    ],
     main_class = "build.buildfarm.tools.Cancel",
     visibility = ["//visibility:public"],
     deps = [

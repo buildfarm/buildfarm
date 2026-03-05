@@ -423,14 +423,10 @@ class Executor {
         "Execute actions on the buildfarm server. Reads action digests from stdin (one per line).")
 class ExecutorCommand implements Callable<Integer> {
 
-  @Parameters(
-      index = "0",
-      description =
-          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
-              + " 'grpcs://', or omitted (default 'grpc://')")
+  @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   private String host;
 
-  @Parameters(index = "1", description = "The instance name")
+  @Parameters(index = "1", description = CliConstants.INSTANCE_NAME)
   private String instanceName;
 
   @Parameters(

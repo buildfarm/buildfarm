@@ -34,14 +34,10 @@ import picocli.CommandLine.Parameters;
     description = "Display a live histogram of dispatched operations")
 class Hist implements Callable<Integer> {
 
-  @Parameters(index = "0", description = "The instance name")
+  @Parameters(index = "0", description = CliConstants.INSTANCE_NAME)
   private String instanceName;
 
-  @Parameters(
-      index = "1",
-      description =
-          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
-              + " 'grpcs://', or omitted (default 'grpc://')")
+  @Parameters(index = "1", description = CliConstants.BUILDFARM_HOST)
   private String host;
 
   @Override

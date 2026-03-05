@@ -61,14 +61,10 @@ import picocli.CommandLine.Parameters;
     description = "Execute remote commands on buildfarm workers via SSH-like interface")
 class Bfssh implements Callable<Integer> {
 
-  @Parameters(
-      index = "0",
-      description =
-          "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',\""
-              + " 'grpcs://', or omitted (default 'grpc://')")
+  @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   private String host;
 
-  @Parameters(index = "1", description = "The instance name")
+  @Parameters(index = "1", description = CliConstants.INSTANCE_NAME)
   private String instanceName;
 
   @Parameters(index = "2..*", description = "Command to execute on worker(s)", arity = "1..*")
