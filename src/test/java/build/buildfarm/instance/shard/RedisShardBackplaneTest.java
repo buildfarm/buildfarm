@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -45,6 +46,7 @@ import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.v1test.WorkerQueueConfig;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -495,5 +497,109 @@ public class RedisShardBackplaneTest {
             "",
             JsonCodec.CODEC.worker().print(shardWorker));
     verify(jedis, times(1)).publish(anyString(), anyString());
+  }
+
+  @Test
+  public void publishWorkerQueueSetsKeyWithExpiry() throws IOException {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(mockJedisClusterFactory.get()).thenReturn(jedis);
+    configs.getBackplane().setWorkerQueuePrefix("WorkerQueue");
+    configs.getBackplane().setWorkerQueueExpireSeconds(60);
+
+    RedisShardBackplane backplane = createBackplane("publish-worker-queue-test");
+    backplane.start("publishQueue/test:0000", name -> {});
+    Queue queue = new Queue();
+    queue.setName("gpu");
+    queue.setAllowUnmatched(false);
+    build.buildfarm.common.config.Property prop1 = new build.buildfarm.common.config.Property();
+    prop1.setName("gpu");
+    prop1.setValue("1");
+    build.buildfarm.common.config.Property prop2 = new build.buildfarm.common.config.Property();
+    prop2.setName("min-cores");
+    prop2.setValue("4");
+    queue.setProperties(List.of(prop1, prop2));
+
+    backplane.publishWorkerQueue(queue);
+
+    // Verify that the proto-serialized bytes are stored with the correct key and TTL
+    WorkerQueueConfig expectedProto =
+        WorkerQueueConfig.newBuilder()
+            .setName("gpu")
+            .setAllowUnmatched(false)
+            .addProperties(Platform.Property.newBuilder().setName("gpu").setValue("1").build())
+            .addProperties(
+                Platform.Property.newBuilder().setName("min-cores").setValue("4").build())
+            .build();
+    verify(jedis, times(1)).setex("WorkerQueue:gpu".getBytes(), 60, expectedProto.toByteArray());
+  }
+
+  @Test
+  public void discoverWorkerQueuesReturnsPublishedQueues() throws IOException {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(mockJedisClusterFactory.get()).thenReturn(jedis);
+    configs.getBackplane().setWorkerQueuePrefix("WorkerQueue");
+    configs.getBackplane().setWorkerQueueExpireSeconds(60);
+
+    WorkerQueueConfig cpuProto =
+        WorkerQueueConfig.newBuilder()
+            .setName("cpu")
+            .setAllowUnmatched(true)
+            .addProperties(
+                Platform.Property.newBuilder().setName("min-cores").setValue("*").build())
+            .addProperties(
+                Platform.Property.newBuilder().setName("max-cores").setValue("*").build())
+            .build();
+    WorkerQueueConfig gpuProto =
+        WorkerQueueConfig.newBuilder()
+            .setName("gpu")
+            .setAllowUnmatched(false)
+            .addProperties(Platform.Property.newBuilder().setName("gpu").setValue("1").build())
+            .build();
+
+    when(jedis.keys("WorkerQueue:*".getBytes()))
+        .thenReturn(Set.of("WorkerQueue:cpu".getBytes(), "WorkerQueue:gpu".getBytes()));
+    when(jedis.get("WorkerQueue:cpu".getBytes())).thenReturn(cpuProto.toByteArray());
+    when(jedis.get("WorkerQueue:gpu".getBytes())).thenReturn(gpuProto.toByteArray());
+
+    RedisShardBackplane backplane = createBackplane("discover-worker-queues-test");
+    backplane.start("discoverQueues/test:0000", name -> {});
+    List<Queue> queues = backplane.discoverWorkerQueues();
+
+    assertThat(queues).hasSize(2);
+
+    // Find the queues by name (order is not guaranteed from Set)
+    Queue cpuQueue =
+        queues.stream().filter(q -> q.getName().equals("cpu")).findFirst().orElse(null);
+    Queue gpuQueue =
+        queues.stream().filter(q -> q.getName().equals("gpu")).findFirst().orElse(null);
+
+    assertThat(cpuQueue).isNotNull();
+    assertThat(cpuQueue.isAllowUnmatched()).isTrue();
+    assertThat(cpuQueue.getProperties()).hasSize(2);
+    assertThat(cpuQueue.getProperties().get(0).getName()).isEqualTo("min-cores");
+    assertThat(cpuQueue.getProperties().get(0).getValue()).isEqualTo("*");
+
+    assertThat(gpuQueue).isNotNull();
+    assertThat(gpuQueue.isAllowUnmatched()).isFalse();
+    assertThat(gpuQueue.getProperties()).hasSize(1);
+    assertThat(gpuQueue.getProperties().get(0).getName()).isEqualTo("gpu");
+    assertThat(gpuQueue.getProperties().get(0).getValue()).isEqualTo("1");
+  }
+
+  @Test
+  public void discoverWorkerQueuesHandlesExpiredKeys() throws IOException {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(mockJedisClusterFactory.get()).thenReturn(jedis);
+    configs.getBackplane().setWorkerQueuePrefix("WorkerQueue");
+
+    // Key exists in scan but expired before GET
+    when(jedis.keys("WorkerQueue:*".getBytes()))
+        .thenReturn(Set.of("WorkerQueue:expired".getBytes()));
+    when(jedis.get("WorkerQueue:expired".getBytes())).thenReturn((byte[]) null);
+
+    RedisShardBackplane backplane = createBackplane("discover-expired-queue-test");
+    backplane.start("discoverExpired/test:0000", name -> {});
+    List<Queue> queues = backplane.discoverWorkerQueues();
+    assertThat(queues).isEmpty();
   }
 }

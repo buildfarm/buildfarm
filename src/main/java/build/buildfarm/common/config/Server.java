@@ -53,6 +53,8 @@ public class Server {
   private boolean findMissingBlobsViaBackplane = false;
   private int gracefulShutdownSeconds = 0;
   private Set<String> correlatedInvocationsIndexScopes = ImmutableSet.of("host", "username");
+  private boolean enableQueueAutoDiscovery = false;
+  private int queueDiscoveryIntervalSeconds = 60;
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);
