@@ -77,10 +77,6 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.shardWorker.resources | nindent 12 }}
-          {{- with .Values.shardWorker.securityContext }}
-          securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
           volumeMounts:
             - mountPath: /config
               name: config
