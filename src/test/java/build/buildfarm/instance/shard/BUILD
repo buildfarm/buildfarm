@@ -255,3 +255,22 @@ java_test(
         "@buildfarm_maven//:redis_clients_jedis",
     ],
 )
+
+java_test(
+    name = "JedisCasWorkerMapPipelineBenchmarkTest",
+    size = "medium",
+    srcs = [
+        "JedisCasWorkerMapPipelineBenchmarkTest.java",
+    ],
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/redis",
+        "//src/main/java/build/buildfarm/instance/shard",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "//src/test/java/build/buildfarm:test_runner",
+        "@buildfarm_maven//:com_github_fppt_jedis_mock",
+        "@buildfarm_maven//:com_google_truth_truth",
+        "@buildfarm_maven//:redis_clients_jedis",
+    ],
+)

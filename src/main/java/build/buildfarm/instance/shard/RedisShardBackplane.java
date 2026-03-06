@@ -98,6 +98,7 @@ import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
 import redis.clients.jedis.AbstractPipeline;
+import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
 
 @Log
@@ -128,6 +129,7 @@ public class RedisShardBackplane implements Backplane {
   private final Supplier<Set<String>> recentExecuteWorkers;
 
   private DistributedState state = new DistributedState();
+  private CasWorkerMap casWorkerMap;
 
   public RedisShardBackplane(
       String source,
@@ -489,6 +491,7 @@ public class RedisShardBackplane implements Backplane {
       throws IOException {
     this.client = client;
     this.state = state;
+    this.casWorkerMap = client.call(this::createCasWorkerMap);
     if (subscribeToBackplane) {
       startSubscriptionThread(onWorkerRemoved);
     }
@@ -739,7 +742,7 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public long getDigestInsertTime(Digest blobDigest) throws IOException {
-    return client.call(jedis -> createCasWorkerMap(jedis).insertTime(blobDigest));
+    return casWorkerMap.insertTime(blobDigest);
   }
 
   private synchronized Set<String> getExecuteWorkers() throws IOException {
@@ -881,44 +884,44 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void adjustBlobLocations(
       Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
-    client.run(jedis -> createCasWorkerMap(jedis).adjust(blobDigest, addWorkers, removeWorkers));
+    client.run(jedis -> casWorkerMap.adjust(blobDigest, addWorkers, removeWorkers));
   }
 
   @Override
   public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    client.run(jedis -> createCasWorkerMap(jedis).add(blobDigest, workerName));
+    client.run(jedis -> casWorkerMap.add(blobDigest, workerName));
   }
 
   @Override
   public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException {
-    client.run(jedis -> createCasWorkerMap(jedis).addAll(blobDigests, workerName));
+    client.run(jedis -> casWorkerMap.addAll(blobDigests, workerName));
   }
 
   @Override
   public void removeBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    client.run(jedis -> createCasWorkerMap(jedis).remove(blobDigest, workerName));
+    client.run(jedis -> casWorkerMap.remove(blobDigest, workerName));
   }
 
   @Override
   public void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName)
       throws IOException {
-    client.run(jedis -> createCasWorkerMap(jedis).removeAll(blobDigests, workerName));
+    client.run(jedis -> casWorkerMap.removeAll(blobDigests, workerName));
   }
 
   @Override
   public String getBlobLocation(Digest blobDigest) throws IOException {
-    return client.call(jedis -> createCasWorkerMap(jedis).getAny(blobDigest));
+    return casWorkerMap.getAny(blobDigest);
   }
 
   @Override
   public Set<String> getBlobLocationSet(Digest blobDigest) throws IOException {
-    return client.call(jedis -> createCasWorkerMap(jedis).get(blobDigest));
+    return casWorkerMap.get(blobDigest);
   }
 
   @Override
   public Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests)
       throws IOException {
-    return client.call(jedis -> createCasWorkerMap(jedis).getMap(blobDigests));
+    return casWorkerMap.getMap(blobDigests);
   }
 
   private Operation getExecution(UnifiedJedis jedis, String executionName) {
@@ -1306,12 +1309,31 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private boolean isBlocklisted(UnifiedJedis jedis, RequestMetadata requestMetadata) {
-    boolean isActionBlocked =
-        (!requestMetadata.getActionId().isEmpty()
-            && state.blockedActions.exists(jedis, requestMetadata.getActionId()));
+    String actionId = requestMetadata.getActionId();
+    String toolInvocationId = requestMetadata.getToolInvocationId();
+    boolean checkAction = !actionId.isEmpty();
+    boolean checkInvocation = !toolInvocationId.isEmpty();
+
+    if (!checkAction && !checkInvocation) {
+      return false;
+    }
+
+    if (jedis instanceof Unified unified) {
+      try (AbstractPipeline p = unified.pipelined(pipelineExecutor)) {
+        Response<Boolean> actionBlocked =
+            checkAction ? state.blockedActions.exists(p, actionId) : null;
+        Response<Boolean> invocationBlocked =
+            checkInvocation ? state.blockedInvocations.exists(p, toolInvocationId) : null;
+        p.sync();
+        return (actionBlocked != null && actionBlocked.get())
+            || (invocationBlocked != null && invocationBlocked.get());
+      }
+    }
+
+    // Fallback for non-Unified instances (e.g., test mocks)
+    boolean isActionBlocked = checkAction && state.blockedActions.exists(jedis, actionId);
     boolean isInvocationBlocked =
-        (!requestMetadata.getToolInvocationId().isEmpty()
-            && state.blockedInvocations.exists(jedis, requestMetadata.getToolInvocationId()));
+        checkInvocation && state.blockedInvocations.exists(jedis, toolInvocationId);
     return isActionBlocked || isInvocationBlocked;
   }
 
@@ -1357,26 +1379,60 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request)
       throws IOException {
-    List<GetClientStartTime> startTimes = new ArrayList<>();
-    for (String key : request.getHostNameList()) {
-      try {
-        startTimes.add(
-            client.call(
-                jedis ->
-                    GetClientStartTime.newBuilder()
-                        .setInstanceName(key)
-                        .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
-                        .build()));
-      } catch (NumberFormatException nfe) {
-        log.warning("Could not obtain start time for " + key);
-      }
+    List<String> hostNames = request.getHostNameList();
+    if (hostNames.isEmpty()) {
+      return GetClientStartTimeResult.getDefaultInstance();
     }
-    return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
+
+    return client.call(
+        jedis -> {
+          if (jedis instanceof Unified unified) {
+            List<Response<String>> responses = new ArrayList<>(hostNames.size());
+            try (AbstractPipeline p = unified.pipelined(pipelineExecutor)) {
+              for (String key : hostNames) {
+                responses.add(p.get(key));
+              }
+              p.sync();
+            }
+
+            List<GetClientStartTime> startTimes = new ArrayList<>();
+            for (int i = 0; i < hostNames.size(); i++) {
+              try {
+                String value = responses.get(i).get();
+                if (value != null) {
+                  startTimes.add(
+                      GetClientStartTime.newBuilder()
+                          .setInstanceName(hostNames.get(i))
+                          .setClientStartTime(Timestamps.fromMillis(Long.parseLong(value)))
+                          .build());
+                }
+              } catch (NumberFormatException nfe) {
+                log.warning("Could not obtain start time for " + hostNames.get(i));
+              }
+            }
+            return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
+          }
+
+          // Fallback for non-Unified instances (e.g., test mocks)
+          List<GetClientStartTime> startTimes = new ArrayList<>();
+          for (String key : hostNames) {
+            try {
+              startTimes.add(
+                  GetClientStartTime.newBuilder()
+                      .setInstanceName(key)
+                      .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
+                      .build());
+            } catch (NumberFormatException nfe) {
+              log.warning("Could not obtain start time for " + key);
+            }
+          }
+          return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
+        });
   }
 
   @Override
   public void updateDigestsExpiry(Iterable<Digest> digests) throws IOException {
-    client.run(jedis -> createCasWorkerMap(jedis).setExpire(digests));
+    client.run(jedis -> casWorkerMap.setExpire(digests));
   }
 
   @Override
@@ -1385,10 +1441,22 @@ public class RedisShardBackplane implements Backplane {
       throws IOException {
     client.run(
         jedis -> {
-          for (Map.Entry<String, List<String>> entry : indexScopeValues.entrySet()) {
-            for (String key : entry.getValue()) {
-              state.correlatedInvocationsIndex.add(
-                  jedis, entry.getKey() + "=" + key, correlatedInvocationsId);
+          if (jedis instanceof Unified unified) {
+            try (AbstractPipeline p = unified.pipelined(pipelineExecutor)) {
+              for (Map.Entry<String, List<String>> entry : indexScopeValues.entrySet()) {
+                for (String key : entry.getValue()) {
+                  state.correlatedInvocationsIndex.add(
+                      p, entry.getKey() + "=" + key, correlatedInvocationsId);
+                }
+              }
+            }
+          } else {
+            // Fallback for non-Unified instances (e.g., test mocks)
+            for (Map.Entry<String, List<String>> entry : indexScopeValues.entrySet()) {
+              for (String key : entry.getValue()) {
+                state.correlatedInvocationsIndex.add(
+                    jedis, entry.getKey() + "=" + key, correlatedInvocationsId);
+              }
             }
           }
         });
