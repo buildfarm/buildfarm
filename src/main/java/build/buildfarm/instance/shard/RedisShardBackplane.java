@@ -36,6 +36,8 @@ import build.buildfarm.common.Visitor;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Property;
+import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue.BalancedQueueEntry;
 import build.buildfarm.common.redis.Codec;
@@ -56,6 +58,7 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.v1test.WorkerQueueConfig;
 import build.buildfarm.v1test.WorkerType;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.annotations.VisibleForTesting;
@@ -70,6 +73,7 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
@@ -1409,5 +1413,91 @@ public class RedisShardBackplane implements Backplane {
   public void incrementRequestCounters(
       String actionId, String toolInvocationId, String actionMnemonic, String targetId) {
     // TODO count for each of these fields
+  }
+
+  @SuppressWarnings("ConstantConditions")
+  @Override
+  public void publishWorkerQueue(Queue queue) throws IOException {
+    String prefix = configs.getBackplane().getWorkerQueuePrefix();
+    int expireSeconds = configs.getBackplane().getWorkerQueueExpireSeconds();
+    byte[] key = (prefix + ":" + queue.getName()).getBytes();
+
+    WorkerQueueConfig.Builder builder =
+        WorkerQueueConfig.newBuilder()
+            .setName(queue.getName())
+            .setAllowUnmatched(queue.isAllowUnmatched());
+    for (Property prop : queue.getProperties()) {
+      builder.addProperties(
+          Platform.Property.newBuilder().setName(prop.getName()).setValue(prop.getValue()).build());
+    }
+    byte[] value = builder.build().toByteArray();
+
+    client.run(
+        jedis -> {
+          jedis.setex(key, expireSeconds, value);
+        });
+    log.log(
+        Level.INFO,
+        format(
+            "Published worker queue '%s' to Redis with %ds TTL", queue.getName(), expireSeconds));
+  }
+
+  @SuppressWarnings("ConstantConditions")
+  @Override
+  public List<Queue> discoverWorkerQueues() throws IOException {
+    String prefix = configs.getBackplane().getWorkerQueuePrefix();
+    byte[] pattern = (prefix + ":*").getBytes();
+
+    return client.call(
+        jedis -> {
+          List<Queue> discoveredQueues = new ArrayList<>();
+          Set<byte[]> keys = jedis.keys(pattern);
+          for (byte[] key : keys) {
+            byte[] value = jedis.get(key);
+            if (value == null) {
+              continue; // key expired between keys() and get()
+            }
+            Queue queue = fromProto(value);
+            if (queue != null) {
+              discoveredQueues.add(queue);
+            }
+          }
+          return discoveredQueues;
+        });
+  }
+
+  private static Queue fromProto(byte[] data) {
+    try {
+      WorkerQueueConfig proto = WorkerQueueConfig.parseFrom(data);
+      Queue queue = new Queue();
+      queue.setName(proto.getName());
+      queue.setAllowUnmatched(proto.getAllowUnmatched());
+      List<Property> properties = new ArrayList<>();
+      for (Platform.Property pp : proto.getPropertiesList()) {
+        Property prop = new Property();
+        prop.setName(pp.getName());
+        prop.setValue(pp.getValue());
+        properties.add(prop);
+      }
+      queue.setProperties(properties);
+      return queue;
+    } catch (InvalidProtocolBufferException e) {
+      log.log(Level.WARNING, "Failed to parse WorkerQueueConfig proto from Redis", e);
+      return null;
+    }
+  }
+
+  @SuppressWarnings("ConstantConditions")
+  @Override
+  public void updateExecutionQueues(Queue[] queues) throws IOException {
+    client.run(
+        jedis -> {
+          ExecutionQueue newExecutionQueue =
+              DistributedStateCreator.createExecutionQueue(jedis, codec.queueEntry(), queues);
+          state.executionQueue = newExecutionQueue;
+          log.log(
+              Level.INFO,
+              format("Execution queue rebuilt with %d provisioned queue(s)", queues.length));
+        });
   }
 }
