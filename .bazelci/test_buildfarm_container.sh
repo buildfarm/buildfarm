@@ -117,6 +117,87 @@ start_server_and_worker(){
   # Build first to create more predictable run time.
   ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
 
+  # Build execution wrappers if needed (for linux-sandbox, process-wrapper, etc.)
+  # These are required when using sandboxing features.
+  if [[ "$BUILDFARM_CONFIG" == *"cgroups-sandbox"* ]]; then
+    echo "Building execution wrappers for sandbox support..."
+    mkdir -p /app/build_buildfarm
+
+    # Build our custom wrappers
+    echo "Building as-nobody..."
+    ./bazel build --jobs=2 //:as-nobody
+    # Get the actual bazel output path when symlinks don't work
+    BAZEL_BIN=$(./bazel info bazel-bin 2>/dev/null)
+    if [ -n "$BAZEL_BIN" ] && [ -f "$BAZEL_BIN/as-nobody" ]; then
+      cp -f "$BAZEL_BIN/as-nobody" /app/build_buildfarm/as-nobody
+      echo "Copied as-nobody from $BAZEL_BIN"
+    elif [ -f "bazel-bin/as-nobody" ]; then
+      cp -f bazel-bin/as-nobody /app/build_buildfarm/as-nobody
+    else
+      echo "ERROR: Could not find as-nobody binary"
+      exit 1
+    fi
+
+    echo "Copying cgexec-wrapper..."
+    cp -f cgexec-wrapper /app/build_buildfarm/cgexec-wrapper
+
+    # For linux-sandbox and process-wrapper, use the ones from the installed bazel
+    # These are embedded in the bazel binary and extracted at runtime
+    BAZEL_INSTALL_BASE=$(./bazel info install_base 2>/dev/null || echo "")
+
+    if [ -n "$BAZEL_INSTALL_BASE" ] && [ -d "$BAZEL_INSTALL_BASE" ]; then
+      echo "Using wrappers from bazel install base: $BAZEL_INSTALL_BASE"
+
+      # Copy linux-sandbox from install base
+      if [ -f "$BAZEL_INSTALL_BASE/linux-sandbox" ]; then
+        cp -f "$BAZEL_INSTALL_BASE/linux-sandbox" /app/build_buildfarm/linux-sandbox
+        echo "Copied linux-sandbox from $BAZEL_INSTALL_BASE"
+      fi
+
+      # Copy process-wrapper from install base
+      if [ -f "$BAZEL_INSTALL_BASE/process-wrapper" ]; then
+        cp -f "$BAZEL_INSTALL_BASE/process-wrapper" /app/build_buildfarm/process-wrapper
+        echo "Copied process-wrapper from $BAZEL_INSTALL_BASE"
+      fi
+    fi
+
+    # If we still don't have the wrappers, try building them from source
+    if [ ! -f /app/build_buildfarm/linux-sandbox ]; then
+      echo "Building linux-sandbox from source..."
+      ./bazel build --jobs=2 @bazel//src/main/tools:linux-sandbox
+      for src in bazel-bin/external/bazel~/src/main/tools/linux-sandbox bazel-bin/external/bazel/src/main/tools/linux-sandbox; do
+        if [ -f "$src" ]; then
+          cp -f "$src" /app/build_buildfarm/linux-sandbox
+          echo "Copied linux-sandbox from $src"
+          break
+        fi
+      done
+    fi
+
+    if [ ! -f /app/build_buildfarm/process-wrapper ]; then
+      echo "Building process-wrapper from source..."
+      ./bazel build --jobs=2 @bazel//src/main/tools:process-wrapper
+      for src in bazel-bin/external/bazel~/src/main/tools/process-wrapper bazel-bin/external/bazel/src/main/tools/process-wrapper; do
+        if [ -f "$src" ]; then
+          cp -f "$src" /app/build_buildfarm/process-wrapper
+          echo "Copied process-wrapper from $src"
+          break
+        fi
+      done
+    fi
+
+    chmod +x /app/build_buildfarm/* 2>/dev/null || true
+
+    echo "Execution wrappers installed:"
+    ls -la /app/build_buildfarm/
+
+    # Verify critical wrappers exist
+    if [ ! -f /app/build_buildfarm/linux-sandbox ]; then
+      echo "ERROR: linux-sandbox not found!"
+      exit 1
+    fi
+  fi
+
   # Start the server.
   ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
   SERVER_PID=$!

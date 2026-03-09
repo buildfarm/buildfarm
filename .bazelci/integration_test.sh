@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025 The Buildfarm Authors. All rights reserved.
+# Copyright 2021-2026 The Buildfarm Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,13 +22,28 @@
 docker run --rm -d --name buildfarm-redis --network host redis:7.2.4 --bind localhost
 
 # Build a container for buildfarm services
-cp `which bazel` bazel
+# Only copy bazel if it doesn't exist (allow pre-existing bazel to be used)
+if [ ! -f bazel ] || [ ! -x bazel ]; then
+  cp `which bazel` bazel
+fi
 docker build -t buildfarm .
 
 # Start the servies and do a test build
+# Use more memory for tests that need to build execution wrappers
+MEMORY_LIMIT=""
+CGROUP_OPTIONS=""
+if [[ "$BUILDFARM_CONFIG" == *"cgroups-sandbox"* ]]; then
+  MEMORY_LIMIT="--memory=4g"
+  # For cgroups v2 + linux-sandbox: need privileged mode for mount/namespace operations
+  # The client bazel needs to create sandboxes, and the worker needs cgroup access
+  CGROUP_OPTIONS="--privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw"
+fi
+
 docker run --rm \
     -v /tmp:/tmp \
     --network host  \
+    $MEMORY_LIMIT \
+    $CGROUP_OPTIONS \
     --env RUN_TEST=$RUN_TEST \
     --env TEST_ARG1=$TEST_ARG1 \
     --env EXECUTION_STAGE_WIDTH=$EXECUTION_STAGE_WIDTH \
