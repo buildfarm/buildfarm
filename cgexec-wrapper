@@ -75,8 +75,10 @@ if ! echo $$ > "$cgroupProcsPath" 2>/dev/null; then
     echo "cgexec-wrapper: Current user: $(id)" >&2
     echo "cgexec-wrapper: cgroup.procs permissions: $(ls -la "$cgroupProcsPath" 2>&1)" >&2
     echo "cgexec-wrapper: Parent dir: $(ls -la "$(dirname "$cgroupProcsPath")" 2>&1 | head -5)" >&2
-    # Try the write again to get the actual error message
-    echo $$ > "$cgroupProcsPath"
+    # Fail hard - do NOT allow the action to run without cgroup limits,
+    # as it would run unconstrained and could OOM the entire container.
+    echo "cgexec-wrapper: FATAL: Refusing to execute without cgroup limits" >&2
+    exit 1
 fi
 
 # Exec the rest of the arguments as-is
