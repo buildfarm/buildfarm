@@ -14,10 +14,12 @@
 
 package build.buildfarm.tools;
 
-public interface CliConstants {
-  String BUILDFARM_HOST =
+public final class CliConstants {
+  public static final String BUILDFARM_HOST =
       "The [scheme://]host:port of the buildfarm server. Scheme should be 'grpc://',"
           + " 'grpcs://', or omitted (default 'grpc://')";
-  String INSTANCE_NAME = "The instance name";
-  String HASH_FUNCTION = "The digest hash function (e.g., SHA256)";
+  public static final String INSTANCE_NAME = "The instance name";
+  public static final String HASH_FUNCTION = "The digest hash function (e.g., SHA256)";
+
+  private CliConstants() {}
 }
