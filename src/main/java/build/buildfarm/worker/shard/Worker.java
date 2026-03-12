@@ -118,6 +118,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
@@ -363,7 +364,7 @@ public final class Worker extends LoggingMain {
     }
   }
 
-  private ContentAddressableStorage createStorages(
+  private CASFileCache createStorages(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       Executor accessRecorder,
@@ -386,7 +387,7 @@ public final class Worker extends LoggingMain {
       delegate = storage;
       delegateSkipLoad = cas.isSkipLoad();
     }
-    return storage;
+    return (CASFileCache) storage;
   }
 
   private ContentAddressableStorage createStorage(
@@ -567,7 +568,7 @@ public final class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
-  private void startFailsafeRegistration() {
+  private void startFailsafeRegistration(Supplier<Boolean> isReadOnly) {
     String endpoint = configs.getWorker().getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
     worker.setWorkerType(configs.getWorker().getWorkerType());
@@ -579,7 +580,10 @@ public final class Worker extends LoggingMain {
               long workerRegistrationExpiresAt = 0;
 
               ShardWorker nextRegistration(long now) {
-                return worker.setExpireAt(now + registrationOffsetMillis).build();
+                return worker
+                    .setExpireAt(now + registrationOffsetMillis)
+                    .setReadOnly(isReadOnly.get())
+                    .build();
               }
 
               long nextInterval(long now) {
@@ -703,7 +707,7 @@ public final class Worker extends LoggingMain {
             new Random(),
             workerStubs,
             (worker, t, context) -> {});
-    ContentAddressableStorage storage =
+    CASFileCache storage =
         createStorages(
             remoteInputStreamFactory,
             removeDirectoryService,
@@ -791,7 +795,7 @@ public final class Worker extends LoggingMain {
         new WorkerProfileService(
             workerName,
             configs.getWorker().getPublicName(),
-            (CASFileCache) storage,
+            storage,
             matchStage,
             inputFetchStage,
             executeActionStage,
@@ -825,7 +829,7 @@ public final class Worker extends LoggingMain {
           }
         },
         directExecutor());
-    startFailsafeRegistration();
+    startFailsafeRegistration(storage::isReadOnly);
 
     pipeline.start();
     healthCheckMetric.labels("start").inc();
