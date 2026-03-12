@@ -224,15 +224,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   protected final transient Entry header = new SentinelEntry();
   protected volatile long unreferencedEntryCount = 0;
 
-  enum State {
-    STOPPED,
-    STARTING, // files are checked for existence/read
-    WRITING, // only writable state
-    READ_ONLY,
-  }
-
-  @GuardedBy("this")
-  private State state = State.STOPPED;
+  private State state = new State();
 
   @GuardedBy("this")
   private long removedEntrySize = 0;
@@ -516,11 +508,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         builder.add(result.build());
       }
     }
-    boolean recordAccess;
-    synchronized (this) {
-      recordAccess = state == State.WRITING || state == State.READ_ONLY;
-    }
-    if (recordAccess) {
+    if (state.shouldRecordAccess()) {
       List<String> foundDigests = found.build();
       if (!foundDigests.isEmpty()) {
         accessed(foundDigests);
@@ -566,10 +554,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     if (entry != null) {
       return entry;
     }
-    synchronized (this) {
-      if (state != State.WRITING && state != State.READ_ONLY) {
-        return new Entry();
-      }
+    if (!state.shouldRecordAccess()) {
+      return new Entry();
     }
     return null;
   }
@@ -833,26 +819,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @Override
-  public synchronized boolean isReadOnly() {
-    return state != State.WRITING;
+  public boolean isReadOnly() {
+    return !state.isWritable();
   }
 
-  public synchronized boolean setReadOnly(boolean value) {
-    if (value && state == State.WRITING) {
-      state = State.READ_ONLY;
-      return true;
-    }
-    if (!value && state == State.READ_ONLY) {
-      state = State.WRITING;
-      notifyAll(); // ensure that we wake up any waits for this state
-      return true;
-    }
-    return false;
+  public boolean setReadOnly(boolean value) {
+    return state.setReadOnly(value);
   }
 
   @Override
-  public synchronized void waitForWritable(Duration timeout) throws InterruptedException {
-    wait(timeout.toMillis(), (int) (timeout.toNanos() % 1000000));
+  public void waitForWritable(Duration timeout) throws InterruptedException {
+    synchronized (state) {
+      state.wait(timeout.toMillis(), (int) (timeout.toNanos() % 1000000));
+    }
   }
 
   @Override
@@ -1320,7 +1299,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     // lock ordering, [this] -> [lru]
     // path used as lock due to isolation by filename
     saveLRU();
-    state = State.STOPPED;
+    state.stop();
   }
 
   public ListenableFuture<Void> start(boolean skipLoad) {
@@ -1337,10 +1316,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ExecutorService removeDirectoryService,
       boolean skipLoad,
       boolean writable) {
-    synchronized (this) {
-      checkState(state == State.STOPPED);
-      state = State.STARTING;
-    }
+    state.start();
     CasFallbackDelegate.start(
         delegate, onStartPut, removeDirectoryService, delegateSkipLoad, writable);
 
@@ -1350,10 +1326,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               startRoutine(onStartPut, removeDirectoryService, skipLoad);
               synchronized (this) {
                 saveLRUAfter = Deadline.after(10, MINUTES);
-                state = writable ? State.WRITING : State.READ_ONLY;
-                if (writable) {
-                  notifyAll();
-                }
+                checkState(state.setReadOnly(!writable));
               }
               return null;
             });

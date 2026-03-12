@@ -409,11 +409,9 @@ class ShardWorkerContext implements WorkerContext {
   /** wait until matching should occur, false return indicates that we are shutting down */
   private boolean waitToMatch() throws InterruptedException {
     ContentAddressableStorage storage = execFileSystem.getStorage();
-    synchronized (storage) {
-      // we may want to get interrupted when match is paused
-      while (!inGracefulShutdown && storage.isReadOnly()) {
-        storage.waitForWritable(java.time.Duration.ofSeconds(1));
-      }
+    // we may want to get interrupted when match is paused
+    while (!inGracefulShutdown && storage.isReadOnly()) {
+      storage.waitForWritable(java.time.Duration.ofSeconds(1));
     }
     return !inGracefulShutdown;
   }
