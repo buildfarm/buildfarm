@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
+import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.transform;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -79,9 +80,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -698,9 +699,9 @@ public class RedisShardBackplane implements Backplane {
    * access to the shared storage set.
    */
   @Override
-  public Set<String> getStorageWorkers() throws IOException {
+  public Collection<ShardWorker> getStorageWorkers() throws IOException {
     refreshStorageWorkersIfExpired();
-    return new HashSet<>(storageWorkers.keySet());
+    return new ArrayList<>(storageWorkers.values());
   }
 
   @Override
@@ -1313,7 +1314,24 @@ public class RedisShardBackplane implements Backplane {
   private BackplaneStatus backplaneStatus(UnifiedJedis jedis) throws IOException {
     Unified unified = (Unified) jedis;
     Set<String> executeWorkers = getExecuteWorkers();
-    Set<String> storageWorkers = getStorageWorkers();
+    Collection<ShardWorker> storageWorkers = getStorageWorkers();
+    Set<String> activeStorageWorkers =
+        storageWorkers.stream().map(w -> w.getEndpoint()).collect(Collectors.toSet());
+    Iterable<ShardWorker> workers =
+        concat(
+            storageWorkers,
+            executeWorkers.stream()
+                .filter(
+                    endpoint ->
+                        !activeStorageWorkers.contains(
+                            endpoint)) // storage workers will already contain their extra type
+                .map(
+                    endpoint ->
+                        ShardWorker.newBuilder()
+                            .setEndpoint(endpoint)
+                            .setWorkerType(WorkerType.EXECUTE.getNumber())
+                            .build())
+                .collect(Collectors.toList()));
     try (AbstractPipeline pipeline = unified.pipelined(pipelineExecutor)) {
       Supplier<QueueStatus> prequeue = state.prequeue.status(pipeline);
       Supplier<OperationQueueStatus> operationQueue = state.executionQueue.status(pipeline);
@@ -1321,8 +1339,9 @@ public class RedisShardBackplane implements Backplane {
       pipeline.sync();
       return BackplaneStatus.newBuilder()
           .addAllActiveExecuteWorkers(executeWorkers)
-          .addAllActiveStorageWorkers(storageWorkers)
-          .addAllActiveWorkers(Sets.union(executeWorkers, storageWorkers))
+          .addAllActiveStorageWorkers(activeStorageWorkers)
+          .addAllActiveWorkers(Sets.union(executeWorkers, activeStorageWorkers))
+          .addAllWorkers(workers)
           .setPrequeue(prequeue.get())
           .setOperationQueue(operationQueue.get())
           .setDispatchedSize(dispatchedSize.get())

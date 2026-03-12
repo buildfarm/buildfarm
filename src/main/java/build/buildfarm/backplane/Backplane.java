@@ -35,6 +35,7 @@ import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -124,8 +125,8 @@ public interface Backplane {
   /** Returns the insert time epoch in seconds for the digest. */
   long getDigestInsertTime(Digest blobDigest) throws IOException;
 
-  /** Returns a set of the names of all active storage workers. */
-  Set<String> getStorageWorkers() throws IOException;
+  /** Returns the entry iterable of all active storage workers. */
+  Collection<ShardWorker> getStorageWorkers() throws IOException;
 
   // TODO this is just a namespace, but kind of jank for just digest function as a string...
   /**
