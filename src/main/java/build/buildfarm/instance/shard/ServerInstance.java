@@ -894,7 +894,10 @@ public class ServerInstance extends NodeInstance {
       RequestMetadata requestMetadata) {
     Deque<String> workers;
     try {
-      List<String> workersList = new ArrayList<>(backplane.getStorageWorkers());
+      List<String> workersList =
+          backplane.getStorageWorkers().stream()
+              .map(w -> w.getEndpoint())
+              .collect(Collectors.toList());
       Collections.shuffle(workersList, rand);
       workers = new ArrayDeque<>(workersList);
     } catch (IOException e) {
@@ -943,7 +946,10 @@ public class ServerInstance extends NodeInstance {
       Map<build.buildfarm.v1test.Digest, Set<String>> foundBlobs =
           backplane.getBlobDigestsWorkers(
               Iterables.transform(uniqueDigests, d -> DigestUtil.fromDigest(d, digestFunction)));
-      Set<String> workerSet = backplane.getStorageWorkers();
+      Set<String> workerSet =
+          backplane.getStorageWorkers().stream()
+              .map(w -> w.getEndpoint())
+              .collect(Collectors.toSet());
       Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerSet);
       Map<Digest, Set<String>> digestAndWorkersMap =
           uniqueDigests.stream()
@@ -1286,7 +1292,10 @@ public class ServerInstance extends NodeInstance {
     Set<String> workerSet;
     Set<String> locationSet;
     try {
-      workerSet = backplane.getStorageWorkers();
+      workerSet =
+          backplane.getStorageWorkers().stream()
+              .map(w -> w.getEndpoint())
+              .collect(Collectors.toSet());
       locationSet = backplane.getBlobLocationSet(blobDigest);
       workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
     } catch (IOException e) {
@@ -1457,28 +1466,18 @@ public class ServerInstance extends NodeInstance {
   }
 
   private Instance writeInstanceSupplier() {
-    String worker = getRandomWorker();
+    String worker = getRandomWritingWorker();
     return workerStub(worker);
   }
 
-  String getRandomWorker() {
-    Set<String> workerSet;
+  String getRandomWritingWorker() {
     try {
-      workerSet = backplane.getStorageWorkers();
+      return Shard.getRandomWritingWorker(backplane, rand);
+    } catch (NoAvailableWorkersException e) {
+      throw Status.UNAVAILABLE.withDescription(e.getMessage()).withCause(e).asRuntimeException();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
-    if (workerSet.isEmpty()) {
-      throw Status.UNAVAILABLE.withDescription("no available workers").asRuntimeException();
-    }
-    int index = rand.nextInt(workerSet.size());
-    // best case no allocation average n / 2 selection
-    Iterator<String> iter = workerSet.iterator();
-    String worker = null;
-    while (iter.hasNext() && index-- >= 0) {
-      worker = iter.next();
-    }
-    return worker;
   }
 
   private Instance workerStub(String worker) {

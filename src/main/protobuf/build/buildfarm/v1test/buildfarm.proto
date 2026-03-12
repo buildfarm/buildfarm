@@ -457,6 +457,8 @@ message BackplaneStatus {
 
   repeated string active_storage_workers = 12;
 
+  repeated ShardWorker workers = 14;
+
   repeated string active_execute_workers = 13;
 
   int64 cas_lookup_size = 5;
