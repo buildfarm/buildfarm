@@ -4,7 +4,10 @@ load("@rules_java//java:java_plugin.bzl", "java_plugin")
 
 java_binary(
     name = "bf-mount",
-    srcs = ["Mount.java"],
+    srcs = [
+        "CliConstants.java",
+        "Mount.java",
+    ],
     main_class = "build.buildfarm.tools.Mount",
     visibility = ["//visibility:public"],
     deps = [
@@ -16,12 +19,14 @@ java_binary(
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
         "@buildfarm_maven//:io_grpc_grpc_protobuf",
         "@buildfarm_maven//:io_grpc_grpc_stub",
         "@googleapis//google/rpc:rpc_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -36,7 +41,10 @@ java_plugin(
 
 java_binary(
     name = "bfssh",
-    srcs = ["Bfssh.java"],
+    srcs = [
+        "Bfssh.java",
+        "CliConstants.java",
+    ],
     main_class = "build.buildfarm.tools.Bfssh",
     visibility = ["//visibility:public"],
     deps = [
@@ -46,9 +54,9 @@ java_binary(
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
-        "@buildfarm_maven//:com_github_pcj_google_options",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
@@ -65,7 +73,10 @@ java_binary(
 
 java_binary(
     name = "bf-executor",
-    srcs = ["Executor.java"],
+    srcs = [
+        "CliConstants.java",
+        "Executor.java",
+    ],
     main_class = "build.buildfarm.tools.Executor",
     visibility = ["//visibility:public"],
     deps = [
@@ -76,6 +87,7 @@ java_binary(
         "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
@@ -92,7 +104,10 @@ java_binary(
 
 java_binary(
     name = "bf-extractor",
-    srcs = ["Extract.java"],
+    srcs = [
+        "CliConstants.java",
+        "Extract.java",
+    ],
     main_class = "build.buildfarm.tools.Extract",
     visibility = ["//visibility:public"],
     deps = [
@@ -101,6 +116,7 @@ java_binary(
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
@@ -114,7 +130,10 @@ java_binary(
 
 java_binary(
     name = "bf-upload",
-    srcs = ["Upload.java"],
+    srcs = [
+        "CliConstants.java",
+        "Upload.java",
+    ],
     main_class = "build.buildfarm.tools.Upload",
     visibility = ["//visibility:public"],
     deps = [
@@ -125,6 +144,7 @@ java_binary(
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
@@ -215,7 +235,10 @@ java_binary(
 
 java_binary(
     name = "bf-ac",
-    srcs = ["Ac.java"],
+    srcs = [
+        "Ac.java",
+        "CliConstants.java",
+    ],
     data = [
         "//examples:example_properties",
     ],
@@ -230,12 +253,14 @@ java_binary(
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
         "@buildfarm_maven//:io_grpc_grpc_protobuf",
         "@buildfarm_maven//:io_grpc_grpc_stub",
         "@googleapis//google/rpc:rpc_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -248,13 +273,17 @@ java_binary(
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_grpc",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
     ],
 )
 
 java_binary(
     name = "bf-hist",
-    srcs = ["Hist.java"],
+    srcs = [
+        "CliConstants.java",
+        "Hist.java",
+    ],
     main_class = "build.buildfarm.tools.Hist",
     visibility = ["//visibility:public"],
     deps = [
@@ -265,6 +294,7 @@ java_binary(
         "//src/main/java/build/buildfarm/server/services",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
@@ -308,7 +338,10 @@ java_binary(
 
 java_binary(
     name = "bf-cancel",
-    srcs = ["Cancel.java"],
+    srcs = [
+        "Cancel.java",
+        "CliConstants.java",
+    ],
     main_class = "build.buildfarm.tools.Cancel",
     visibility = ["//visibility:public"],
     deps = [
@@ -316,6 +349,7 @@ java_binary(
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
