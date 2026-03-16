@@ -422,7 +422,6 @@ class Executor {
     description =
         "Execute actions on the buildfarm server. Reads action digests from stdin (one per line).")
 class ExecutorCommand implements Callable<Integer> {
-
   @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   private String host;
 
