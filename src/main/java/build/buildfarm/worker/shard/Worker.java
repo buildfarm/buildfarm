@@ -818,6 +818,7 @@ public final class Worker extends LoggingMain {
         new FutureCallback<>() {
           @Override
           public void onSuccess(Void result) {
+            log.log(INFO, String.format("%s initialized", identifier));
             healthStatusManager.setStatus(
                 HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
             PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
@@ -836,8 +837,6 @@ public final class Worker extends LoggingMain {
     inputFetchSlotsTotal.set(inputFetchStageWidth);
     executionSlotsTotal.set(executeStageWidth);
     reportResultSlotsTotal.set(reportResultStageWidth);
-
-    log.log(INFO, String.format("%s initialized", identifier));
   }
 
   @Override

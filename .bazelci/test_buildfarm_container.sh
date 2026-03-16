@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025 The Buildfarm Authors. All rights reserved.
+# Copyright 2021-2026 The Buildfarm Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -63,6 +63,38 @@ ensure_server_is_up(){
     done
 }
 
+ensure_worker_is_up(){
+    # We cannot do a test build until the worker is properly started and writable.
+    # In order to determine when the worker is started, we can watch the worker's log for the proper startup message.
+    # We also capture the PID to monitor any crashes.
+    # In the future, we will want a better way to confirm the buildfarm cluster is ready to take on work.
+    FILE_TO_CHECK="worker.log"
+    LINE_TO_CONTAIN=" initialized$"
+    SLEEP_TIME=10
+    COUNT=0
+    MAX_COUNT=5
+
+    # Wait for the server to start
+    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]];
+    do
+        echo "Waiting for Worker to start..."
+        sleep ${SLEEP_TIME}
+        COUNT=$(($COUNT + 1))
+
+       # Give up waiting for the worker to start.
+       if [ $COUNT -eq $MAX_COUNT ]; then
+          echo "Worker did not start."
+          break
+       fi
+
+       # Give up because the worker crashed.
+       if [ ! -n "$(ps -p $WORKER_PID -o pid=)" ]; then
+          echo "Worker crashed."
+          break
+       fi;
+    done
+}
+
 check_for_crashes(){
     while :
     do
@@ -94,6 +126,8 @@ start_server_and_worker(){
   # Start the worker.
   ./bazel run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
   WORKER_PID=$!
+
+  ensure_worker_is_up
 }
 
 init_grpc_parser(){
