@@ -41,7 +41,7 @@ public class ActionResultTranslatorTest {
     StringTranslator<ActionResult> actionResultTranslator = new ActionResultTranslator();
 
     String json = actionResultTranslator.print(builder.build());
-    ActionResult actionResult = actionResultTranslator.parse(json);
+    ActionResult actionResult = actionResultTranslator.parse(json).value();
 
     assertThat(actionResult.getExecutionMetadata().getAuxiliaryMetadataCount()).isEqualTo(1);
   }

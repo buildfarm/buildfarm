@@ -166,7 +166,8 @@ public class RedisHashMap<T> {
                 Iterables.transform(
                     scanResults.getResult(),
                     entry ->
-                        new SimpleEntry<>(entry.getKey(), translator.parse(entry.getValue()))));
+                        new SimpleEntry<>(
+                            entry.getKey(), translator.parse(entry.getValue()).value())));
         return new ScanResult<>(scanResults.getCursor(), results);
       }
     }.fill(hashCursor, count);
@@ -179,7 +180,7 @@ public class RedisHashMap<T> {
    * @return The redis hashmap represented as a java map.
    */
   public Map<String, T> asMap(UnifiedJedis jedis) {
-    return transformValues(jedis.hgetAll(name), translator::parse);
+    return transformValues(jedis.hgetAll(name), value -> translator.parse(value).value());
   }
 
   /**
@@ -189,6 +190,8 @@ public class RedisHashMap<T> {
    * @return Values associated with the specified fields
    */
   public Iterable<T> mget(UnifiedJedis jedis, Iterable<String> fields) {
-    return transform(jedis.hmget(name, Iterables.toArray(fields, String.class)), translator::parse);
+    return transform(
+        jedis.hmget(name, Iterables.toArray(fields, String.class)),
+        value -> translator.parse(value).value());
   }
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 The Buildfarm Authors. All rights reserved.
+// Copyright 2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.redis;
+package build.buildfarm.instance.shard.codec;
 
-public class IdentityTranslator implements StringTranslator<String> {
-  @Override
-  public String print(String value) {
-    return value;
-  }
+import build.buildfarm.common.redis.Codec;
+import build.buildfarm.instance.shard.codec.b64.B64Codec;
+import build.buildfarm.instance.shard.codec.failover.FailoverCodec;
+import build.buildfarm.instance.shard.codec.json.JsonCodec;
+import java.util.logging.Level;
 
-  @Override
-  public Result<String> parse(String value) {
-    return new Result<>(value, /* dirty= */ false);
-  }
+public final class ShardCodec {
+  public static final Codec DEFAULT_CODEC =
+      FailoverCodec.create(B64Codec.create(Level.FINEST), JsonCodec.CODEC);
+
+  private ShardCodec() {}
 }

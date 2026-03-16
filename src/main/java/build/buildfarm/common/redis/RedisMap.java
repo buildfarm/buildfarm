@@ -113,21 +113,6 @@ public class RedisMap<T> {
    * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @param value The value for the key.
-   * @param timeout_s Timeout to expire the entry. (units: seconds (s))
-   * @note Overloaded.
-   */
-  public void insert(UnifiedJedis jedis, String key, T value, long timeout_s) {
-    // Jedis only provides int precision.  this is fine as the units are seconds.
-    // We supply an interface for longs as a convenience to callers.
-    jedis.setex(createKeyName(key), (int) timeout_s, printNotNull(value));
-  }
-
-  /**
-   * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
-   * @details If the key already exists, then the value is replaced.
-   * @param jedis Jedis cluster client.
-   * @param key The name of the key.
-   * @param value The value for the key.
    * @note Overloaded.
    */
   public void insert(UnifiedJedis jedis, String key, T value) {
@@ -182,7 +167,11 @@ public class RedisMap<T> {
    * @note Suggested return identifier: value.
    */
   public T get(UnifiedJedis jedis, String key) {
-    return translator.parse(jedis.get(createKeyName(key)));
+    StringTranslator.Result<T> result = translator.parse(jedis.get(createKeyName(key)));
+    if (result.dirty()) {
+      insert(jedis, key, result.value());
+    }
+    return result.value();
   }
 
   /**
@@ -194,9 +183,13 @@ public class RedisMap<T> {
    * @note Overloaded.
    * @note Suggested return identifier: value.
    */
-  public T getex(UnifiedJedis jedis, String key, long timeout_s) {
+  public T getex(UnifiedJedis jedis, String key, int timeout_s) {
     GetExParams params = GetExParams.getExParams().ex(timeout_s);
-    return translator.parse(jedis.getEx(createKeyName(key), params));
+    StringTranslator.Result<T> result = translator.parse(jedis.getEx(createKeyName(key), params));
+    if (result.dirty()) {
+      insert(jedis, key, result.value(), timeout_s);
+    }
+    return result.value();
   }
 
   /**
@@ -220,8 +213,11 @@ public class RedisMap<T> {
 
       List<Map.Entry<String, T>> resolved = new ArrayList<>();
       for (Map.Entry<String, Response<String>> val : values) {
-        T t = translator.parse(val.getValue().get());
-        if (t == null) {
+        StringTranslator.Result<T> r = translator.parse(val.getValue().get());
+        T t;
+        if (r != null) {
+          t = r.value();
+        } else {
           t = onNull.apply(val.getKey());
         }
         resolved.add(new AbstractMap.SimpleEntry<>(val.getKey(), t));
