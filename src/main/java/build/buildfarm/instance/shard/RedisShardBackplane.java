@@ -87,13 +87,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
@@ -754,27 +752,6 @@ public class RedisShardBackplane implements Backplane {
       }
       throw e;
     }
-  }
-
-  // When performing a graceful scale down of workers, the backplane can provide worker names to the
-  // scale-down service. The algorithm in which the backplane chooses these workers can be made more
-  // sophisticated in the future. But for now, we'll give back n random workers.
-  public List<String> suggestedWorkersToScaleDown(int numWorkers) throws IOException {
-    // get all workers
-    List<String> allWorkers = new ArrayList<>(getStorageWorkers());
-
-    // ensure selection amount is in range [0 - size]
-    numWorkers = Math.max(0, Math.min(numWorkers, allWorkers.size()));
-
-    // select n workers
-    return randomN(allWorkers, numWorkers);
-  }
-
-  public static <T> List<T> randomN(List<T> list, int n) {
-    return Stream.generate(
-            () -> list.remove((int) (list.size() * ThreadLocalRandom.current().nextDouble())))
-        .limit(Math.min(list.size(), n))
-        .collect(Collectors.toList());
   }
 
   private void removeInvalidWorkers(
