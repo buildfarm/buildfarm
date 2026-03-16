@@ -77,6 +77,7 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.v1test.ShardWorker;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.cache.CacheBuilder;
@@ -85,7 +86,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -105,6 +105,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -200,6 +201,18 @@ public class ServerInstanceTest {
     return createAction(provideAction, provideCommand, inputRootDigest, command);
   }
 
+  private static Collection<ShardWorker> shardWorkers(String... workers) {
+    return shardWorkers(Arrays.asList(workers));
+  }
+
+  private static Collection<ShardWorker> shardWorkers(Collection<String> workers) {
+    return workers.stream().map(ServerInstanceTest::shardWorker).collect(Collectors.toList());
+  }
+
+  private static ShardWorker shardWorker(String endpoint) {
+    return ShardWorker.newBuilder().setEndpoint(endpoint).build();
+  }
+
   @SuppressWarnings("unchecked")
   private Action createAction(
       boolean provideAction,
@@ -210,8 +223,9 @@ public class ServerInstanceTest {
     String workerName = "worker";
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
-    ImmutableSet<String> workers = ImmutableSet.of(workerName);
-    when(mockBackplane.getStorageWorkers()).thenReturn(workers);
+    Set<String> workers = ImmutableSet.of(workerName);
+    Collection<ShardWorker> storageWorkers = shardWorkers(workers);
+    when(mockBackplane.getStorageWorkers()).thenReturn(storageWorkers);
 
     ByteString commandBlob = command.toByteString();
     DigestFunction.Value digestFunction = inputRootDigest.getDigestFunction();
@@ -940,7 +954,7 @@ public class ServerInstanceTest {
 
   @Test
   public void blobsAreMissingWhenWorkersIsEmpty() throws Exception {
-    when(mockBackplane.getStorageWorkers()).thenReturn(ImmutableSet.of());
+    when(mockBackplane.getStorageWorkers()).thenReturn(ImmutableList.of());
     Digest digest = Digest.newBuilder().setHash("hash").setSizeBytes(1).build();
     Iterable<Digest> missingDigests =
         instance
@@ -957,7 +971,7 @@ public class ServerInstanceTest {
     String workerName = "worker";
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
-    ImmutableSet<String> workers = ImmutableSet.of(workerName);
+    Collection<ShardWorker> workers = ImmutableList.of(shardWorker(workerName));
     when(mockBackplane.getStorageWorkers()).thenReturn(workers);
 
     Digest digest = Digest.newBuilder().setHash("hash").setSizeBytes(1).build();
@@ -1146,7 +1160,7 @@ public class ServerInstanceTest {
     String workerName = "worker";
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
-    ImmutableSet<String> workers = ImmutableSet.of(workerName);
+    Collection<ShardWorker> workers = ImmutableList.of(shardWorker(workerName));
     when(mockBackplane.getStorageWorkers()).thenReturn(workers);
 
     ByteString blob = ByteString.copyFromUtf8("blobOnWorker");
@@ -1197,9 +1211,9 @@ public class ServerInstanceTest {
 
   @Test
   public void findMissingBlobsTest_ViaBackPlane() throws Exception {
-    Set<String> activeWorkers = ImmutableSet.of("worker1", "worker2", "worker3");
-    Set<String> expiredWorkers = ImmutableSet.of("workerX", "workerY", "workerZ");
-    Set<String> imposterWorkers = ImmutableSet.of("imposter1", "imposter2", "imposter3");
+    Collection<ShardWorker> activeWorkers = shardWorkers("worker1", "worker2", "worker3");
+    Collection<ShardWorker> expiredWorkers = shardWorkers("workerX", "workerY", "workerZ");
+    Collection<ShardWorker> imposterWorkers = shardWorkers("imposter1", "imposter2", "imposter3");
     DigestFunction.Value digestFunction = DigestFunction.Value.MURMUR3;
 
     Set<Digest> availableDigests =
@@ -1242,23 +1256,24 @@ public class ServerInstanceTest {
 
     Map<build.buildfarm.v1test.Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
 
+    Random random = new Random();
     for (Digest digest : availableDigests) {
       digestAndWorkersMap.put(
-          DigestUtil.fromDigest(digest, digestFunction), getRandomSubset(activeWorkers));
+          DigestUtil.fromDigest(digest, digestFunction), getRandomSubset(activeWorkers, random));
     }
     for (Digest digest : missingDigests) {
       digestAndWorkersMap.put(
-          DigestUtil.fromDigest(digest, digestFunction), getRandomSubset(expiredWorkers));
+          DigestUtil.fromDigest(digest, digestFunction), getRandomSubset(expiredWorkers, random));
     }
     for (Digest digest : digestAvailableOnImposters) {
       digestAndWorkersMap.put(
-          DigestUtil.fromDigest(digest, digestFunction), getRandomSubset(imposterWorkers));
+          DigestUtil.fromDigest(digest, digestFunction), getRandomSubset(imposterWorkers, random));
     }
 
     BuildfarmConfigs buildfarmConfigs = instance.getBuildFarmConfigs();
     buildfarmConfigs.getServer().setFindMissingBlobsViaBackplane(true);
-    Set<String> activeAndImposterWorkers =
-        Sets.newHashSet(Iterables.concat(activeWorkers, imposterWorkers));
+    Collection<ShardWorker> activeAndImposterWorkers = new ArrayList<>(activeWorkers);
+    activeAndImposterWorkers.addAll(imposterWorkers);
 
     when(mockBackplane.getStorageWorkers()).thenReturn(activeAndImposterWorkers);
     when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
@@ -1269,10 +1284,10 @@ public class ServerInstanceTest {
 
     long serverStartTime = 1686951033L; // june 15th, 2023
     Map<String, Long> workersStartTime = new HashMap<>();
-    for (String worker : activeAndImposterWorkers) {
-      workersStartTime.put(worker, serverStartTime);
+    for (ShardWorker worker : activeAndImposterWorkers) {
+      workersStartTime.put(worker.getEndpoint(), serverStartTime);
     }
-    when(mockBackplane.getWorkersStartTimeInEpochSecs(activeAndImposterWorkers))
+    when(mockBackplane.getWorkersStartTimeInEpochSecs(workersStartTime.keySet()))
         .thenReturn(workersStartTime);
     long oneDay = 86400L;
     for (Digest digest : availableDigests) {
@@ -1309,11 +1324,14 @@ public class ServerInstanceTest {
     buildfarmConfigs.getServer().setFindMissingBlobsViaBackplane(false);
   }
 
-  private Set<String> getRandomSubset(Set<String> input) {
-    Random random = new Random();
+  private static Set<String> getRandomSubset(Collection<ShardWorker> input, Random random) {
     int end = random.nextInt(input.size()) + 1;
     int start = random.nextInt(end);
-    return input.stream().skip(start).limit(end - start).collect(Collectors.toSet());
+    return input.stream()
+        .skip(start)
+        .limit(end - start)
+        .map(w -> w.getEndpoint())
+        .collect(Collectors.toSet());
   }
 
   @Test

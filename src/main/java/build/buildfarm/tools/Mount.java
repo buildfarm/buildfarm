@@ -83,6 +83,9 @@ class Mount implements Callable<Integer> {
 
               public synchronized InputStream newInput(
                   Compressor.Value compressor, Digest blobDigest, long offset) {
+                if (blobDigest.getSize() == 0) {
+                  return ByteString.EMPTY.newInput();
+                }
                 checkArgument(compressor == Compressor.Value.IDENTITY);
                 if (cache.containsKey(blobDigest)) {
                   return cache.get(blobDigest).substring((int) offset).newInput();
