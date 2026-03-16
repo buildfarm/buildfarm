@@ -44,7 +44,6 @@ import picocli.CommandLine.Parameters;
     mixinStandardHelpOptions = true,
     description = "Mount an REAPI directory specified by digest at a mount point")
 class Mount implements Callable<Integer> {
-
   @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   private String host;
 
