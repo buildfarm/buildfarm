@@ -53,6 +53,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -194,26 +195,35 @@ public class DirectoryEntryCFC extends CASFileCache {
       Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       ExecutorService service) {
-    ListenableFuture<Long> fetched = fetch(path, digest, directoriesIndex, service);
+    String suffix = UUID.randomUUID().toString();
+    Path filename = path.getFileName();
+    String tmpFilename = filename + ".tmp." + suffix;
+    Path tmpPath = path.resolveSibling(tmpFilename);
+
+    ListenableFuture<Long> fetched = fetch(tmpPath, digest, directoriesIndex, service);
     ListenableFuture<Void> limited =
         transformAsync(
             fetched,
             weight -> {
-              try {
-                disableAllWriteAccess(path, fileStore);
-              } catch (IOException e) {
-                return immediateFailedFuture(e);
-              }
+              disableAllWriteAccess(tmpPath, fileStore);
               return immediateFuture(null);
+            },
+            service);
+    ListenableFuture<Void> renamed =
+        transformAsync(
+            limited,
+            result -> {
+              Files.move(tmpPath, path);
+              return immediateFuture(result);
             },
             service);
     ListenableFuture<Void> rolled =
         catchingAsync(
-            limited,
+            renamed,
             Throwable.class,
             e -> {
               try {
-                Directories.remove(path, fileStore);
+                Directories.remove(tmpPath, fileStore);
               } catch (IOException removeException) {
                 e.addSuppressed(removeException);
               }
@@ -223,7 +233,7 @@ public class DirectoryEntryCFC extends CASFileCache {
     return transformAsync(
         rolled,
         result -> {
-          String key = path.getFileName().toString();
+          String key = filename.toString();
           long blobSizeInBytes = getCompleted(fetched);
 
           // might be able to clean this call up, need the expiration, but not the boolean
