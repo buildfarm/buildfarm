@@ -135,4 +135,12 @@ public class LinuxSandboxOptions {
    * @details Flag value: -D.
    */
   public boolean debug = false;
+
+  /**
+   * @field hermetic
+   * @brief Run the sandbox in hermetic mode.
+   * @details Flag value: -h. if set, chroot to sandbox-dir and only mount whats been specified with
+   *     -M/-m for improved hermeticity.
+   */
+  public boolean hermetic = false;
 }
