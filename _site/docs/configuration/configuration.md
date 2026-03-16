@@ -290,6 +290,7 @@ backplane:
 |-----------------------------------|-------------------------------|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | port                              | Integer, _8981_               |                       | Listening port of the worker                                                                                                                                                                                                                                                                                             |
 | publicName                        | String, _DERIVED:port_        | INSTANCE_NAME         | Host:port of the GRPC server, required to be accessible by all servers                                                                                                                                                                                                                                                   |
+| tags                               | List of Strings, _[]_         |                       | Optional list of tags for the worker, used for categorizing workers (e.g., ["gpu"], ["cpu"], ["high-memory"]). Default is empty list                                                                                                                                                                                    |
 | root                              | String, _/tmp/worker_         |                       | Path for all operation content storage                                                                                                                                                                                                                                                                                   |
 | inlineContentLimit                | Integer, _1048567_            |                       | Total size in bytes of inline content for action results, output files, stdout, stderr content                                                                                                                                                                                                                           |
 | operationPollPeriod               | Integer, _1_                  |                       | Period between poll operations at any stage                                                                                                                                                                                                                                                                              |
@@ -319,8 +320,31 @@ backplane:
 worker:
   port: 8981
   publicName: "localhost:8981"
+  tags: ["gpu", "high-memory"]  # Optional: list of tags to categorize worker
   linkedInputDirectories:
     - "^path/to/common/directory"
+```
+
+### Tags Examples
+
+Workers can be tagged with multiple values for flexible categorization:
+
+```yaml
+# GPU worker with high memory
+worker:
+  tags: ["gpu", "high-memory", "production"]
+
+# CPU-only worker  
+worker:
+  tags: ["cpu", "standard-memory"]
+
+# Development worker
+worker:
+  tags: ["dev", "testing"]
+
+# No tags (default)
+worker:
+  tags: []
 ```
 
 ### Capabilities
