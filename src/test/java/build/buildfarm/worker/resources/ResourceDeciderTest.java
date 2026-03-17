@@ -52,7 +52,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -86,7 +85,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             defaultMaxCores,
             /* onlyMulticoreTests= */ true,
             /* limitGlobalExecution= */ false,
@@ -119,7 +117,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -151,7 +148,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ true,
@@ -183,7 +179,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -215,7 +210,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -246,7 +240,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -272,7 +265,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -302,7 +294,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -335,7 +326,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -370,7 +360,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -407,7 +396,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -445,7 +433,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -480,7 +467,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -516,7 +502,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -552,7 +537,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -589,7 +573,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -624,7 +607,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -659,7 +641,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -669,30 +650,6 @@ public class ResourceDeciderTest {
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isFalse();
-  }
-
-  // Function under test: decideResourceLimitations
-  // Reason for testing: The worker name is captured
-  // Failure explanation: The worker name is not being captured in the returned value.
-  @Test
-  public void decideResourceLimitationsTestWorkerName() throws Exception {
-    // ARRANGE
-    Command command = Command.newBuilder().build();
-
-    // ACT
-    ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(
-            command,
-            "foo",
-            /* defaultMaxCores= */ 0,
-            /* onlyMulticoreTests= */ false,
-            /* limitGlobalExecution= */ false,
-            /* executeStageWidth= */ 100,
-            /* allowBringYourOwnContainer= */ false,
-            new SandboxSettings());
-
-    // ASSERT
-    assertThat(limits.workerName).isEqualTo("foo");
   }
 
   // Function under test: decideResourceLimitations
@@ -707,7 +664,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "foo",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -733,7 +689,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "foo",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -767,7 +722,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "foo",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -801,7 +755,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "foo",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -835,7 +788,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "foo",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
@@ -869,7 +821,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "foo",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,

@@ -31,7 +31,6 @@ public final class ResourceDecider {
    * @details Platform properties from specified exec_properties are taken into account as well as
    *     global buildfarm configuration.
    * @param command The command to decide resource limitations for.
-   * @param workerName The name of the worker taking on the action.
    * @param onlyMulticoreTests Only allow tests to be multicore.
    * @param defaultMaxCores The unspecified maximum constraint for cores.
    * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
@@ -44,7 +43,6 @@ public final class ResourceDecider {
    */
   public static ResourceLimits decideResourceLimitations(
       Command command,
-      String workerName,
       int defaultMaxCores,
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
@@ -58,7 +56,6 @@ public final class ResourceDecider {
     adjustLimits(
         limits,
         command,
-        workerName,
         defaultMaxCores,
         onlyMulticoreTests,
         limitGlobalExecution,
@@ -74,7 +71,6 @@ public final class ResourceDecider {
    * @details Existing limits configuration and buildfarm configuration are taken into account.
    * @param limits Existing limits chosen by the user's exec_properties.
    * @param command The command to decide resource limitations for.
-   * @param workerName The name of the worker taking on the action.
    * @param defaultMaxCores The unspecified maximum constraint for cores.
    * @param onlyMulticoreTests Only allow tests to be multicore.
    * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
@@ -86,16 +82,12 @@ public final class ResourceDecider {
   private static void adjustLimits(
       ResourceLimits limits,
       Command command,
-      String workerName,
       int defaultMaxCores,
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
       int executeStageWidth,
       boolean allowBringYourOwnContainer,
       SandboxSettings sandbox) {
-    // store worker name
-    limits.workerName = workerName;
-
     // force limits on non-test actions
     if (onlyMulticoreTests && !CommandUtils.isTest(command)) {
       if (limits.cpu.min > 1 || limits.cpu.max > defaultMaxCores) {
