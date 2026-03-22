@@ -15,6 +15,7 @@
 package build.buildfarm.cas.cfc;
 
 import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
+import static build.buildfarm.common.io.Directories.makeWritable;
 import static build.buildfarm.common.io.EvenMoreFiles.setReadOnlyPerms;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
@@ -205,7 +206,7 @@ public class DirectoryEntryCFC extends CASFileCache {
         transformAsync(
             fetched,
             weight -> {
-              disableAllWriteAccess(tmpPath, fileStore);
+              disableAllWriteAccess(tmpPath, fileStore, /* excludeTopLevel= */ true);
               return immediateFuture(null);
             },
             service);
@@ -214,6 +215,7 @@ public class DirectoryEntryCFC extends CASFileCache {
             limited,
             result -> {
               Files.move(tmpPath, path);
+              makeWritable(path, /* writable= */ false, fileStore);
               return immediateFuture(result);
             },
             service);
