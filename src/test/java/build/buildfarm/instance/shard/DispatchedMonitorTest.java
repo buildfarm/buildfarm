@@ -68,7 +68,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> true,
-            /* isLeader= */ null,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -108,7 +108,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
-            /* isLeader= */ null,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -134,7 +134,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
-            /* isLeader= */ null,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -151,7 +151,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
-            /* isLeader= */ null,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -180,7 +180,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
-            /* isLeader= */ null,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -204,7 +204,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
-            /* isLeader= */ null,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -228,7 +228,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             shouldStop,
-            /* isLeader= */ null,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,

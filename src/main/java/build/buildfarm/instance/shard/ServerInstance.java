@@ -89,7 +89,6 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.function.CountingConsumer;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
-import build.buildfarm.common.redis.LeaderElection;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.server.Filter;
@@ -262,7 +261,6 @@ public class ServerInstance extends NodeInstance {
   private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final com.google.common.cache.LoadingCache<String, StubInstance> workerStubs;
   private final Thread dispatchedMonitor;
-  private final LeaderElection leaderElection;
   private final Duration maxActionTimeout;
   private AsyncCache<build.buildfarm.v1test.Digest, Directory> directoryCache;
   private AsyncCache<build.buildfarm.v1test.Digest, Command> commandCache;
@@ -526,19 +524,12 @@ public class ServerInstance extends NodeInstance {
         new RemoteInputStreamFactory(
             backplane, rand, workerStubs, this::removeMalfunctioningWorker);
 
-    // Initialize leader election for DispatchedMonitor coordination
-    if (backplane instanceof RedisShardBackplane) {
-      leaderElection = new LeaderElection(name);
-    } else {
-      leaderElection = null;
-    }
-
     if (runDispatchedMonitor) {
       dispatchedMonitor =
           new Thread(
               new DispatchedMonitor(
                   backplane::isStopped,
-                  leaderElection != null ? this::isDispatchedMonitorLeader : null,
+                  this::isDispatchedMonitorLeader,
                   dispatchedOperations,
                   this::requeueOperation,
                   dispatchedMonitorIntervalSeconds,
@@ -741,15 +732,13 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
-  /**
-   * @brief Check if this server instance is the leader for DispatchedMonitor operations.
-   * @return true if this instance is the leader, false otherwise
-   */
   private boolean isDispatchedMonitorLeader() {
-    if (leaderElection == null || !(backplane instanceof RedisShardBackplane redisBackplane)) {
-      return true; // No leader election configured, assume leader
+    try {
+      return backplane.isLeader("dispatchedmonitor");
+    } catch (IOException e) {
+      log.log(Level.WARNING, "error checking leader status, assuming leader", e);
+      return true;
     }
-    return leaderElection.isLeader(redisBackplane.getJedis(), "dispatchedmonitor");
   }
 
   @Override
@@ -767,15 +756,12 @@ public class ServerInstance extends NodeInstance {
     }
 
     // Attempt to become leader for DispatchedMonitor operations
-    if (leaderElection != null && backplane instanceof RedisShardBackplane redisBackplane) {
-      boolean becameLeader =
-          leaderElection.tryBecomeLeader(redisBackplane.getJedis(), "dispatchedmonitor");
-      log.log(
-          Level.INFO,
-          format(
-              "ServerInstance '%s' leader election result: %s",
-              publicName, becameLeader ? "LEADER" : "FOLLOWER"));
-    }
+    boolean becameLeader = backplane.tryBecomeLeader("dispatchedmonitor");
+    log.log(
+        Level.INFO,
+        format(
+            "ServerInstance '%s' leader election result: %s",
+            publicName, becameLeader ? "LEADER" : "FOLLOWER"));
 
     if (dispatchedMonitor != null) {
       dispatchedMonitor.start();
@@ -804,14 +790,6 @@ public class ServerInstance extends NodeInstance {
     if (dispatchedMonitor != null) {
       dispatchedMonitor.interrupt();
       dispatchedMonitor.join();
-    }
-    if (leaderElection != null) {
-      try {
-        leaderElection.close();
-        log.log(Level.INFO, "LeaderElection closed for instance " + getName());
-      } catch (Exception e) {
-        log.log(Level.WARNING, "Error closing LeaderElection", e);
-      }
     }
     if (prometheusMetricsThread != null) {
       prometheusMetricsThread.interrupt();

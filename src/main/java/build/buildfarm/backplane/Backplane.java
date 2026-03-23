@@ -341,4 +341,17 @@ public interface Backplane {
   void incrementRequestCounters(
       String actionId, String toolInvocationId, String actionMnemonic, String targetId)
       throws IOException;
+
+  /** Attempt to acquire leadership for a specific election key. */
+  default boolean tryBecomeLeader(String electionKey) throws IOException {
+    return true;
+  }
+
+  /** Check if this instance is currently the leader for a specific election. */
+  default boolean isLeader(String electionKey) throws IOException {
+    return true;
+  }
+
+  /** Resign leadership for a specific election. */
+  default void resignLeadership(String electionKey) throws IOException {}
 }

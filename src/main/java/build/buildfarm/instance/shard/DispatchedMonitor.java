@@ -32,7 +32,6 @@ import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 /**
@@ -65,14 +64,13 @@ class DispatchedMonitor implements Runnable {
    */
   DispatchedMonitor(
       BooleanSupplier shouldStop,
-      @Nullable BooleanSupplier isLeader,
+      BooleanSupplier isLeader,
       Scannable<DispatchedOperation> location,
       BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer,
       int intervalSeconds,
       Duration requeueDelay) {
     this.shouldStop = shouldStop;
-    this.isLeader =
-        isLeader != null ? isLeader : () -> true; // Default to always leader if not provided
+    this.isLeader = isLeader;
     this.location = location;
     this.requeuer = requeuer;
     this.intervalSeconds = intervalSeconds;
