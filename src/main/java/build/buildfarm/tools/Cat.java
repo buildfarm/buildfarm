@@ -33,6 +33,7 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.LogFile;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -187,7 +188,6 @@ class Cat implements Callable<Integer> {
     for (String outputDirectory : command.getOutputDirectoriesList()) {
       indentOut(level, "OutputDirectory: " + outputDirectory);
     }
-    // FIXME platform
     indentOut(level, "Arguments: ('" + String.join("', '", command.getArgumentsList()) + "')");
     if (!command.getEnvironmentVariablesList().isEmpty()) {
       indentOut(level, "Environment Variables:");
@@ -196,7 +196,15 @@ class Cat implements Callable<Integer> {
         indentOut(level, "  " + env.getName() + "='" + env.getValue() + "'");
       }
     }
-    indentOut(level, "Platform: " + command.getPlatform());
+    if (!command.getPlatform().getPropertiesList().isEmpty()) {
+      indentOut(level, "Platform:");
+      for (build.bazel.remote.execution.v2.Platform.Property property :
+          command.getPlatform().getPropertiesList()) {
+        indentOut(level, "  " + property.getName() + "='" + property.getValue() + "'");
+      }
+    } else {
+      indentOut(level, "Platform: (none)");
+    }
     indentOut(level, "WorkingDirectory: " + command.getWorkingDirectory());
   }
 
@@ -659,7 +667,22 @@ class Cat implements Callable<Integer> {
       printActionResult(response.getResult(), digestFunction, 2);
       System.out.println("  CachedResult: " + (response.getCachedResult() ? "true" : "false"));
     }
-    // FIXME server_logs
+    if (response.getServerLogsCount() > 0) {
+      System.out.println("  Server Logs:");
+      for (Map.Entry<String, LogFile> entry : response.getServerLogsMap().entrySet()) {
+        LogFile logFile = entry.getValue();
+        System.out.println(
+            "    "
+                + entry.getKey()
+                + ":"
+                + " Log "
+                + DigestUtil.toString(DigestUtil.fromDigest(logFile.getDigest(), digestFunction))
+                + (logFile.getHumanReadable() ? " (human-readable)" : ""));
+      }
+    }
+    if (!response.getMessage().isEmpty()) {
+      System.out.println("  Message: " + response.getMessage());
+    }
   }
 
   private static ExecuteOperationMetadata executeEntryMetadata(
