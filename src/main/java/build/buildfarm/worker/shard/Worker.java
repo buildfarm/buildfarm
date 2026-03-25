@@ -802,8 +802,8 @@ public final class Worker extends LoggingMain {
 
     WorkerProfileService workerProfileService =
         new WorkerProfileService(
+            hostName,
             endpointName,
-            configs.getWorker().getPublicName(),
             storage,
             matchStage,
             inputFetchStage,
