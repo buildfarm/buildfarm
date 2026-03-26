@@ -168,7 +168,7 @@ maven.install(
         "org.threeten:threetenbp:1.7.2",
         "org.xerial:sqlite-jdbc:3.50.3.0",
         "org.yaml:snakeyaml:2.5",
-        "redis.clients:jedis:7.3.0",
+        "redis.clients:jedis:7.4.0",
     ],
     boms = [
         # keep sorted
