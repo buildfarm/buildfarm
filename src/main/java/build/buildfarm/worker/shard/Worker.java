@@ -251,7 +251,9 @@ public final class Worker extends LoggingMain {
     serverBuilder.addService(new ByteStreamService(instance));
     serverBuilder.addService(new WorkerControl(this));
     serverBuilder.addService(ProtoReflectionServiceV1.newInstance());
-    serverBuilder.addService(ChannelzService.newInstance(/* maxPageSize= */ 100));
+    if (configs.getWorker().isGrpcChannelz()) {
+      serverBuilder.addService(ChannelzService.newInstance(/* maxPageSize= */ 100));
+    }
     serverBuilder.addService(workerProfileService);
 
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());

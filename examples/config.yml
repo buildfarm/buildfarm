@@ -9,6 +9,7 @@ server:
   name: shard
   actionCacheReadOnly: false
   port: 8980
+  grpcChannelz: false
   bindAddress: ''
   grpcMetrics:
     enabled: true
@@ -104,6 +105,7 @@ backplane:
       value: '*'
 worker:
   port: 8981
+  grpcChannelz: false
   publicName: localhost:8981
   grpcMetrics:
     enabled: false

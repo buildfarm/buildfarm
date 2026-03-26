@@ -162,11 +162,13 @@ public class BuildFarmServer extends LoggingMain {
         .addService(new OperationsService(instance))
         .addService(new FetchService(instance))
         .addService(ProtoReflectionService.newInstance())
-        .addService(ChannelzService.newInstance(/* maxPageSize= */ 100))
         .addService(new PublishBuildEventService())
         .addService(new WorkerProfileService(instance))
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor);
+    if (configs.getServer().isGrpcChannelz()) {
+      serverBuilder.addService(ChannelzService.newInstance(/* maxPageSize= */ 100));
+    }
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getServer().getGrpcMetrics());
 
     if (configs.getServer().getMaxInboundMessageSizeBytes() != 0) {
