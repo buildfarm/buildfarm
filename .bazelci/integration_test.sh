@@ -34,8 +34,8 @@ MEMORY_LIMIT=""
 CGROUP_OPTIONS=""
 if [[ "$BUILDFARM_CONFIG" == *"cgroups-sandbox"* ]]; then
   MEMORY_LIMIT="--memory=4g"
-  # For cgroups v2 + linux-sandbox: need privileged mode for mount/namespace operations
-  # The client bazel needs to create sandboxes, and the worker needs cgroup access
+  # For cgroups v2 + linux-sandbox: need privileged mode for namespace operations
+  # Multiplex workers are disabled in test script to avoid IPC hangs with sandboxing
   CGROUP_OPTIONS="--privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw"
 fi
 

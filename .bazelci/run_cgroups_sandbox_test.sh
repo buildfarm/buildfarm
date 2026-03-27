@@ -20,4 +20,9 @@ set -o xtrace
 
 # Build bazel targets with buildfarm using cgroups + linux-sandbox
 cd src/test/many;
-MANY_CC_BINARIES=20 MANY_CC_LIBRARIES=2 MANY_CC_LIBRARY_SOURCES=1 ../../../bazel build :cc --remote_executor=grpc://localhost:8980 $1
+# Force all actions to execute remotely, not locally
+# --remote_executor alone isn't enough; need to explicitly disable local execution
+MANY_CC_BINARIES=20 MANY_CC_LIBRARIES=2 MANY_CC_LIBRARY_SOURCES=1 ../../../bazel build :cc \
+  --remote_executor=grpc://localhost:8980 \
+  --remote_download_minimal \
+  $1
