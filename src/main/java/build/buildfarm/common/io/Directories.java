@@ -115,17 +115,23 @@ public final class Directories {
     }
   }
 
-  public static ListenableFuture<Void> remove(
-      Path path, FileStore fileStore, ExecutorService service) {
+  private static Path renameDirectoryForRemove(Path directory, FileStore fileStore) throws IOException {
     String suffix = UUID.randomUUID().toString();
-    Path filename = path.getFileName();
+    Path filename = directory.getFileName();
     String tmpFilename = filename + ".tmp." + suffix;
-    Path tmpPath = path.resolveSibling(tmpFilename);
+    Path tmpPath = directory.resolveSibling(tmpFilename);
+    // MacOS does not permit renames unless the directory is permissioned appropriately
+    makeWritable(directory, true, fileStore);
+    Files.move(directory, tmpPath);
+    return tmpPath;
+  }
+
+  public static ListenableFuture<Void> remove(
+      Path directory, FileStore fileStore, ExecutorService service) {
+    final Path tmpPath;
     try {
-      // MacOS does not permit renames unless the directory is permissioned appropriately
-      makeWritable(path, true, fileStore);
       // rename must be synchronous to call
-      Files.move(path, tmpPath);
+      tmpPath = renameDirectoryForRemove(directory, fileStore);
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
@@ -133,7 +139,7 @@ public final class Directories {
         .submit(
             () -> {
               try {
-                remove(tmpPath, fileStore);
+                remove(tmpPath, fileStore, /* renamed= */ true);
               } catch (IOException e) {
                 log.log(Level.SEVERE, "error removing directory " + tmpPath, e);
               }
@@ -142,8 +148,12 @@ public final class Directories {
   }
 
   public static void remove(Path directory, FileStore fileStore) throws IOException {
+    remove(directory, fileStore, /* renamed= */ false);
+  }
+
+  private static void remove(Path directory, FileStore fileStore, boolean renamed) throws IOException {
     Files.walkFileTree(
-        directory,
+        renamed ? directory : renameDirectoryForRemove(directory, fileStore),
         new SimpleFileVisitor<>() {
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
