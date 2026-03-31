@@ -51,6 +51,15 @@
       "rebaseWhen": "never"
     },
     {
+      "groupName": "jnr",
+      "description": "Bundle jnr dependency updates into one PR",
+      "matchPackageNames": [
+        "com.github.jnr:jffi",
+        "com.github.jnr:jnr-ffi",
+        "com.github.jnr:jnr-posix"
+      ]
+    },
+    {
       "groupName": "Apache commons",
       "description": "All apache commons grouped into one PR",
       "matchPackageNames": [
