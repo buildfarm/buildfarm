@@ -33,6 +33,7 @@ import lombok.extern.java.Log;
 @Log
 public class Worker {
   private int port = 8981;
+  private boolean grpcChannelz = false;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
   private String publicName;
   private Capabilities capabilities = new Capabilities();
