@@ -21,17 +21,12 @@ public class WorkerControlProxyService extends WorkerControlGrpc.WorkerControlIm
   public void pipelineChange(
       WorkerPipelineChangeRequest request,
       StreamObserver<WorkerPipelineChangeResponse> responseObserver) {
-    if (request.getChangesCount() > 0) {
-      try {
-        responseObserver.onNext(
-            instance.pipelineChange(request.getWorkerName(), request.getChangesList()).get());
-        responseObserver.onCompleted();
-      } catch (Exception e) {
-        responseObserver.onError(e);
-      }
-    } else {
-      responseObserver.onNext(WorkerPipelineChangeResponse.newBuilder().build());
+    try {
+      responseObserver.onNext(
+          instance.pipelineChange(request.getWorkerName(), request.getChangesList()).get());
       responseObserver.onCompleted();
+    } catch (Exception e) {
+      responseObserver.onError(e);
     }
   }
 
