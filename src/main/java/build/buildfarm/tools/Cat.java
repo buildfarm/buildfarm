@@ -99,7 +99,7 @@ import picocli.CommandLine.ParentCommand;
 
 /** Display operations on the buildfarm server. */
 @Command(
-    name = "cat",
+    name = "bf-cat",
     mixinStandardHelpOptions = true,
     description = "Request, retrieve, and display information related to REAPI services",
     subcommands = {
@@ -671,13 +671,11 @@ class Cat implements Callable<Integer> {
       System.out.println("  Server Logs:");
       for (Map.Entry<String, LogFile> entry : response.getServerLogsMap().entrySet()) {
         LogFile logFile = entry.getValue();
-        System.out.println(
-            "    "
-                + entry.getKey()
-                + ":"
-                + " Log "
-                + DigestUtil.toString(DigestUtil.fromDigest(logFile.getDigest(), digestFunction))
-                + (logFile.getHumanReadable() ? " (human-readable)" : ""));
+        System.out.printf(
+            "    %s: Log %s%s%n",
+            entry.getKey(),
+            DigestUtil.toString(DigestUtil.fromDigest(logFile.getDigest(), digestFunction)),
+            logFile.getHumanReadable() ? " (human-readable)" : "");
       }
     }
     if (!response.getMessage().isEmpty()) {
@@ -979,17 +977,17 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              batchWorkerProfiles(instance, names != null ? names : ImmutableList.of());
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        batchWorkerProfiles(instance, names != null ? names : ImmutableList.of());
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1002,18 +1000,18 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              ServerCapabilities capabilities = instance.getCapabilities();
-              printCapabilities(capabilities);
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        ServerCapabilities capabilities = instance.getCapabilities();
+        printCapabilities(capabilities);
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1029,18 +1027,18 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              System.out.println("Listing Operations");
-              listOperations(instance, args != null ? args : ImmutableList.of());
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        System.out.println("Listing Operations");
+        listOperations(instance, args != null ? args : ImmutableList.of());
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1053,17 +1051,17 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              System.out.println(instance.backplaneStatus());
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        System.out.println(instance.backplaneStatus());
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1079,28 +1077,26 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              ImmutableList<Digest> digests =
-                  (digestStrings != null ? digestStrings : ImmutableList.<String>of())
-                      .stream()
-                          .map(DigestUtil::parseDigest)
-                          .collect(ImmutableList.toImmutableList());
+      return runWithDeadline(10, this::run);
+    }
 
-              if (!digests.isEmpty()) {
-                printFindMissing(
-                    instance,
-                    Iterables.transform(digests, DigestUtil::toDigest),
-                    digests.getFirst().getDigestFunction());
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        ImmutableList<Digest> digests =
+            (digestStrings != null ? digestStrings : ImmutableList.<String>of())
+                .stream().map(DigestUtil::parseDigest).collect(ImmutableList.toImmutableList());
+
+        if (!digests.isEmpty()) {
+          printFindMissing(
+              instance,
+              Iterables.transform(digests, DigestUtil::toDigest),
+              digests.getFirst().getDigestFunction());
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1116,19 +1112,19 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (String operationName : operationNames) {
-                printOperation(instance.getOperation(operationName));
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (String operationName : operationNames) {
+          printOperation(instance.getOperation(operationName));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1144,19 +1140,19 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          deadlineSecondsForType("Watch"),
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (String operationName : operationNames) {
-                watchOperation(instance, operationName);
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(deadlineSecondsForType("Watch"), this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (String operationName : operationNames) {
+          watchOperation(instance, operationName);
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1172,31 +1168,29 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                ActionResult actionResult =
-                    instance
-                        .getActionResult(
-                            DigestUtil.asActionKey(digest), RequestMetadata.getDefaultInstance())
-                        .get();
-                if (actionResult != null) {
-                  printActionResult(actionResult, digest.getDigestFunction(), 0);
-                } else {
-                  System.out.println("ActionResult not found for " + DigestUtil.toString(digest));
-                }
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ActionResult actionResult =
+              instance
+                  .getActionResult(
+                      DigestUtil.asActionKey(digest), RequestMetadata.getDefaultInstance())
+                  .get();
+          if (actionResult != null) {
+            printActionResult(actionResult, digest.getDigestFunction(), 0);
+          } else {
+            System.out.println("ActionResult not found for " + DigestUtil.toString(digest));
+          }
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1212,22 +1206,20 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                printDirectoryTree(instance, digest);
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          printDirectoryTree(instance, digest);
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1244,23 +1236,21 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                Tree tree = fetchTree(instance, digest);
-                printTreeLayout(new ProxyDirectoriesIndex(tree.getDirectoriesMap()), digest);
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          Tree tree = fetchTree(instance, digest);
+          printTreeLayout(new ProxyDirectoriesIndex(tree.getDirectoriesMap()), digest);
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1276,31 +1266,29 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                try (InputStream in =
-                    instance.newBlobInput(
-                        Compressor.Value.IDENTITY,
-                        digest,
-                        0,
-                        60,
-                        TimeUnit.SECONDS,
-                        RequestMetadata.getDefaultInstance())) {
-                  ByteStreams.copy(in, System.out);
-                }
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          try (InputStream in =
+              instance.newBlobInput(
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  0,
+                  60,
+                  TimeUnit.SECONDS,
+                  RequestMetadata.getDefaultInstance())) {
+            ByteStreams.copy(in, System.out);
+          }
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1316,28 +1304,26 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                ByteString blob =
-                    getBlob(
-                        instance,
-                        Compressor.Value.IDENTITY,
-                        digest,
-                        RequestMetadata.getDefaultInstance());
-                printAction(blob, digest.getDigestFunction());
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printAction(blob, digest.getDigestFunction());
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1353,29 +1339,26 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                ByteString blob =
-                    getBlob(
-                        instance,
-                        Compressor.Value.IDENTITY,
-                        digest,
-                        RequestMetadata.getDefaultInstance());
-                printQueuedOperation(
-                    blob, new DigestUtil(HashFunction.get(digest.getDigestFunction())));
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printQueuedOperation(blob, new DigestUtil(HashFunction.get(digest.getDigestFunction())));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1393,29 +1376,26 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                ByteString blob =
-                    getBlob(
-                        instance,
-                        Compressor.Value.IDENTITY,
-                        digest,
-                        RequestMetadata.getDefaultInstance());
-                dumpQueuedOperation(
-                    blob, new DigestUtil(HashFunction.get(digest.getDigestFunction())));
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          dumpQueuedOperation(blob, new DigestUtil(HashFunction.get(digest.getDigestFunction())));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1431,30 +1411,28 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                ByteString blob =
-                    getBlob(
-                        instance,
-                        Compressor.Value.IDENTITY,
-                        digest,
-                        RequestMetadata.getDefaultInstance());
-                printREDirectoryTree(
-                    new DigestUtil(HashFunction.get(digest.getDigestFunction())),
-                    build.bazel.remote.execution.v2.Tree.parseFrom(blob));
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printREDirectoryTree(
+              new DigestUtil(HashFunction.get(digest.getDigestFunction())),
+              build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1470,30 +1448,28 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                ByteString blob =
-                    getBlob(
-                        instance,
-                        Compressor.Value.IDENTITY,
-                        digest,
-                        RequestMetadata.getDefaultInstance());
-                printRETreeLayout(
-                    new DigestUtil(HashFunction.get(digest.getDigestFunction())),
-                    build.bazel.remote.execution.v2.Tree.parseFrom(blob));
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printRETreeLayout(
+              new DigestUtil(HashFunction.get(digest.getDigestFunction())),
+              build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1509,28 +1485,26 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                ByteString blob =
-                    getBlob(
-                        instance,
-                        Compressor.Value.IDENTITY,
-                        digest,
-                        RequestMetadata.getDefaultInstance());
-                printCommand(blob);
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printCommand(blob);
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1546,28 +1520,26 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (Digest digest :
-                  digestStrings.stream()
-                      .map(DigestUtil::parseDigest)
-                      .collect(Collectors.toList())) {
-                ByteString blob =
-                    getBlob(
-                        instance,
-                        Compressor.Value.IDENTITY,
-                        digest,
-                        RequestMetadata.getDefaultInstance());
-                printDirectory(blob, digest.getDigestFunction());
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printDirectory(blob, digest.getDigestFunction());
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1583,17 +1555,17 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              fetch(instance, uris);
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        fetch(instance, uris);
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
@@ -1609,28 +1581,28 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(
-          10,
-          () -> {
-            Instance instance = parent.createInstance();
-            try {
-              for (String resourceName : resourceNames) {
-                UploadBlobRequest request = parseUploadBlobRequest(resourceName);
-                Write write =
-                    instance.getBlobWrite(
-                        request.getBlob().getCompressor(),
-                        request.getBlob().getDigest(),
-                        UUID.fromString(request.getUuid()),
-                        RequestMetadata.getDefaultInstance());
-                System.out.println("resourceName: " + resourceName);
-                System.out.println("committedSize: " + write.getCommittedSize());
-                System.out.println("complete: " + write.isComplete());
-              }
-            } finally {
-              instance.stop();
-            }
-            return 0;
-          });
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (String resourceName : resourceNames) {
+          UploadBlobRequest request = parseUploadBlobRequest(resourceName);
+          Write write =
+              instance.getBlobWrite(
+                  request.getBlob().getCompressor(),
+                  request.getBlob().getDigest(),
+                  UUID.fromString(request.getUuid()),
+                  RequestMetadata.getDefaultInstance());
+          System.out.println("resourceName: " + resourceName);
+          System.out.println("committedSize: " + write.getCommittedSize());
+          System.out.println("complete: " + write.isComplete());
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
     }
   }
 
