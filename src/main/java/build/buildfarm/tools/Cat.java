@@ -24,6 +24,7 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
@@ -93,12 +94,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /** Display operations on the buildfarm server. */
-@Command(
+@picocli.CommandLine.Command(
     name = "bf-cat",
     mixinStandardHelpOptions = true,
     description = "Request, retrieve, and display information related to REAPI services",
@@ -171,9 +171,9 @@ class Cat implements Callable<Integer> {
   }
 
   private static void printCommand(ByteString commandBlob) {
-    build.bazel.remote.execution.v2.Command command;
+    Command command;
     try {
-      command = build.bazel.remote.execution.v2.Command.parseFrom(commandBlob);
+      command = Command.parseFrom(commandBlob);
     } catch (InvalidProtocolBufferException e) {
       System.out.println("Not a command");
       return;
@@ -181,7 +181,7 @@ class Cat implements Callable<Integer> {
     printCommand(0, command);
   }
 
-  private static void printCommand(int level, build.bazel.remote.execution.v2.Command command) {
+  private static void printCommand(int level, Command command) {
     for (String outputFile : command.getOutputFilesList()) {
       indentOut(level, "OutputFile: " + outputFile);
     }
@@ -191,8 +191,7 @@ class Cat implements Callable<Integer> {
     indentOut(level, "Arguments: ('" + String.join("', '", command.getArgumentsList()) + "')");
     if (!command.getEnvironmentVariablesList().isEmpty()) {
       indentOut(level, "Environment Variables:");
-      for (build.bazel.remote.execution.v2.Command.EnvironmentVariable env :
-          command.getEnvironmentVariablesList()) {
+      for (Command.EnvironmentVariable env : command.getEnvironmentVariablesList()) {
         indentOut(level, "  " + env.getName() + "='" + env.getValue() + "'");
       }
     }
@@ -965,7 +964,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "WorkerProfile",
       mixinStandardHelpOptions = true,
       description = "Status including Execution and CAS statistics (Worker only)")
@@ -991,7 +990,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "Capabilities",
       mixinStandardHelpOptions = true,
       description = "List remote capabilities")
@@ -1015,7 +1014,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "Operations",
       mixinStandardHelpOptions = true,
       description = "List longrunning operations")
@@ -1042,7 +1041,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "BackplaneStatus",
       mixinStandardHelpOptions = true,
       description = "Acquire backplane status")
@@ -1065,7 +1064,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "Missing",
       mixinStandardHelpOptions = true,
       description = "Query missing blob [digests...]")
@@ -1100,7 +1099,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "Operation",
       mixinStandardHelpOptions = true,
       description = "Current status of Operation [names...]")
@@ -1128,7 +1127,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "Watch",
       mixinStandardHelpOptions = true,
       description = "Wait for updates on Operation [names...] until it is completed")
@@ -1156,7 +1155,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "ActionResult",
       mixinStandardHelpOptions = true,
       description = "Get results of Action [digests...] from the ActionCache")
@@ -1194,7 +1193,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "DirectoryTree",
       mixinStandardHelpOptions = true,
       description = "Simple recursive root Directory [digests...], missing directories will error")
@@ -1223,7 +1222,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "TreeLayout",
       mixinStandardHelpOptions = true,
       description =
@@ -1254,7 +1253,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "File",
       mixinStandardHelpOptions = true,
       description = "Raw content of blob [digests...] file (60s time limit)")
@@ -1292,7 +1291,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "Action",
       mixinStandardHelpOptions = true,
       description = "Definition of Action [digests...]")
@@ -1327,7 +1326,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "QueuedOperation",
       mixinStandardHelpOptions = true,
       description = "Definition of prepared operation [digests...] for execution")
@@ -1362,7 +1361,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "DumpQueuedOperation",
       mixinStandardHelpOptions = true,
       description =
@@ -1399,7 +1398,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "REDirectoryTree",
       mixinStandardHelpOptions = true,
       description = "Vanilla REAPI Tree [digests...] description (NOT buildfarm Tree with index)")
@@ -1436,7 +1435,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "RETreeLayout",
       mixinStandardHelpOptions = true,
       description = "Vanilla REAPI Tree [digests...] with rich weighting like TreeLayout")
@@ -1473,7 +1472,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "Command",
       mixinStandardHelpOptions = true,
       description = "Definition of Command [digests...]")
@@ -1508,7 +1507,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "Directory",
       mixinStandardHelpOptions = true,
       description = "Definition of Directory [digests...]")
@@ -1543,7 +1542,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "Fetch",
       mixinStandardHelpOptions = true,
       description = "Request an url fetch via the assets API")
@@ -1569,7 +1568,7 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  @Command(
+  @picocli.CommandLine.Command(
       name = "WriteStatus",
       mixinStandardHelpOptions = true,
       description = "Retrieve write status")
