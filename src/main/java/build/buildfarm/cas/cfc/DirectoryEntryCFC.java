@@ -133,8 +133,8 @@ public class DirectoryEntryCFC extends CASFileCache {
           if (e.decrementReference(header)) {
             unreferencedEntryCount++;
           }
+          sizeInBytes += e.size;
         }
-        sizeInBytes += e.size;
       }
     } catch (Exception e) {
       log.log(Level.SEVERE, "error processing directory " + path.toString(), e);
