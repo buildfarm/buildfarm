@@ -1622,8 +1622,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             if (e.decrementReference(header)) {
               unreferencedEntryCount++;
             }
+            sizeInBytes += size;
           }
-          sizeInBytes += size;
         }
       }
     }
