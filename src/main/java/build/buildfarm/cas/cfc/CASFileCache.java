@@ -219,7 +219,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 }
               });
 
+  private static final long DEFAULT_BLOCK_SIZE = 4096;
+  private static final long ESTIMATED_BYTES_PER_DIRECTORY_ENTRY = 32;
+
   protected FileStore fileStore; // bound to root
+  protected long blockSize = DEFAULT_BLOCK_SIZE;
   protected transient long sizeInBytes = 0;
   protected final transient Entry header = new SentinelEntry();
   protected volatile long unreferencedEntryCount = 0;
@@ -1277,6 +1281,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Files.createDirectories(dir);
     }
     fileStore = Files.getFileStore(root);
+    try {
+      blockSize = fileStore.getBlockSize();
+    } catch (UnsupportedOperationException | IOException e) {
+      // blockSize retains its initial value of DEFAULT_BLOCK_SIZE
+    }
   }
 
   @SuppressWarnings({"PMD.CompareObjectsWithEquals"})
@@ -2012,7 +2021,24 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  protected void fetchDirectory(
+  /**
+   * Estimates the on-disk size of a directory's entry table based on its contents. On typical Linux
+   * filesystems (ext4, XFS), each directory entry is approximately 8 bytes of header plus the
+   * filename length, aligned to 4 bytes. Each directory occupies at least one filesystem block.
+   */
+  @VisibleForTesting
+  static long estimateDirectorySizeOnDisk(Directory directory, long blockSize) {
+    checkArgument(blockSize > 0, "blockSize (%s) must be positive", blockSize);
+    long entryCount =
+        directory.getFilesCount() + directory.getSymlinksCount() + directory.getDirectoriesCount();
+    // ~32 bytes per entry is a reasonable average for typical filename lengths
+    // on ext4/XFS (8-byte header + ~20-char name + alignment padding)
+    long estimatedBytes = entryCount * ESTIMATED_BYTES_PER_DIRECTORY_ENTRY;
+    long blocks = Math.max(1, Math.ceilDiv(estimatedBytes, blockSize));
+    return blocks * blockSize;
+  }
+
+  protected long fetchDirectory(
       Path rootPath,
       Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
@@ -2020,6 +2046,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ImmutableList.Builder<ListenableFuture<Path>> putFutures,
       ExecutorService service)
       throws IOException, InterruptedException {
+    long directoryOverhead = 0;
     Stack<Map.Entry<Path, Directory>> stack = new Stack<>();
     stack.push(
         new AbstractMap.SimpleEntry<>(
@@ -2031,6 +2058,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       removeFilePath(path);
       Files.createDirectory(path);
+      directoryOverhead += estimateDirectorySizeOnDisk(directory, blockSize);
       putDirectoryFiles(
           digest.getDigestFunction(),
           directory.getFilesList(),
@@ -2050,6 +2078,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     DigestUtil.fromDigest(directoryNode.getDigest(), digest.getDigestFunction()))));
       }
     }
+    return directoryOverhead;
   }
 
   private void removeFilePath(Path path) throws IOException {
