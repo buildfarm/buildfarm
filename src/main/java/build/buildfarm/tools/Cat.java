@@ -25,7 +25,6 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
@@ -35,6 +34,7 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.LogFile;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -63,7 +63,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -89,13 +88,50 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
+import picocli.CommandLine;
+import picocli.CommandLine.Parameters;
+import picocli.CommandLine.ParentCommand;
 
-class Cat {
+/** Display operations on the buildfarm server. */
+@picocli.CommandLine.Command(
+    name = "bf-cat",
+    mixinStandardHelpOptions = true,
+    description = "Request, retrieve, and display information related to REAPI services",
+    subcommands = {
+      Cat.CatWorkerProfile.class,
+      Cat.CatCapabilities.class,
+      Cat.CatOperations.class,
+      Cat.CatBackplaneStatus.class,
+      Cat.CatMissing.class,
+      Cat.CatOperation.class,
+      Cat.CatWatch.class,
+      Cat.CatActionResult.class,
+      Cat.CatDirectoryTree.class,
+      Cat.CatTreeLayout.class,
+      Cat.CatFile.class,
+      Cat.CatAction.class,
+      Cat.CatQueuedOperation.class,
+      Cat.CatDumpQueuedOperation.class,
+      Cat.CatREDirectoryTree.class,
+      Cat.CatRETreeLayout.class,
+      Cat.CatRECommand.class,
+      Cat.CatDirectory.class,
+      Cat.CatFetch.class,
+      Cat.CatWriteStatus.class,
+    })
+class Cat implements Callable<Integer> {
+
+  @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
+  String host;
+
+  @Parameters(index = "1", description = CliConstants.INSTANCE_NAME)
+  String instanceName;
+
   private static void printCapabilities(ServerCapabilities capabilities) {
     System.out.println(capabilities);
   }
@@ -152,15 +188,22 @@ class Cat {
     for (String outputDirectory : command.getOutputDirectoriesList()) {
       indentOut(level, "OutputDirectory: " + outputDirectory);
     }
-    // FIXME platform
     indentOut(level, "Arguments: ('" + String.join("', '", command.getArgumentsList()) + "')");
     if (!command.getEnvironmentVariablesList().isEmpty()) {
       indentOut(level, "Environment Variables:");
-      for (EnvironmentVariable env : command.getEnvironmentVariablesList()) {
+      for (Command.EnvironmentVariable env : command.getEnvironmentVariablesList()) {
         indentOut(level, "  " + env.getName() + "='" + env.getValue() + "'");
       }
     }
-    indentOut(level, "Platform: " + command.getPlatform());
+    if (!command.getPlatform().getPropertiesList().isEmpty()) {
+      indentOut(level, "Platform:");
+      for (build.bazel.remote.execution.v2.Platform.Property property :
+          command.getPlatform().getPropertiesList()) {
+        indentOut(level, "  " + property.getName() + "='" + property.getValue() + "'");
+      }
+    } else {
+      indentOut(level, "Platform: (none)");
+    }
     indentOut(level, "WorkingDirectory: " + command.getWorkingDirectory());
   }
 
@@ -623,7 +666,20 @@ class Cat {
       printActionResult(response.getResult(), digestFunction, 2);
       System.out.println("  CachedResult: " + (response.getCachedResult() ? "true" : "false"));
     }
-    // FIXME server_logs
+    if (response.getServerLogsCount() > 0) {
+      System.out.println("  Server Logs:");
+      for (Map.Entry<String, LogFile> entry : response.getServerLogsMap().entrySet()) {
+        LogFile logFile = entry.getValue();
+        System.out.printf(
+            "    %s: Log %s%s%n",
+            entry.getKey(),
+            DigestUtil.toString(DigestUtil.fromDigest(logFile.getDigest(), digestFunction)),
+            logFile.getHumanReadable() ? " (human-readable)" : "");
+      }
+    }
+    if (!response.getMessage().isEmpty()) {
+      System.out.println("  Message: " + response.getMessage());
+    }
   }
 
   private static ExecuteOperationMetadata executeEntryMetadata(
@@ -879,28 +935,26 @@ class Cat {
     return Durations.toNanos(d) / (1000.0f * 1000.0f);
   }
 
-  public static void main(String[] args) throws Exception {
-    if (args.length < 3) {
-      usage();
-      System.exit(1);
-    }
+  @Override
+  public Integer call() {
+    // Parent command: print usage if no subcommand given
+    CommandLine.usage(this, System.err);
+    return 0;
+  }
 
-    String host = args[0];
-    String instanceName = args[1];
-    String type = args[2];
-    main(host, instanceName, type, Iterables.skip(Lists.newArrayList(args), 3));
+  Instance createInstance() {
+    ManagedChannel channel = createChannel(host);
+    return new StubInstance(instanceName, "bf-cat", channel, Durations.fromSeconds(10));
   }
 
   @SuppressWarnings("ThrowFromFinallyBlock")
-  private static void main(String host, String instanceName, String type, Iterable<String> args)
-      throws Exception {
+  static int runWithDeadline(int deadlineSeconds, Callable<Integer> action) throws Exception {
     ScheduledExecutorService service = newSingleThreadScheduledExecutor();
     Context.CancellableContext ctx =
-        Context.current()
-            .withDeadlineAfter(deadlineSecondsForType(type), TimeUnit.SECONDS, service);
+        Context.current().withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS, service);
     Context prevContext = ctx.attach();
     try {
-      cancellableMain(host, instanceName, type, args);
+      return action.call();
     } finally {
       ctx.cancel(null);
       ctx.detach(prevContext);
@@ -910,423 +964,649 @@ class Cat {
     }
   }
 
-  abstract static class CatCommand {
-    public abstract void run(Instance instance, Iterable<String> args) throws Exception;
+  @picocli.CommandLine.Command(
+      name = "WorkerProfile",
+      mixinStandardHelpOptions = true,
+      description = "Status including Execution and CAS statistics (Worker only)")
+  static class CatWorkerProfile implements Callable<Integer> {
+    @ParentCommand private Cat parent;
 
-    public abstract String description();
-
-    public String name() {
-      return getClass().getSimpleName();
-    }
-  }
-
-  static class Fetch extends CatCommand {
-    @Override
-    public String description() {
-      return "Request an url fetch via the assets API";
-    }
+    @Parameters(arity = "0..*", description = "Worker names")
+    private List<String> names;
 
     @Override
-    public void run(Instance instance, Iterable<String> args) throws Exception {
-      fetch(instance, args);
-    }
-  }
-
-  static class WriteStatus extends CatCommand {
-    @Override
-    public String description() {
-      return "Retrieve write status";
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
     }
 
-    @Override
-    public void run(Instance instance, Iterable<String> args) throws Exception {
-      for (String resourceName : args) {
-        UploadBlobRequest request = parseUploadBlobRequest(resourceName);
-        Write write =
-            instance.getBlobWrite(
-                request.getBlob().getCompressor(),
-                request.getBlob().getDigest(),
-                UUID.fromString(request.getUuid()),
-                RequestMetadata.getDefaultInstance());
-        System.out.println("resourceName: " + resourceName);
-        System.out.println("committedSize: " + write.getCommittedSize());
-        System.out.println("complete: " + write.isComplete());
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        batchWorkerProfiles(instance, names != null ? names : ImmutableList.of());
+      } finally {
+        instance.stop();
       }
+      return 0;
     }
   }
 
-  static class WorkerProfile extends CatCommand {
+  @picocli.CommandLine.Command(
+      name = "Capabilities",
+      mixinStandardHelpOptions = true,
+      description = "List remote capabilities")
+  static class CatCapabilities implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
     @Override
-    public String description() {
-      return "Status including Execution and CAS statistics (Worker only)";
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
     }
 
-    @Override
-    public void run(Instance instance, Iterable<String> args) throws Exception {
-      batchWorkerProfiles(instance, args);
-    }
-  }
-
-  static class Capabilities extends CatCommand {
-    @Override
-    public String description() {
-      return "List remote capabilities";
-    }
-
-    @Override
-    public void run(Instance instance, Iterable<String> args) {
-      ServerCapabilities capabilities = instance.getCapabilities();
-      printCapabilities(capabilities);
-    }
-  }
-
-  static class Operations extends CatCommand {
-    @Override
-    public String description() {
-      return "List longrunning operations";
-    }
-
-    @Override
-    public void run(Instance instance, Iterable<String> args) throws Exception {
-      System.out.println("Listing Operations");
-      listOperations(instance, args);
-    }
-  }
-
-  static class BackplaneStatus extends CatCommand {
-    @Override
-    public String description() {
-      return "Acquire backplane status";
-    }
-
-    @Override
-    public void run(Instance instance, Iterable<String> args) {
-      System.out.println(instance.backplaneStatus());
-    }
-  }
-
-  static class Missing extends CatCommand {
-    @Override
-    public String description() {
-      return "Query missing blob [digests...]";
-    }
-
-    @Override
-    public void run(Instance instance, Iterable<String> args) throws Exception {
-      ImmutableList<Digest> digests =
-          StreamSupport.stream(args.spliterator(), false)
-              .map(DigestUtil::parseDigest)
-              .collect(ImmutableList.toImmutableList());
-
-      if (!digests.isEmpty()) {
-        printFindMissing(
-            instance,
-            Iterables.transform(digests, DigestUtil::toDigest),
-            digests.getFirst().getDigestFunction());
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        ServerCapabilities capabilities = instance.getCapabilities();
+        printCapabilities(capabilities);
+      } finally {
+        instance.stop();
       }
+      return 0;
     }
   }
 
-  abstract static class OperationsCommand extends CatCommand {
+  @picocli.CommandLine.Command(
+      name = "Operations",
+      mixinStandardHelpOptions = true,
+      description = "List longrunning operations")
+  static class CatOperations implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "0..*", description = "Filter and name arguments")
+    private List<String> args;
+
     @Override
-    public void run(Instance instance, Iterable<String> args) throws Exception {
-      for (String operationName : args) {
-        run(instance, operationName);
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        System.out.println("Listing Operations");
+        listOperations(instance, args != null ? args : ImmutableList.of());
+      } finally {
+        instance.stop();
       }
-    }
-
-    protected abstract void run(Instance instance, String operationName) throws Exception;
-  }
-
-  static class CatOperation extends OperationsCommand {
-    @Override
-    public String name() {
-      return "Operation";
-    }
-
-    @Override
-    public String description() {
-      return "Current status of Operation [names...]";
-    }
-
-    @Override
-    protected void run(Instance instance, String operationName) {
-      printOperation(instance.getOperation(operationName));
+      return 0;
     }
   }
 
-  static class Watch extends OperationsCommand {
-    @Override
-    public String description() {
-      return "Wait for updates on Operation [names...] until it is completed";
-    }
+  @picocli.CommandLine.Command(
+      name = "BackplaneStatus",
+      mixinStandardHelpOptions = true,
+      description = "Acquire backplane status")
+  static class CatBackplaneStatus implements Callable<Integer> {
+    @ParentCommand private Cat parent;
 
     @Override
-    protected void run(Instance instance, String operationName) throws Exception {
-      watchOperation(instance, operationName);
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
     }
-  }
 
-  abstract static class DigestsCommand extends CatCommand {
-    @Override
-    public void run(Instance instance, Iterable<String> args) throws Exception {
-      for (Digest digest :
-          StreamSupport.stream(args.spliterator(), false)
-              .map(DigestUtil::parseDigest)
-              .collect(Collectors.toList())) {
-        run(instance, digest);
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        System.out.println(instance.backplaneStatus());
+      } finally {
+        instance.stop();
       }
-    }
-
-    protected abstract void run(Instance instance, Digest digest) throws Exception;
-  }
-
-  static class CatActionResult extends DigestsCommand {
-    @Override
-    public String name() {
-      return "ActionResult";
-    }
-
-    @Override
-    public String description() {
-      return "Get results of Action [digests...] from the ActionCache";
-    }
-
-    @Override
-    protected void run(Instance instance, Digest digest) throws Exception {
-      ActionResult actionResult =
-          instance
-              .getActionResult(DigestUtil.asActionKey(digest), RequestMetadata.getDefaultInstance())
-              .get();
-      if (actionResult != null) {
-        printActionResult(actionResult, digest.getDigestFunction(), 0);
-      } else {
-        System.out.println("ActionResult not found for " + DigestUtil.toString(digest));
-      }
+      return 0;
     }
   }
 
-  static class DirectoryTree extends DigestsCommand {
-    @Override
-    public String description() {
-      return "Simple recursive root Directory [digests...], missing directories will error";
-    }
+  @picocli.CommandLine.Command(
+      name = "Missing",
+      mixinStandardHelpOptions = true,
+      description = "Query missing blob [digests...]")
+  static class CatMissing implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "0..*", description = "Digests to check")
+    private List<String> digestStrings;
 
     @Override
-    protected void run(Instance instance, Digest digest) throws Exception {
-      printDirectoryTree(instance, digest);
-    }
-  }
-
-  static class TreeLayout extends DigestsCommand {
-    @Override
-    public String description() {
-      return "Rich tree layout of root directory [digests...], with weighting and missing"
-          + " tolerance";
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
     }
 
-    @Override
-    protected void run(Instance instance, Digest digest) throws Exception {
-      Tree tree = fetchTree(instance, digest);
-      printTreeLayout(new ProxyDirectoriesIndex(tree.getDirectoriesMap()), digest);
-    }
-  }
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        ImmutableList<Digest> digests =
+            (digestStrings != null ? digestStrings : ImmutableList.<String>of())
+                .stream().map(DigestUtil::parseDigest).collect(ImmutableList.toImmutableList());
 
-  static class File extends DigestsCommand {
-    @Override
-    public String description() {
-      return "Raw content of blob [digests...] file (60s time limit)";
-    }
-
-    @Override
-    protected void run(Instance instance, Digest digest) throws Exception {
-      try (InputStream in =
-          instance.newBlobInput(
-              Compressor.Value.IDENTITY,
-              digest,
-              0,
-              60,
-              TimeUnit.SECONDS,
-              RequestMetadata.getDefaultInstance())) {
-        ByteStreams.copy(in, System.out);
-      }
-    }
-  }
-
-  abstract static class BlobCommand extends DigestsCommand {
-    @Override
-    protected void run(Instance instance, Digest digest) throws Exception {
-      run(
-          instance,
-          getBlob(
-              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance()),
-          digest.getDigestFunction());
-    }
-
-    protected abstract void run(
-        Instance instance, ByteString blob, DigestFunction.Value digestFunction) throws Exception;
-  }
-
-  static class CatAction extends BlobCommand {
-    @Override
-    public String name() {
-      return "Action";
-    }
-
-    @Override
-    public String description() {
-      return "Definition of Action [digests...]";
-    }
-
-    @Override
-    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction) {
-      printAction(blob, digestFunction);
-    }
-  }
-
-  static class CatQueuedOperation extends BlobCommand {
-    @Override
-    public String name() {
-      return "QueuedOperation";
-    }
-
-    @Override
-    public String description() {
-      return "Definition of prepared operation [digests...] for execution";
-    }
-
-    @Override
-    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction) {
-      printQueuedOperation(blob, new DigestUtil(HashFunction.get(digestFunction)));
-    }
-  }
-
-  static class DumpQueuedOperation extends BlobCommand {
-    @Override
-    public String description() {
-      return "Binary QueuedOperation [digests...] content, suitable for retention in local 'blobs'"
-          + " directory and use with bf-executor";
-    }
-
-    @Override
-    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction)
-        throws Exception {
-      dumpQueuedOperation(blob, new DigestUtil(HashFunction.get(digestFunction)));
-    }
-  }
-
-  static class REDirectoryTree extends BlobCommand {
-    @Override
-    public String description() {
-      return "Vanilla REAPI Tree [digests...] description (NOT buildfarm Tree with index)";
-    }
-
-    @Override
-    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction)
-        throws Exception {
-      printREDirectoryTree(
-          new DigestUtil(HashFunction.get(digestFunction)),
-          build.bazel.remote.execution.v2.Tree.parseFrom(blob));
-    }
-  }
-
-  static class RETreeLayout extends BlobCommand {
-    @Override
-    public String description() {
-      return "Vanilla REAPI Tree [digests...] with rich weighting like TreeLayout";
-    }
-
-    @Override
-    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction)
-        throws Exception {
-      printRETreeLayout(
-          new DigestUtil(HashFunction.get(digestFunction)),
-          build.bazel.remote.execution.v2.Tree.parseFrom(blob));
-    }
-  }
-
-  static class CatRECommand extends BlobCommand {
-    @Override
-    public String name() {
-      return "Command";
-    }
-
-    @Override
-    public String description() {
-      return "Definition of Command [digests...]";
-    }
-
-    @Override
-    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction) {
-      printCommand(blob);
-    }
-  }
-
-  static class CatDirectory extends BlobCommand {
-    @Override
-    public String name() {
-      return "Directory";
-    }
-
-    @Override
-    public String description() {
-      return "Definition of Directory [digests...]";
-    }
-
-    @Override
-    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction) {
-      printDirectory(blob, digestFunction);
-    }
-  }
-
-  static final CatCommand[] commands = {
-    new WorkerProfile(),
-    new Capabilities(),
-    new Operations(),
-    new BackplaneStatus(),
-    new Missing(),
-    new CatOperation(),
-    new Watch(),
-    new CatActionResult(),
-    new DirectoryTree(),
-    new TreeLayout(),
-    new File(),
-    new CatAction(),
-    new CatQueuedOperation(),
-    new DumpQueuedOperation(),
-    new REDirectoryTree(),
-    new RETreeLayout(),
-    new CatRECommand(),
-    new CatDirectory(),
-    new Fetch(),
-    new WriteStatus(),
-  };
-
-  static void usage() {
-    System.err.println("Usage: bf-cat <host:port> <instance-name> <type>");
-    System.err.println("\nRequest, retrieve, and display information related to REAPI services:");
-    for (CatCommand command : commands) {
-      System.err.printf("\t%s\t%s%n", command.name(), command.description());
-    }
-  }
-
-  private static void cancellableMain(
-      String host, String instanceName, String type, Iterable<String> args) throws Exception {
-    ManagedChannel channel = createChannel(host);
-    Instance instance =
-        new StubInstance(instanceName, "bf-cat", channel, Durations.fromSeconds(10));
-    // should do something to match caps against requested digests
-    try {
-      for (CatCommand command : commands) {
-        if (command.name().equals(type)) {
-          command.run(instance, args);
-          return;
+        if (!digests.isEmpty()) {
+          printFindMissing(
+              instance,
+              Iterables.transform(digests, DigestUtil::toDigest),
+              digests.getFirst().getDigestFunction());
         }
+      } finally {
+        instance.stop();
       }
-      System.err.printf("Unrecognized bf-cat type %s%n", type);
-      usage();
-    } finally {
-      instance.stop();
+      return 0;
     }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "Operation",
+      mixinStandardHelpOptions = true,
+      description = "Current status of Operation [names...]")
+  static class CatOperation implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Operation names")
+    private List<String> operationNames;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (String operationName : operationNames) {
+          printOperation(instance.getOperation(operationName));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "Watch",
+      mixinStandardHelpOptions = true,
+      description = "Wait for updates on Operation [names...] until it is completed")
+  static class CatWatch implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Operation names")
+    private List<String> operationNames;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(deadlineSecondsForType("Watch"), this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (String operationName : operationNames) {
+          watchOperation(instance, operationName);
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "ActionResult",
+      mixinStandardHelpOptions = true,
+      description = "Get results of Action [digests...] from the ActionCache")
+  static class CatActionResult implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ActionResult actionResult =
+              instance
+                  .getActionResult(
+                      DigestUtil.asActionKey(digest), RequestMetadata.getDefaultInstance())
+                  .get();
+          if (actionResult != null) {
+            printActionResult(actionResult, digest.getDigestFunction(), 0);
+          } else {
+            System.out.println("ActionResult not found for " + DigestUtil.toString(digest));
+          }
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "DirectoryTree",
+      mixinStandardHelpOptions = true,
+      description = "Simple recursive root Directory [digests...], missing directories will error")
+  static class CatDirectoryTree implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          printDirectoryTree(instance, digest);
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "TreeLayout",
+      mixinStandardHelpOptions = true,
+      description =
+          "Rich tree layout of root directory [digests...], with weighting and missing tolerance")
+  static class CatTreeLayout implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          Tree tree = fetchTree(instance, digest);
+          printTreeLayout(new ProxyDirectoriesIndex(tree.getDirectoriesMap()), digest);
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "File",
+      mixinStandardHelpOptions = true,
+      description = "Raw content of blob [digests...] file (60s time limit)")
+  static class CatFile implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          try (InputStream in =
+              instance.newBlobInput(
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  0,
+                  60,
+                  TimeUnit.SECONDS,
+                  RequestMetadata.getDefaultInstance())) {
+            ByteStreams.copy(in, System.out);
+          }
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "Action",
+      mixinStandardHelpOptions = true,
+      description = "Definition of Action [digests...]")
+  static class CatAction implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printAction(blob, digest.getDigestFunction());
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "QueuedOperation",
+      mixinStandardHelpOptions = true,
+      description = "Definition of prepared operation [digests...] for execution")
+  static class CatQueuedOperation implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printQueuedOperation(blob, new DigestUtil(HashFunction.get(digest.getDigestFunction())));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "DumpQueuedOperation",
+      mixinStandardHelpOptions = true,
+      description =
+          "Binary QueuedOperation [digests...] content, suitable for retention in local 'blobs'"
+              + " directory and use with bf-executor")
+  static class CatDumpQueuedOperation implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          dumpQueuedOperation(blob, new DigestUtil(HashFunction.get(digest.getDigestFunction())));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "REDirectoryTree",
+      mixinStandardHelpOptions = true,
+      description = "Vanilla REAPI Tree [digests...] description (NOT buildfarm Tree with index)")
+  static class CatREDirectoryTree implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printREDirectoryTree(
+              new DigestUtil(HashFunction.get(digest.getDigestFunction())),
+              build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "RETreeLayout",
+      mixinStandardHelpOptions = true,
+      description = "Vanilla REAPI Tree [digests...] with rich weighting like TreeLayout")
+  static class CatRETreeLayout implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printRETreeLayout(
+              new DigestUtil(HashFunction.get(digest.getDigestFunction())),
+              build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "Command",
+      mixinStandardHelpOptions = true,
+      description = "Definition of Command [digests...]")
+  static class CatRECommand implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printCommand(blob);
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "Directory",
+      mixinStandardHelpOptions = true,
+      description = "Definition of Directory [digests...]")
+  static class CatDirectory implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          ByteString blob =
+              getBlob(
+                  instance,
+                  Compressor.Value.IDENTITY,
+                  digest,
+                  RequestMetadata.getDefaultInstance());
+          printDirectory(blob, digest.getDigestFunction());
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "Fetch",
+      mixinStandardHelpOptions = true,
+      description = "Request an url fetch via the assets API")
+  static class CatFetch implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "URIs to fetch")
+    private List<String> uris;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        fetch(instance, uris);
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "WriteStatus",
+      mixinStandardHelpOptions = true,
+      description = "Retrieve write status")
+  static class CatWriteStatus implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Resource names")
+    private List<String> resourceNames;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(10, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (String resourceName : resourceNames) {
+          UploadBlobRequest request = parseUploadBlobRequest(resourceName);
+          Write write =
+              instance.getBlobWrite(
+                  request.getBlob().getCompressor(),
+                  request.getBlob().getDigest(),
+                  UUID.fromString(request.getUuid()),
+                  RequestMetadata.getDefaultInstance());
+          System.out.println("resourceName: " + resourceName);
+          System.out.println("committedSize: " + write.getCommittedSize());
+          System.out.println("complete: " + write.isComplete());
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  public static void main(String[] args) {
+    int exitCode = new CommandLine(new Cat()).execute(args);
+    System.exit(exitCode);
   }
 }
