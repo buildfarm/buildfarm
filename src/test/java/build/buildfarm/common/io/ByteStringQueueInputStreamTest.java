@@ -199,7 +199,6 @@ public class ByteStringQueueInputStreamTest {
     ByteStringQueueInputStream in =
         new ByteStringQueueInputStream(
             newLinkedBlockingQueue(of()), () -> {}, closes::incrementAndGet);
-
     in.close();
     in.close();
 
