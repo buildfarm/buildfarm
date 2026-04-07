@@ -25,6 +25,7 @@ java_library(
         "@buildfarm_maven//:io_grpc_grpc_stub",
         "@buildfarm_maven//:io_netty_netty_codec_http",
         "@buildfarm_maven//:org_apache_httpcomponents_httpclient",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@googleapis//google/longrunning:longrunning_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",

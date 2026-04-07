@@ -33,6 +33,7 @@ java_library(
         "@buildfarm_maven//:io_prometheus_simpleclient",
         "@buildfarm_maven//:net_javacrumbs_future_converter_future_converter_java8_guava",
         "@buildfarm_maven//:org_apache_commons_commons_pool2",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@buildfarm_maven//:redis_clients_jedis",
         "@googleapis//google/rpc:rpc_java_proto",

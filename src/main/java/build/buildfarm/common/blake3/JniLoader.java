@@ -26,11 +26,13 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /** Generic code to interact with the platform-specific JNI code bundle. */
 @Log
+@NullMarked
 public final class JniLoader {
   @Nullable private static final Throwable JNI_LOAD_ERROR;
 

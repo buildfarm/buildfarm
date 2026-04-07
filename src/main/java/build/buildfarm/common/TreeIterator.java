@@ -28,8 +28,8 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Stack;
-import javax.annotation.Nullable;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 
 public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryEntry> {
   private final DirectoryFetcher directoryFetcher;

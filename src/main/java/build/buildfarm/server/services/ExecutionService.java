@@ -45,8 +45,8 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
@@ -111,8 +111,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       serverCallStreamObserver.setOnCancelHandler(this::cancel);
     }
 
-    @Nullable
-    ListenableFuture<?> getFuture() {
+    @Nullable ListenableFuture<?> getFuture() {
       return keepaliveFuture;
     }
 

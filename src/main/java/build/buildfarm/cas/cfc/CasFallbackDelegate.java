@@ -24,7 +24,7 @@ import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * @class CasFallbackDelegate

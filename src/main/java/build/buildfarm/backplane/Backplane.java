@@ -40,9 +40,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 import lombok.Data;
 import net.jcip.annotations.ThreadSafe;
+import org.jspecify.annotations.Nullable;
 
 @ThreadSafe
 public interface Backplane {
@@ -287,8 +287,7 @@ public interface Backplane {
    * @return An execution if the actionKey has an association, null otherwise.
    * @note Suggested return identifier: execution.
    */
-  @Nullable
-  Operation mergeExecution(ActionKey actionKey) throws IOException;
+  @Nullable Operation mergeExecution(ActionKey actionKey) throws IOException;
 
   /**
    * @brief Remove actionKey execution merge association.
