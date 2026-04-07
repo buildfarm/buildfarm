@@ -125,6 +125,13 @@ class CASFileCacheTest {
     this.storeFileDirsIndexInMemory = storeFileDirsIndexInMemory;
   }
 
+  private static final long TEST_BLOCK_SIZE = 4096;
+
+  // Convenience method to call estimateSizeOnDisk with the test's block size
+  private static long estimateSizeOnDisk(long logicalSize) {
+    return CASFileCache.estimateSizeOnDisk(logicalSize, TEST_BLOCK_SIZE, /* isHardlink= */ false);
+  }
+
   @Before
   public void setUp() throws IOException, InterruptedException {
     MockitoAnnotations.initMocks(this);
@@ -148,17 +155,14 @@ class CASFileCacheTest {
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
     fileCache =
-        new LegacyDirectoryCFC(
+        new DirectoryEntryCFC(
             root,
-            /* maxSizeInBytes= */ 1024,
-            /* maxEntrySizeInBytes= */ 1024,
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
             /* hexBucketLevels= */ 1,
-            storeFileDirsIndexInMemory,
-            /* execRootFallback= */ false,
             expireService,
             /* accessRecorder= */ directExecutor(),
             storage,
-            /* directoriesIndexDbName= */ ":memory:",
             /* zstdBufferPool= */ null,
             onPut,
             onExpire,
@@ -174,6 +178,8 @@ class CASFileCacheTest {
             });
     // do this so that we can remove the cache root dir
     fileCache.initializeRootDirectory();
+    // Force a known block size so tests are more hermetic and don't depend on the host filesystem
+    fileCache.setBlockSizeForTesting(TEST_BLOCK_SIZE);
   }
 
   @After
@@ -296,7 +302,7 @@ class CASFileCacheTest {
 
   @Test
   public void expireUnreferencedEntryRemovesBlobFile() throws IOException, InterruptedException {
-    byte[] bigData = new byte[1000];
+    byte[] bigData = new byte[22000]; // on-disk: 24576 bytes (6 blocks), fills the 24576-byte cache
     ByteString bigBlob = ByteString.copyFrom(bigData);
     Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
     blobs.put(bigDigest, bigBlob);
@@ -304,7 +310,7 @@ class CASFileCacheTest {
 
     decrementReference(bigPath);
 
-    byte[] strawData = new byte[30]; // take us beyond our 1024 limit
+    byte[] strawData = new byte[30]; // on-disk: 4096, takes us beyond 24576-byte cache limit
     ByteString strawBlob = ByteString.copyFrom(strawData);
     Digest strawDigest = DIGEST_UTIL.compute(strawBlob);
     blobs.put(strawDigest, strawBlob);
@@ -360,6 +366,35 @@ class CASFileCacheTest {
     // FIXME https://github.com/google/truth/issues/285 assertThat(Path) is ambiguous
     assertThat(fileCache.put(blobDigest, false).path().equals(path)).isTrue();
     assertThat(fileCache.put(blobDigest, true).path().equals(execPath)).isTrue();
+  }
+
+  @Test
+  public void startLoadsExistingBlobWithBlockAlignedSize() throws Exception {
+    // Simulate a restart: write blobs directly to disk, then start() the cache.
+    // Verify that sizeInBytes reflects block-aligned on-disk sizes, not logical sizes.
+    FileStore fileStore = Files.getFileStore(root);
+
+    // Two blobs with different sizes, both smaller than one block.
+    ByteString blob1 = ByteString.copyFromUtf8("small");
+    Digest digest1 = DIGEST_UTIL.compute(blob1);
+    Path path1 = fileCache.getPath(fileCache.getKey(digest1, false));
+    Files.write(path1, blob1.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(path1, false, fileStore);
+
+    ByteString blob2 = ByteString.copyFromUtf8("another small blob");
+    Digest digest2 = DIGEST_UTIL.compute(blob2);
+    Path path2 = fileCache.getPath(fileCache.getKey(digest2, false));
+    Files.write(path2, blob2.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(path2, false, fileStore);
+
+    fileCache.start(false).get();
+
+    assertThat(storage.size()).isEqualTo(2);
+    // Each blob is < 4096 bytes, so each occupies one full block on disk.
+    // Total size should be 2 * 4096 = 8192, NOT the sum of logical sizes.
+    assertThat(fileCache.size())
+        .isEqualTo(estimateSizeOnDisk(blob1.size()) + estimateSizeOnDisk(blob2.size()));
+    assertThat(fileCache.size()).isEqualTo(2 * TEST_BLOCK_SIZE);
   }
 
   @Test
@@ -429,7 +464,7 @@ class CASFileCacheTest {
   @Test
   public void expireEntryWaitsForUnreferencedEntry()
       throws ExecutionException, IOException, InterruptedException {
-    byte[] bigData = new byte[1023];
+    byte[] bigData = new byte[22000]; // on-disk: 24576 bytes (6 blocks), fills the 24576-byte cache
     Arrays.fill(bigData, (byte) 1);
     ByteString bigContent = ByteString.copyFrom(bigData);
     Digest bigDigest = DIGEST_UTIL.compute(bigContent);
@@ -562,14 +597,14 @@ class CASFileCacheTest {
     incompleteWrite.getFuture().addListener(() -> notified.set(true), directExecutor());
     OutputStream incompleteOut = incompleteWrite.getOutput(1, SECONDS, () -> {});
     try (OutputStream out = completingWrite.getOutput(1, SECONDS, () -> {})) {
-      assertThat(fileCache.size()).isEqualTo(digest.getSize() * 2);
+      assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()) * 2);
       content.writeTo(out);
     }
     assertThat(notified.get()).isTrue();
     if (!shutdownAndAwaitTermination(expireService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down expire service");
     }
-    assertThat(fileCache.size()).isEqualTo(digest.getSize());
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()));
     assertThat(incompleteWrite.getCommittedSize()).isEqualTo(digest.getSize());
     assertThat(incompleteWrite.isComplete()).isTrue();
     incompleteOut.close(); // redundant
@@ -584,7 +619,7 @@ class CASFileCacheTest {
     OutputStream out = cancellingWrite.getOutput(1, SECONDS, () -> {});
     assertThat(out).isInstanceOf(CancellableOutputStream.class);
     CancellableOutputStream cancelOut = (CancellableOutputStream) out;
-    assertThat(fileCache.size()).isEqualTo(digest.getSize());
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()));
     cancelOut.cancel();
     assertThat(fileCache.size()).isEqualTo(0);
     assertThat(cancellingWrite.getCommittedSize()).isEqualTo(0);
@@ -602,7 +637,7 @@ class CASFileCacheTest {
     OutputStream out = cancellingWrite.getOutput(1, SECONDS, () -> {});
     assertThat(out).isInstanceOf(CancellableOutputStream.class);
     CancellableOutputStream cancelOut = (CancellableOutputStream) out;
-    assertThat(fileCache.size()).isEqualTo(digest.getSize());
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()));
     content.substring(0, 6).writeTo(out);
     assertThat(cancellingWrite.getCommittedSize()).isEqualTo(6);
     assertThat(cancellingWrite.isComplete()).isFalse();
@@ -613,7 +648,7 @@ class CASFileCacheTest {
       content.writeTo(restartedOut);
     }
     assertThat(notified.get()).isTrue();
-    assertThat(fileCache.size()).isEqualTo(digest.getSize());
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()));
     assertThat(cancellingWrite.getCommittedSize()).isEqualTo(digest.getSize());
     assertThat(cancellingWrite.isComplete()).isTrue();
   }
@@ -765,8 +800,8 @@ class CASFileCacheTest {
   @Test
   public void expireInterruptCausesExpirySequenceHalt() throws IOException, InterruptedException {
     Blob expiringBlob;
-    try (ByteString.Output out = ByteString.newOutput(1024)) {
-      for (int i = 0; i < 1024; i++) {
+    try (ByteString.Output out = ByteString.newOutput(22000)) {
+      for (int i = 0; i < 22000; i++) {
         out.write(0);
       }
       expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
@@ -823,8 +858,8 @@ class CASFileCacheTest {
   @Test
   public void delegateWriteCompleteIsNotAnError() throws IOException, InterruptedException {
     Blob expiringBlob;
-    try (ByteString.Output out = ByteString.newOutput(1024)) {
-      for (int i = 0; i < 1024; i++) {
+    try (ByteString.Output out = ByteString.newOutput(22000)) {
+      for (int i = 0; i < 22000; i++) {
         out.write(0);
       }
       expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
@@ -881,8 +916,8 @@ class CASFileCacheTest {
   public void duplicateExpiredEntrySuppressesDigestExpiration()
       throws IOException, InterruptedException {
     Blob expiringBlob;
-    try (ByteString.Output out = ByteString.newOutput(512)) {
-      for (int i = 0; i < 512; i++) {
+    try (ByteString.Output out = ByteString.newOutput(10000)) {
+      for (int i = 0; i < 10000; i++) {
         out.write(0);
       }
       expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
@@ -911,15 +946,15 @@ class CASFileCacheTest {
   @Test
   public void interruptDeferredDuringExpirations() throws IOException, InterruptedException {
     Blob expiringBlob;
-    try (ByteString.Output out = ByteString.newOutput(1024)) {
-      for (int i = 0; i < 1024; i++) {
+    try (ByteString.Output out = ByteString.newOutput(22000)) {
+      for (int i = 0; i < 22000; i++) {
         out.write(0);
       }
       expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
     }
     fileCache.put(expiringBlob);
     // state of CAS
-    //   1024-byte key
+    //   22000-byte key (24576 bytes on disk, fills the cache)
 
     AtomicReference<Throwable> exRef = new AtomicReference<>(null);
     // 0 = not blocking
@@ -1139,17 +1174,14 @@ class CASFileCacheTest {
   @Test
   public void copyExternalInputRetries() throws Exception {
     CASFileCache flakyExternalCAS =
-        new LegacyDirectoryCFC(
+        new DirectoryEntryCFC(
             root,
-            /* maxSizeInBytes= */ 1024,
-            /* maxEntrySizeInBytes= */ 1024,
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
             /* hexBucketLevels= */ 1,
-            storeFileDirsIndexInMemory,
-            /* execRootFallback= */ false,
             expireService,
             /* accessRecorder= */ directExecutor(),
             storage,
-            /* directoriesIndexDbName= */ ":memory:",
             /* zstdBufferPool= */ null,
             /* onPut= */ digest -> {},
             /* onExpire= */ digests -> {},
@@ -1193,6 +1225,7 @@ class CASFileCacheTest {
               }
             });
     flakyExternalCAS.initializeRootDirectory();
+    flakyExternalCAS.setBlockSizeForTesting(TEST_BLOCK_SIZE);
     ByteString blob = ByteString.copyFromUtf8("Flaky Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     blobs.put(blobDigest, blob);
@@ -1202,18 +1235,15 @@ class CASFileCacheTest {
 
   @Test
   public void newInputThrowsNoSuchFileExceptionWithoutDelegate() throws Exception {
-    ContentAddressableStorage undelegatedCAS =
-        new LegacyDirectoryCFC(
+    CASFileCache undelegatedCAS =
+        new DirectoryEntryCFC(
             root,
-            /* maxSizeInBytes= */ 1024,
-            /* maxEntrySizeInBytes= */ 1024,
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
             /* hexBucketLevels= */ 1,
-            storeFileDirsIndexInMemory,
-            /* execRootFallback= */ false,
             expireService,
             /* accessRecorder= */ directExecutor(),
             storage,
-            /* directoriesIndexDbName= */ ":memory:",
             /* zstdBufferPool= */ null,
             /* onPut= */ digest -> {},
             /* onExpire= */ digests -> {},
@@ -1227,6 +1257,8 @@ class CASFileCacheTest {
               checkArgument(compressor == Compressor.Value.IDENTITY);
               return content.substring((int) offset).newInput();
             });
+    undelegatedCAS.initializeRootDirectory();
+    undelegatedCAS.setBlockSizeForTesting(TEST_BLOCK_SIZE);
     ByteString blob = ByteString.copyFromUtf8("Missing Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     assertThrows(
@@ -1296,6 +1328,97 @@ class CASFileCacheTest {
 
     assertThat(write1.getState()).isEqualTo(TERMINATED);
     assertThat(write2.getState()).isEqualTo(TERMINATED);
+  }
+
+  // -- Block-aligned size tracking tests --
+
+  @Test
+  public void evictionTriggersAtBlockAlignedThreshold() throws IOException, InterruptedException {
+    // A large blob fills the cache (on-disk: 24576 = maxSizeInBytes).
+    // Adding a small blob should trigger eviction.
+    byte[] data1 = new byte[22000]; // on-disk: 24576 = maxSizeInBytes
+    Arrays.fill(data1, (byte) 1);
+    ByteString blob1 = ByteString.copyFrom(data1);
+    Digest digest1 = DIGEST_UTIL.compute(blob1);
+    blobs.put(digest1, blob1);
+    Path path1 = fileCache.put(digest1, false).path();
+    decrementReference(path1);
+
+    assertThat(Files.exists(path1)).isTrue();
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(22000));
+
+    // Second blob triggers eviction: 24576 + 4096 = 28672 > 24576
+    byte[] data2 = new byte[100];
+    Arrays.fill(data2, (byte) 2);
+    ByteString blob2 = ByteString.copyFrom(data2);
+    Digest digest2 = DIGEST_UTIL.compute(blob2);
+    blobs.put(digest2, blob2);
+    fileCache.put(digest2, false);
+
+    // Oldest unreferenced entry (blob1) should be evicted
+    assertThat(Files.exists(path1)).isFalse();
+  }
+
+  @Test
+  public void chargeAndDischargeSizeReturnsToZero() throws IOException, InterruptedException {
+    // Write a blob, dereference it, write a cache-filling blob to evict it, verify size is exact.
+    byte[] data = new byte[100];
+    ByteString blob = ByteString.copyFrom(data);
+    Digest digest = DIGEST_UTIL.compute(blob);
+    blobs.put(digest, blob);
+    Path path = fileCache.put(digest, false).path();
+    decrementReference(path);
+
+    // Write a large blob that forces eviction of the first
+    byte[] bigData = new byte[22000]; // on-disk: 24576 = maxSizeInBytes
+    Arrays.fill(bigData, (byte) 99);
+    ByteString bigBlob = ByteString.copyFrom(bigData);
+    Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
+    blobs.put(bigDigest, bigBlob);
+    Path bigPath = fileCache.put(bigDigest, false).path();
+
+    // First blob should be evicted, only big blob remains
+    assertThat(Files.exists(path)).isFalse();
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(22000));
+  }
+
+  @Test
+  public void maxEntrySizeUsesLogicalSizeNotBlockAligned() throws Exception {
+    // To test that maxEntrySizeInBytes compares against logical size (not on-disk size),
+    // we need: logical < maxEntrySizeInBytes < on-disk.
+    // Use maxEntrySizeInBytes=2048, blob=1500 bytes (logical), on-disk=4096.
+    // If the check correctly uses logical size: 1500 < 2048 → accepted.
+    // If it incorrectly used on-disk size: 4096 > 2048 → rejected.
+    CASFileCache smallEntryCache =
+        new DirectoryEntryCFC(
+            root,
+            /* maxSizeInBytes= */ 8192,
+            /* maxEntrySizeInBytes= */ 2048,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            /* accessRecorder= */ directExecutor(),
+            Maps.newConcurrentMap(),
+            /* zstdBufferPool= */ null,
+            /* onPut= */ digest -> {},
+            /* onExpire= */ digests -> {},
+            /* delegate= */ null,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              ByteString content = blobs.get(digest);
+              checkArgument(content != null, "blob not found: %s", digest);
+              checkArgument(compressor == Compressor.Value.IDENTITY);
+              return content.substring((int) offset).newInput();
+            });
+    smallEntryCache.initializeRootDirectory();
+    smallEntryCache.setBlockSizeForTesting(TEST_BLOCK_SIZE);
+
+    byte[] data = new byte[1500]; // logical: 1500, on-disk: 4096
+    ByteString blob = ByteString.copyFrom(data);
+    Digest digest = DIGEST_UTIL.compute(blob);
+    blobs.put(digest, blob);
+    Path path = smallEntryCache.put(digest, false).path();
+    assertThat(Files.exists(path)).isTrue();
+    assertThat(smallEntryCache.size()).isEqualTo(estimateSizeOnDisk(1500));
   }
 
   static class ConcurrentWriteStreamObserver {

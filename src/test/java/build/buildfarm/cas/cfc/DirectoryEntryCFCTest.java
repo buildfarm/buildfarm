@@ -21,6 +21,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
@@ -39,6 +40,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.v1test.Digest;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -132,6 +134,8 @@ class DirectoryEntryCFCTest {
               return content.substring((int) offset).newInput();
             });
     fileCache.initializeRootDirectory();
+    // Force a known block size so tests are hermetic and don't depend on the host filesystem.
+    fileCache.setBlockSizeForTesting(4096);
   }
 
   @After
@@ -207,6 +211,166 @@ class DirectoryEntryCFCTest {
     }
     // 200 total entries * 32 bytes = 6400 bytes, needs 2 blocks
     assertThat(CASFileCache.estimateDirectorySizeOnDisk(dir.build(), 4096)).isEqualTo(8192);
+  }
+
+  // -- estimateSizeOnDisk tests --
+
+  @Test
+  public void estimateSizeOnDisk_zeroSize_returnsZero() {
+    assertThat(CASFileCache.estimateSizeOnDisk(0, 4096, /* isHardlink= */ false)).isEqualTo(0);
+  }
+
+  @Test
+  public void estimateSizeOnDisk_oneByte_returnsOneBlock() {
+    assertThat(CASFileCache.estimateSizeOnDisk(1, 4096, /* isHardlink= */ false)).isEqualTo(4096);
+  }
+
+  @Test
+  public void estimateSizeOnDisk_justUnderOneBlock_returnsOneBlock() {
+    assertThat(CASFileCache.estimateSizeOnDisk(4095, 4096, /* isHardlink= */ false))
+        .isEqualTo(4096);
+  }
+
+  @Test
+  public void estimateSizeOnDisk_exactlyOneBlock_returnsOneBlock() {
+    // Idempotent: an already-aligned value should not round up to the next block.
+    assertThat(CASFileCache.estimateSizeOnDisk(4096, 4096, /* isHardlink= */ false))
+        .isEqualTo(4096);
+  }
+
+  @Test
+  public void estimateSizeOnDisk_oneByteOverBlock_returnsTwoBlocks() {
+    assertThat(CASFileCache.estimateSizeOnDisk(4097, 4096, /* isHardlink= */ false))
+        .isEqualTo(8192);
+  }
+
+  @Test
+  public void estimateSizeOnDisk_negativeSize_throws() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> CASFileCache.estimateSizeOnDisk(-1, 4096, /* isHardlink= */ false));
+  }
+
+  @Test
+  public void estimateSizeOnDisk_differentBlockSizes() {
+    assertThat(CASFileCache.estimateSizeOnDisk(100, 512, /* isHardlink= */ false)).isEqualTo(512);
+    assertThat(CASFileCache.estimateSizeOnDisk(100, 1, /* isHardlink= */ false)).isEqualTo(100);
+  }
+
+  @Test
+  public void estimateSizeOnDisk_invalidBlockSize_throws() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> CASFileCache.estimateSizeOnDisk(100, 0, /* isHardlink= */ false));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> CASFileCache.estimateSizeOnDisk(100, -1, /* isHardlink= */ false));
+  }
+
+  @Test
+  public void estimateSizeOnDisk_isIdempotent() {
+    // Applying estimateSizeOnDisk twice should give the same result as applying it once.
+    // This matters because directory Entry.size values are pre-aligned, and discharge()
+    // applies estimateSizeOnDisk again.
+    long[] sizes = {0, 1, 100, 4095, 4096, 4097, 8192, 10000};
+    long[] blockSizes = {512, 1024, 4096, 8192};
+    for (long blockSize : blockSizes) {
+      for (long size : sizes) {
+        long once = CASFileCache.estimateSizeOnDisk(size, blockSize, /* isHardlink= */ false);
+        long twice = CASFileCache.estimateSizeOnDisk(once, blockSize, /* isHardlink= */ false);
+        assertThat(twice).isEqualTo(once);
+      }
+    }
+  }
+
+  @Test
+  public void estimateSizeOnDisk_isHardlinkTrue_returnsZero() {
+    // Hardlinks reuse an existing inode's blocks, so the physical cost is ~0 regardless of
+    // logical size or block size.
+    long[] sizes = {0, 1, 100, 4095, 4096, 4097, 1L << 20};
+    long[] blockSizes = {1, 512, 1024, 4096, 8192};
+    for (long blockSize : blockSizes) {
+      for (long size : sizes) {
+        assertThat(CASFileCache.estimateSizeOnDisk(size, blockSize, /* isHardlink= */ true))
+            .isEqualTo(0);
+      }
+    }
+  }
+
+  @Test
+  public void estimateSizeOnDisk_isHardlinkTrue_zeroSize_returnsZero() {
+    // Zero-size boundary with the hardlink branch still returns 0.
+    assertThat(CASFileCache.estimateSizeOnDisk(0, 4096, /* isHardlink= */ true)).isEqualTo(0);
+  }
+
+  @Test
+  public void estimateSizeOnDisk_isHardlinkTrue_largeSize_returnsZero() {
+    // Integer.MAX_VALUE-scale sizes with the hardlink branch still return 0 and do not overflow.
+    assertThat(CASFileCache.estimateSizeOnDisk(Integer.MAX_VALUE, 4096, /* isHardlink= */ true))
+        .isEqualTo(0);
+    assertThat(
+            CASFileCache.estimateSizeOnDisk(
+                (long) Integer.MAX_VALUE + 1, 4096, /* isHardlink= */ true))
+        .isEqualTo(0);
+  }
+
+  @Test
+  public void estimateSizeOnDisk_isHardlinkTrue_isIdempotent() {
+    // Applying estimateSizeOnDisk twice with isHardlink=true still yields 0, mirroring the
+    // existing estimateSizeOnDisk_isIdempotent test.
+    long[] sizes = {0, 1, 100, 4095, 4096, 4097, 8192, 10000};
+    long[] blockSizes = {512, 1024, 4096, 8192};
+    for (long blockSize : blockSizes) {
+      for (long size : sizes) {
+        long once = CASFileCache.estimateSizeOnDisk(size, blockSize, /* isHardlink= */ true);
+        long twice = CASFileCache.estimateSizeOnDisk(once, blockSize, /* isHardlink= */ true);
+        assertThat(twice).isEqualTo(once);
+      }
+    }
+  }
+
+  @Test
+  public void directoryChargeDischargeSizeReturnsToZero() throws IOException, InterruptedException {
+    // Put a directory, verify it charges sizeInBytes, then evict it and verify size returns to
+    // zero.
+    ByteString file = ByteString.copyFromUtf8("Hello Directory");
+    Digest fileDigest = DIGEST_UTIL.compute(file);
+    blobs.put(fileDigest, file);
+
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("file")
+                    .setDigest(DigestUtil.toDigest(fileDigest))
+                    .build())
+            .build();
+    Digest dirDigest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(DigestUtil.toDigest(dirDigest), directory);
+
+    getInterruptiblyOrIOException(fileCache.putDirectory(dirDigest, directoriesIndex, putService));
+
+    long sizeAfterPut = fileCache.size();
+    assertThat(sizeAfterPut).isGreaterThan(0);
+
+    // Dereference the directory entry so it becomes evictable.
+    fileCache.decrementReferences(
+        ImmutableList.of(),
+        ImmutableList.of(DigestUtil.toDigest(dirDigest)),
+        DIGEST_UTIL.getDigestFunction());
+
+    // Put a large blob that forces eviction of the directory entry.
+    byte[] bigData = new byte[(int) (fileCache.maxSize() - 100)];
+    ByteString bigBlob = ByteString.copyFrom(bigData);
+    Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
+    blobs.put(bigDigest, bigBlob);
+    fileCache.put(bigDigest, false);
+
+    // After eviction and new charge, size should exactly equal the big blob's on-disk size —
+    // no drift from asymmetric charge/discharge of the directory entry.
+    assertThat(fileCache.size())
+        .isEqualTo(CASFileCache.estimateSizeOnDisk(bigData.length, 4096, /* isHardlink= */ false));
   }
 
   @Test

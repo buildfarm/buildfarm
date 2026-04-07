@@ -109,14 +109,16 @@ public class DirectoryEntryCFC extends CASFileCache {
           new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-              blobSizeInBytes.addAndGet(attrs.size());
+              blobSizeInBytes.addAndGet(
+                  estimateSizeOnDisk(attrs.size(), blockSize, /* isHardlink= */ false));
               return FileVisitResult.CONTINUE;
             }
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
               if (attrs.isRegularFile()) {
-                blobSizeInBytes.addAndGet(attrs.size());
+                blobSizeInBytes.addAndGet(
+                    estimateSizeOnDisk(attrs.size(), blockSize, /* isHardlink= */ false));
               }
               return FileVisitResult.CONTINUE;
             }
@@ -133,7 +135,7 @@ public class DirectoryEntryCFC extends CASFileCache {
           if (e.decrementReference(header)) {
             unreferencedEntryCount++;
           }
-          sizeInBytes += e.size;
+          sizeInBytes += estimateSizeOnDisk(e.size, blockSize, /* isHardlink= */ false);
         }
       }
     } catch (Exception e) {
@@ -279,7 +281,7 @@ public class DirectoryEntryCFC extends CASFileCache {
               directoriesIndex,
               (dst, src, size, isExecutable) -> {
                 copyLocalFileAndDereference(dst, src, isExecutable);
-                weight.addAndGet(size);
+                weight.addAndGet(estimateSizeOnDisk(size, blockSize, /* isHardlink= */ false));
               },
               putFuturesBuilder,
               service);
