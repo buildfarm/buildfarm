@@ -165,8 +165,7 @@ public class LeaderElection implements Closeable {
     this.leaseDuration = leaseDuration;
     this.renewalInterval = renewalInterval;
     this.renewalExecutor =
-        Executors.newScheduledThreadPool(
-            1,
+        Executors.newSingleThreadScheduledExecutor(
             r -> {
               Thread thread = new Thread(r, "leader-election-renewal");
               thread.setDaemon(true);
