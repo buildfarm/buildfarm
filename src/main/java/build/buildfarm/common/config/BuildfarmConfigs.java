@@ -54,6 +54,8 @@ public final class BuildfarmConfigs {
         return yaml.load(input);
       } catch (NoSuchFileException ex) {
         throw new RuntimeException("Could not find config file: " + value);
+      } catch (IOException ex) {
+        throw new RuntimeException("Could not read config file: " + value, ex);
       }
     }
   }
