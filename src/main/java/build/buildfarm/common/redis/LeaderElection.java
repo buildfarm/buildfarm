@@ -26,6 +26,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.logging.Level;
 import lombok.extern.java.Log;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.SetParams;
@@ -241,9 +242,10 @@ public class LeaderElection implements Closeable {
 
       return acquired;
     } catch (Exception e) {
-      log.severe(
-          String.format(
-              "Error attempting to become leader for '%s': %s", electionKey, e.getMessage()));
+      log.log(
+          Level.SEVERE,
+          String.format("Error attempting to become leader for '%s'", electionKey),
+          e);
       return false;
     }
   }
@@ -517,7 +519,7 @@ public class LeaderElection implements Closeable {
         renewalInterval.toMillis(),
         TimeUnit.MILLISECONDS);
 
-    log.fine(String.format("Renewal task started (interval: %d ms)", renewalInterval.toMillis()));
+    log.fine(String.format("Renewal task started (interval: %dms)", renewalInterval.toMillis()));
   }
 
   /**
@@ -550,9 +552,10 @@ public class LeaderElection implements Closeable {
             try {
               callback.accept(electionKey, isLeader);
             } catch (Exception e) {
-              log.severe(
-                  String.format(
-                      "Error in leadership callback for '%s': %s", electionKey, e.getMessage()));
+              log.log(
+                  Level.SEVERE,
+                  String.format("Error in leadership callback for '%s'", electionKey),
+                  e);
             }
           }
         });
