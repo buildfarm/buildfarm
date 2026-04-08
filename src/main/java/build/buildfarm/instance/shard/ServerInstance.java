@@ -253,6 +253,7 @@ public class ServerInstance extends NodeInstance {
           "bindings",
           ImmutableList.of(
               BINDING_EXECUTIONS, BINDING_TOOL_INVOCATIONS, BINDING_CORRELATED_INVOCATIONS));
+  public static final String ELECTION_KEY_DISPATCHEDMONITOR = "dispatchedmonitor";
 
   private final Runnable onStop;
   private final long maxEntrySizeBytes;
@@ -734,7 +735,7 @@ public class ServerInstance extends NodeInstance {
 
   private boolean isDispatchedMonitorLeader() {
     try {
-      return backplane.isLeader("dispatchedmonitor");
+      return backplane.isLeader(ELECTION_KEY_DISPATCHEDMONITOR);
     } catch (IOException e) {
       log.log(Level.WARNING, "error checking leader status, assuming leader", e);
       return true;
@@ -755,15 +756,13 @@ public class ServerInstance extends NodeInstance {
       throw e;
     }
 
-    // Attempt to become leader for DispatchedMonitor operations
-    boolean becameLeader = backplane.tryBecomeLeader("dispatchedmonitor");
-    log.log(
-        Level.INFO,
-        format(
-            "ServerInstance '%s' leader election result: %s",
-            publicName, becameLeader ? "LEADER" : "FOLLOWER"));
-
     if (dispatchedMonitor != null) {
+      boolean becameLeader = backplane.tryBecomeLeader(ELECTION_KEY_DISPATCHEDMONITOR);
+      log.log(
+          Level.INFO,
+          format(
+              "name='%s' leader election result: %s",
+              publicName, becameLeader ? "LEADER" : "FOLLOWER"));
       dispatchedMonitor.start();
     }
     if (operationQueuer != null) {
