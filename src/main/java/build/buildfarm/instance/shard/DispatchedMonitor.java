@@ -218,11 +218,11 @@ class DispatchedMonitor implements Runnable {
    */
   void iterate() throws InterruptedException {
     // Only perform work if this node is the leader
-    if (!isLeader.getAsBoolean()) {
+    if (isLeader.getAsBoolean()) {
+      getOnlyInterruptibly(submitAll());
+    } else {
       log.log(Level.FINE, "DispatchedMonitor: Skipping iteration (not leader)");
-      return;
     }
-    getOnlyInterruptibly(submitAll());
   }
 
   /**
