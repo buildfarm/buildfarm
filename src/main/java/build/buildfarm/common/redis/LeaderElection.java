@@ -29,6 +29,7 @@ import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.params.SetParams;
 
 /**
@@ -241,7 +242,7 @@ public class LeaderElection implements Closeable {
       }
 
       return acquired;
-    } catch (Exception e) {
+    } catch (JedisException e) {
       log.log(
           Level.SEVERE,
           String.format("Error attempting to become leader for '%s'", electionKey),
@@ -285,7 +286,7 @@ public class LeaderElection implements Closeable {
       }
 
       return renewed;
-    } catch (Exception e) {
+    } catch (JedisException e) {
       log.severe(
           String.format("Error renewing leadership for '%s': %s", electionKey, e.getMessage()));
       handleLeadershipLoss(electionKey);
@@ -310,7 +311,7 @@ public class LeaderElection implements Closeable {
     try {
       String currentLeader = jedis.get(redisKey);
       return value.equals(currentLeader);
-    } catch (Exception e) {
+    } catch (JedisException e) {
       log.severe(
           String.format("Error checking leadership for '%s': %s", electionKey, e.getMessage()));
       return false;
@@ -343,7 +344,7 @@ public class LeaderElection implements Closeable {
       }
 
       return value;
-    } catch (Exception e) {
+    } catch (JedisException e) {
       log.severe(
           String.format("Error getting current leader for '%s': %s", electionKey, e.getMessage()));
       return null;
@@ -385,7 +386,7 @@ public class LeaderElection implements Closeable {
       }
 
       return resigned;
-    } catch (Exception e) {
+    } catch (JedisException e) {
       log.severe(
           String.format("Error resigning leadership for '%s': %s", electionKey, e.getMessage()));
       return false;
