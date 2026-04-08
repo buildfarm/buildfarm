@@ -26,11 +26,12 @@ import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.netty.handler.ssl.SslContext;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -125,9 +126,9 @@ public final class GoogleAuthUtils {
       return null;
     } else if (options.googleCredentials != null) {
       // Credentials from file
-      try (InputStream authFile = new FileInputStream(options.googleCredentials)) {
+      try (InputStream authFile = Files.newInputStream(Path.of(options.googleCredentials))) {
         return newCredentials(authFile, options.googleAuthScopes);
-      } catch (FileNotFoundException e) {
+      } catch (NoSuchFileException | FileNotFoundException e) {
         String message =
             String.format(
                 "Could not open auth credentials file '%s': %s",
