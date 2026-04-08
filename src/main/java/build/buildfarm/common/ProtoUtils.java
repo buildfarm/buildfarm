@@ -21,6 +21,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * @class ProtoUtils
@@ -28,8 +30,9 @@ import lombok.extern.java.Log;
  * @details Performs validation and error reporting of proto data.
  */
 @Log
+@NullMarked
 public class ProtoUtils {
-  public static QueuedOperation parseQueuedOperation(
+  public static @Nullable QueuedOperation parseQueuedOperation(
       ByteString queuedOperationBlob, QueueEntry queueEntry) {
     Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
     String operationName = queueEntry.getExecuteEntry().getOperationName();

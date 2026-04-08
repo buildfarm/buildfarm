@@ -23,10 +23,13 @@ import com.google.protobuf.util.Durations;
 import io.grpc.Deadline;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+@NullMarked
 public class Poller {
   private final Duration period;
-  private ActivePoller activePoller = null;
+  private @Nullable ActivePoller activePoller = null;
 
   private class ActivePoller implements Runnable {
     private final BooleanSupplier poll;
