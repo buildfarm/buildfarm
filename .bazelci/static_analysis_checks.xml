@@ -117,63 +117,6 @@
     <exclude name="UncommentedEmptyMethodBody"/>
 </rule>
 
-<rule ref="category/java/errorprone.xml">
-    <exclude name="AssignmentInOperand"/>
-    <exclude name="AssignmentToNonFinalStatic"/>
-    <exclude name="AvoidAccessibilityAlteration"/>
-    <exclude name="AvoidBranchingStatementAsLastInLoop"/>
-    <exclude name="AvoidCallingFinalize"/>
-    <exclude name="AvoidCatchingThrowable"/>
-    <exclude name="AvoidDuplicateLiterals"/>
-    <exclude name="AvoidFieldNameMatchingMethodName"/>
-    <exclude name="AvoidFieldNameMatchingTypeName"/>
-    <exclude name="AvoidInstanceofChecksInCatchClause"/>
-    <exclude name="AvoidLiteralsInIfCondition"/>
-    <exclude name="AvoidLosingExceptionInformation"/>
-    <exclude name="AvoidMultipleUnaryOperators"/>
-    <exclude name="AvoidUsingOctalValues"/>
-    <exclude name="CheckSkipResult"/>
-    <exclude name="ClassCastExceptionWithToArray"/>
-    <exclude name="CloneMethodMustBePublic"/>
-    <exclude name="CloneMethodMustImplementCloneable"/>
-    <exclude name="CloneMethodReturnTypeMustMatchClassName"/>
-    <exclude name="CloseResource"/>
-    <exclude name="ConstructorCallsOverridableMethod"/>
-    <exclude name="DoNotThrowExceptionInFinally"/>
-    <exclude name="EmptyCatchBlock"/>
-    <exclude name="DetachedTestCase"/>
-    <exclude name="DoNotTerminateVM"/>
-    <exclude name="DoNotThrowExceptionInFinally"/>
-    <exclude name="EmptyCatchBlock"/>
-    <exclude name="FinalizeDoesNotCallSuperFinalize"/>
-    <exclude name="FinalizeOnlyCallsSuperFinalize"/>
-    <exclude name="FinalizeOverloaded"/>
-    <exclude name="FinalizeShouldBeProtected"/>
-    <exclude name="MethodWithSameNameAsEnclosingClass"/>
-    <exclude name="MissingSerialVersionUID"/>
-    <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
-    <exclude name="NonCaseLabelInSwitchStatement"/>
-    <exclude name="NonStaticInitializer"/>
-    <exclude name="NullAssignment"/>
-    <exclude name="OverrideBothEqualsAndHashcode"/>
-    <exclude name="ProperCloneImplementation"/>
-    <exclude name="SimpleDateFormatNeedsLocale"/>
-    <exclude name="SingleMethodSingleton"/>
-    <exclude name="SingletonClassReturningNewInstance"/>
-    <exclude name="StaticEJBFieldShouldBeFinal"/>
-    <exclude name="StringBufferInstantiationWithChar"/>
-    <exclude name="SuspiciousEqualsMethodName"/>
-    <exclude name="SuspiciousHashcodeMethodName"/>
-    <exclude name="SuspiciousOctalEscape"/>
-    <exclude name="UnnecessaryBooleanAssertion"/>
-    <exclude name="UnnecessaryCaseChange"/>
-    <exclude name="UnnecessaryConversionTemporary"/>
-    <exclude name="UseCorrectExceptionLogging"/>
-    <exclude name="UseEqualsToCompareStrings"/>
-    <exclude name="UseLocaleWithCaseConversions"/>
-</rule>
-
-
 <rule ref="category/java/multithreading.xml">
     <exclude name="AvoidSynchronizedAtMethodLevel"/>
     <exclude name="AvoidThreadGroup"/>
