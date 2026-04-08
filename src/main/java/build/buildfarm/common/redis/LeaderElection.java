@@ -14,7 +14,6 @@
 
 package build.buildfarm.common.redis;
 
-import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.io.Closeable;
 import java.time.Duration;
 import java.time.Instant;
@@ -205,7 +204,6 @@ public class LeaderElection implements Closeable {
    * @param electionKey Unique identifier for what needs a leader (e.g., "build-scheduler")
    * @return true if this node became (or already was) the leader, false otherwise
    */
-  @WithSpan
   public boolean tryBecomeLeader(UnifiedJedis jedis, String electionKey) {
     if (closed.get()) {
       log.warning(
@@ -258,7 +256,6 @@ public class LeaderElection implements Closeable {
    * @param electionKey Unique identifier for the election
    * @return true if renewal was successful (this node is still leader), false otherwise
    */
-  @WithSpan
   public boolean renewLeadership(UnifiedJedis jedis, String electionKey) {
     if (closed.get()) {
       return false;
@@ -300,7 +297,6 @@ public class LeaderElection implements Closeable {
    * @param electionKey Unique identifier for the election
    * @return true if this node is the current leader, false otherwise
    */
-  @WithSpan
   public boolean isLeader(UnifiedJedis jedis, String electionKey) {
     if (closed.get()) {
       return false;
@@ -325,7 +321,6 @@ public class LeaderElection implements Closeable {
    * @param electionKey Unique identifier for the election
    * @return The node ID of the current leader, or null if there is no leader
    */
-  @WithSpan
   public String getCurrentLeader(UnifiedJedis jedis, String electionKey) {
     if (closed.get()) {
       return null;
@@ -362,7 +357,6 @@ public class LeaderElection implements Closeable {
    * @param electionKey Unique identifier for the election
    * @return true if resignation was successful, false if not currently leader
    */
-  @WithSpan
   public boolean resignLeadership(UnifiedJedis jedis, String electionKey) {
     if (closed.get()) {
       return false;
