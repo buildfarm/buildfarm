@@ -7,13 +7,11 @@ import build.buildfarm.common.SystemProcessors;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,10 +49,10 @@ public final class BuildfarmConfigs {
       final ScalarNode scalarNode = (ScalarNode) node;
       final String value = scalarNode.getValue();
       try {
-        final InputStream input = new FileInputStream(new File(configsBasePath + "/" + value));
+        final InputStream input = Files.newInputStream(Path.of(configsBasePath + "/" + value));
         final Yaml yaml = new Yaml(constructor);
         return yaml.load(input);
-      } catch (FileNotFoundException ex) {
+      } catch (NoSuchFileException ex) {
         throw new RuntimeException("Could not find config file: " + value);
       }
     }

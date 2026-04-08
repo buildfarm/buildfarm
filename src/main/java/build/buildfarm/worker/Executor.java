@@ -59,7 +59,6 @@ import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -663,8 +662,7 @@ class Executor {
       if (limits.useLinuxSandbox) {
         executionStatistics =
             ExecutionStatistics.newBuilder()
-                .mergeFrom(
-                    new FileInputStream(execDir.resolve("action_execution_statistics").toString()))
+                .mergeFrom(Files.newInputStream(execDir.resolve("action_execution_statistics")))
                 .build();
       }
 
