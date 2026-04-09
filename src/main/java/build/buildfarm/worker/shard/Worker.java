@@ -1050,6 +1050,7 @@ public final class Worker extends LoggingMain {
             executeStageWidth,
             reportResultStageWidth,
             configs.getWorker().getInputFetchDeadline(),
+            configs.getWorker().getReportResultDeadline(),
             backplane,
             execFileSystem,
             new EmptyInputStreamFactory(
