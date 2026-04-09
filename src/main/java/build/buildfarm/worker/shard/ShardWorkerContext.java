@@ -124,6 +124,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
   private final int inputFetchDeadline;
+  private final int reportResultDeadline;
   private final int inputFetchStageWidth;
   private final int executeStageWidth;
   private final int reportResultStageWidth;
@@ -179,6 +180,7 @@ class ShardWorkerContext implements WorkerContext {
    * @param executeStageWidth Number of execution slots for concurrent action execution
    * @param reportResultStageWidth Number of execution slots for concurrent result reports/cleanup
    * @param inputFetchDeadline The duration input fetch must complete in before return to queue
+   * @param reportResultDeadline The duration report result must complete in before return to queue
    * @param backplane A source of truth and reporting for execution and content
    * @param execFileSystem Manager of execution filesystem presentation
    * @param inputStreamFactory Supplier of CAS streams for reading
@@ -208,6 +210,7 @@ class ShardWorkerContext implements WorkerContext {
       int executeStageWidth,
       int reportResultStageWidth,
       int inputFetchDeadline,
+      int reportResultDeadline,
       Backplane backplane,
       ExecFileSystem execFileSystem,
       InputStreamFactory inputStreamFactory,
@@ -231,6 +234,7 @@ class ShardWorkerContext implements WorkerContext {
     this.executeStageWidth = executeStageWidth;
     this.reportResultStageWidth = reportResultStageWidth;
     this.inputFetchDeadline = inputFetchDeadline;
+    this.reportResultDeadline = reportResultDeadline;
     this.backplane = backplane;
     this.execFileSystem = execFileSystem;
     this.inputStreamFactory = inputStreamFactory;
@@ -547,6 +551,11 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public int getInputFetchDeadline() {
     return inputFetchDeadline;
+  }
+
+  @Override
+  public int getReportResultDeadline() {
+    return reportResultDeadline;
   }
 
   @Override
