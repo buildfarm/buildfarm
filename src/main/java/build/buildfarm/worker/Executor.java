@@ -301,21 +301,30 @@ class Executor {
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
+    Code statusCode;
+    // First, add cgroups wrapper which MUST run as root before any privilege-dropping wrappers.
+    // This is required for cgroupsv2 where the wrapper needs to write to cgroup.procs.
+    IOResource cgroupResource =
+        workerContext.applyCgroupsLimitation(
+            operationName, executionContext.claim.owner(), arguments, executionContext.command);
+
     // Apply custom PRIORITIZED execution policies BEFORE built-in wrappers
+    // (e.g., as-nobody for privilege dropping)
     for (ExecutionPolicy policy : policies) {
       if (policy.isPrioritized() && policy.getExecutionWrapper() != null) {
         arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
       }
     }
 
-    Code statusCode;
+    // Now add the rest of the execution limits (linux-sandbox, as-nobody, etc.)
     try (IOResource resource =
         workerContext.limitExecution(
             operationName,
             executionContext.claim.owner(),
             arguments,
             executionContext.command,
-            workingDirectory)) {
+            workingDirectory,
+            cgroupResource)) {
       // Apply all other custom execution policies AFTER built-in wrappers
       for (ExecutionPolicy policy : policies) {
         if (!policy.isPrioritized() && policy.getExecutionWrapper() != null) {

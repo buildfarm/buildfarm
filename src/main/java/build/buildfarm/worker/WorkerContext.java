@@ -135,12 +135,41 @@ public interface WorkerContext {
 
   void destroyExecutionLimits();
 
+  /**
+   * Apply cgroups limitation wrapper first, before any privilege-dropping wrappers. This is
+   * required for cgroupsv2 where the wrapper needs to write to cgroup.procs as root.
+   *
+   * @param operationName the name of the operation
+   * @param owner the owner to run as (may be null)
+   * @param arguments the command arguments builder to prepend the wrapper to
+   * @param command the command being executed
+   * @return an IOResource for the cgroup, or null if cgroups are not enabled
+   */
+  @Nullable
+  IOResource applyCgroupsLimitation(
+      String operationName,
+      @Nullable UserPrincipal owner,
+      ImmutableList.Builder<String> arguments,
+      Command command);
+
+  /**
+   * Apply remaining execution limits (linux-sandbox, as-nobody, etc.) AFTER cgroups wrapper.
+   *
+   * @param operationName the name of the operation
+   * @param owner the owner to run as (may be null)
+   * @param arguments the command arguments builder to prepend wrappers to
+   * @param command the command being executed
+   * @param workingDirectory the working directory for execution
+   * @param cgroupResource the cgroup resource from applyCgroupsLimitation, may be null
+   * @return an IOResource that manages the execution limits
+   */
   IOResource limitExecution(
       String operationName,
       @Nullable UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
-      Path workingDirectory);
+      Path workingDirectory,
+      @Nullable IOResource cgroupResource);
 
   int commandExecutionClaims(Command command);
 
