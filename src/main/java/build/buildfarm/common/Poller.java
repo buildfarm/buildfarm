@@ -14,6 +14,7 @@
 
 package build.buildfarm.common;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -97,7 +98,7 @@ public class Poller {
    * @param period the polling interval. Must be at least 1µs
    */
   public Poller(Duration period) {
-    checkState(Durations.toMicros(period) >= 1, "period is too short! It must be at least 1µs");
+    checkArgument(Durations.toMicros(period) >= 1, "period is too short! It must be at least 1µs");
     this.period = period;
   }
 
