@@ -226,7 +226,7 @@ public class S3Bucket {
     try {
       getSecretValueResult = client.getSecretValue(getSecretValueRequest);
     } catch (Exception e) {
-      log.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName));
+      log.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName), e);
     }
 
     // decode secret
