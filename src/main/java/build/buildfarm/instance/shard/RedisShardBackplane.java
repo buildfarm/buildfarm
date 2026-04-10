@@ -1139,7 +1139,6 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
-  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean pollExecution(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
       throws IOException {
@@ -1152,28 +1151,23 @@ public class RedisShardBackplane implements Backplane {
   boolean pollExecution(
       UnifiedJedis jedis, String executionName, DispatchedOperation dispatchedOperation) {
     if (state.dispatchedExecutions.exists(jedis, executionName)) {
-      if (!state.dispatchedExecutions.insert(jedis, executionName, dispatchedOperation)) {
-        return true;
-      }
       /* someone else beat us to the punch, delete our incorrectly added key */
       state.dispatchedExecutions.remove(jedis, executionName);
+      return false;
     }
-    return false;
+    return state.dispatchedExecutions.insert(jedis, executionName, dispatchedOperation);
   }
 
-  @SuppressWarnings("ConstantConditions")
   @Override
   public @Nullable Operation mergeExecution(ActionKey actionKey) throws IOException {
     return client.call(jedis -> state.executions.merge(jedis, actionKey.toString()));
   }
 
-  @SuppressWarnings("ConstantConditions")
   @Override
   public void unmergeExecution(ActionKey actionKey) throws IOException {
     client.run(jedis -> state.executions.unmerge(jedis, actionKey.toString()));
   }
 
-  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean prequeue(ExecuteEntry executeEntry, Operation execution, boolean ignoreMerge)
       throws IOException {
