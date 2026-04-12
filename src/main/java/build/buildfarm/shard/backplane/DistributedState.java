@@ -121,7 +121,7 @@ public class DistributedState {
    * @field blockedActions
    * @brief Actions that the cluster has decided it no longer wants to execute in the future.
    * @details The requests tied to these actions will be denied and the client will not get their
-   *     action request executed. The use case is blocking a certain action hash they we didn't like
+   *     action request executed. The use case is blocking a certain action hash that we didn't like
    *     and will refuse to run again.
    */
   public RedisMap<String> blockedActions;
