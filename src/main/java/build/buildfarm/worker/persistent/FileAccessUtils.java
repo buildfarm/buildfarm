@@ -145,7 +145,6 @@ public final class FileAccessUtils {
    *
    * <p>It is up to the write operation to specify whether or not to overwrite existing files.
    */
-  @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
   private static IOException writeFileSafe(Path absTo, Supplier<IOException> writeOp) {
     PathLock toLock = fileLock(absTo);
     synchronized (toLock) {
