@@ -22,8 +22,8 @@ import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
@@ -508,7 +508,7 @@ public final class Utils {
 
       // Copy tar files to the destination path
       else {
-        try (FileOutputStream fos = new FileOutputStream(destinationPath)) {
+        try (OutputStream fos = Files.newOutputStream(destinationPath.toPath())) {
           IOUtils.copy(tis, fos);
         }
       }
