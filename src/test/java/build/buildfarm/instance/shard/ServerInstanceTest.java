@@ -825,6 +825,47 @@ public class ServerInstanceTest {
   }
 
   @Test
+  public void executeRetriesMergeWhenPrequeueLosesRace() throws Exception {
+    when(mockBackplane.canPrequeue()).thenReturn(true);
+
+    build.buildfarm.v1test.Digest actionDigest =
+        build.buildfarm.v1test.Digest.newBuilder().setHash("raced-action").setSize(10).build();
+    ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
+
+    // First mergeExecution returns null (no existing execution yet — both servers see empty state).
+    // Second mergeExecution returns the winner's operation (the other server won the NX race).
+    Operation winnerExecution = Operation.newBuilder().setName("winner-execution").build();
+    when(mockBackplane.mergeExecution(actionKey)).thenReturn(null).thenReturn(winnerExecution);
+
+    // prequeue returns false on the first attempt, simulating losing the SET NX race.
+    when(mockBackplane.prequeue(any(ExecuteEntry.class), any(Operation.class), eq(false)))
+        .thenReturn(false);
+
+    SettableFuture<Void> future = SettableFuture.create();
+    when(mockBackplane.watchExecution(eq(winnerExecution.getName()), any(Watcher.class)))
+        .thenReturn(future);
+
+    Watcher mockWatcher = mock(Watcher.class);
+    instance.execute(
+        actionDigest,
+        /* skipCacheLookup= */ false,
+        ExecutionPolicy.getDefaultInstance(),
+        ResultsCachePolicy.getDefaultInstance(),
+        RequestMetadata.getDefaultInstance(),
+        /* watcher= */ mockWatcher);
+
+    // Verify prequeue was called exactly once with ignoreMerge=false (not forced through).
+    verify(mockBackplane, times(1))
+        .prequeue(any(ExecuteEntry.class), any(Operation.class), eq(false));
+    // Verify prequeue was never called with ignoreMerge=true (the bug would cause this).
+    verify(mockBackplane, never())
+        .prequeue(any(ExecuteEntry.class), any(Operation.class), eq(true));
+    // Verify the second iteration merged onto the winner's execution.
+    verify(mockBackplane, times(2)).mergeExecution(actionKey);
+    verify(mockBackplane, times(1)).watchExecution(eq(winnerExecution.getName()), any(Watcher.class));
+  }
+
+  @Test
   public void requeueFailsOnMissingDirectory() throws Exception {
     String operationName = "missing-directory-operation";
 
