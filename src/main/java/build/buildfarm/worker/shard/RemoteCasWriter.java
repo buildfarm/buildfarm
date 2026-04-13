@@ -32,13 +32,13 @@ import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.Digest;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
+import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
@@ -150,7 +150,7 @@ public class RemoteCasWriter implements CasWriter {
               try {
                 FeedbackOutputStream outStream = (FeedbackOutputStream) write;
                 while (outStream.isReady()) {
-                  if (!copyBytes(in, outStream, chunkSizeBytes)) {
+                  if (ByteStreams.copy(ByteStreams.limit(in, chunkSizeBytes), outStream) == 0) {
                     return;
                   }
                 }
@@ -189,15 +189,5 @@ public class RemoteCasWriter implements CasWriter {
             directExecutor());
 
     return writtenFuture;
-  }
-
-  private boolean copyBytes(InputStream in, OutputStream out, int bytesAmount) throws IOException {
-    byte[] buf = new byte[bytesAmount];
-    int n = in.read(buf);
-    if (n > 0) {
-      out.write(buf, 0, n);
-      return true;
-    }
-    return false;
   }
 }
