@@ -862,7 +862,8 @@ public class ServerInstanceTest {
         .prequeue(any(ExecuteEntry.class), any(Operation.class), eq(true));
     // Verify the second iteration merged onto the winner's execution.
     verify(mockBackplane, times(2)).mergeExecution(actionKey);
-    verify(mockBackplane, times(1)).watchExecution(eq(winnerExecution.getName()), any(Watcher.class));
+    verify(mockBackplane, times(1))
+        .watchExecution(eq(winnerExecution.getName()), any(Watcher.class));
   }
 
   @Test
