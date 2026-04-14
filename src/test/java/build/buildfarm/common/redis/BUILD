@@ -113,3 +113,11 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
+
+java_test(
+    name = "streamqueue",
+    size = "small",
+    srcs = ["RedisStreamQueueMockTest.java"],
+    test_class = "build.buildfarm.AllTests",
+    deps = COMMON_DEPS,
+)
