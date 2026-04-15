@@ -227,7 +227,7 @@ public abstract class NodeInstance extends InstanceBase {
       "Operation %s not requeued. " + BLOCK_LIST_ERROR;
 
   public static final String NO_REQUEUE_TOO_MANY_ERROR =
-      "Operation %s not requeued.  Operation has been requeued too many times ( %d > %d).";
+      "Operation %s not requeued.  Operation has been requeued too many times (%d > %d).";
 
   public static final String NO_REQUEUE_MISSING_MESSAGE =
       "Operation %s not requeued.  Operation no longer exists.";
