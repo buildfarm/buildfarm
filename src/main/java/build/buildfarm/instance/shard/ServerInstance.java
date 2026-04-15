@@ -2193,12 +2193,16 @@ public class ServerInstance extends NodeInstance {
 
   void putFailedOperation(ExecuteEntry executeEntry, String errorMessage) {
     // Create a failed operation which will be reported back to the client.
+    QueuedOperationMetadata metadata =
+        QueuedOperationMetadata.newBuilder()
+            .setExecuteOperationMetadata(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED))
+            .setRequestMetadata(executeEntry.getRequestMetadata())
+            .build();
     Operation.Builder failedOperation =
         Operation.newBuilder()
             .setName(executeEntry.getOperationName())
             .setDone(true)
-            .setMetadata(
-                Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)));
+            .setMetadata(Any.pack(metadata));
 
     // put the operation back into the backplane with a failed precondition.
     putOperation(
