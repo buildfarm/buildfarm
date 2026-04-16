@@ -280,6 +280,20 @@ message ShardWorker {
   bool read_only = 5;
 }
 
+// Configuration for a worker-published execution queue, stored in Redis
+// so that servers can auto-discover queues registered by workers.
+message WorkerQueueConfig {
+  // The name of the queue (e.g. "cpu", "gpu").
+  string name = 1;
+
+  // Whether the queue accepts operations with properties not listed
+  // in the queue's platform requirements.
+  bool allow_unmatched = 2;
+
+  // Platform properties that define the queue's provisioning requirements.
+  repeated build.bazel.remote.execution.v2.Platform.Property properties = 3;
+}
+
 message WorkerChange {
   message Add {
     google.protobuf.Timestamp effectiveAt = 1;

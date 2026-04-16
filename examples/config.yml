@@ -53,6 +53,10 @@ server:
   correlatedInvocationsIndexScopes: !!set
     ? host
     ? username
+  # Queue auto-discovery: when enabled, the server will periodically discover
+  # worker-published queues from Redis and update its execution queues live.
+  enableQueueAutoDiscovery: false
+  queueDiscoveryIntervalSeconds: 30
 backplane:
   type: SHARD
   redisUri: redis://localhost:6379
@@ -103,6 +107,10 @@ backplane:
       value: '*'
     - name: max-cores
       value: '*'
+  # Prefix for worker-published queue keys in Redis
+  workerQueuePrefix: WorkerQueue
+  # TTL in seconds for worker-published queue keys (workers refresh this periodically)
+  workerQueueExpireSeconds: 60
 worker:
   port: 8981
   grpcChannelz: false

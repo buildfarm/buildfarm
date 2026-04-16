@@ -291,6 +291,7 @@ public class ServerInstance extends NodeInstance {
   private final Scannable<String> correlatedInvocations;
   private final Scannable<String> toolInvocations;
   private Thread operationQueuer;
+  private Thread queueDiscoveryThread;
   private boolean stopping = false;
   private boolean stopped = true;
   private final Thread prometheusMetricsThread;
@@ -711,6 +712,116 @@ public class ServerInstance extends NodeInstance {
               }
             },
             "Prometheus Metrics Collector");
+
+    // Initialize queue auto-discovery thread if enabled
+    if (configs.getServer().isEnableQueueAutoDiscovery()) {
+      int discoveryIntervalSeconds = configs.getServer().getQueueDiscoveryIntervalSeconds();
+      Set<String> knownQueueNames = new HashSet<>();
+      // Seed with statically configured queues
+      for (build.buildfarm.common.config.Queue q : configs.getBackplane().getQueues()) {
+        knownQueueNames.add(q.getName());
+      }
+      queueDiscoveryThread =
+          new Thread(
+              () -> {
+                while (!Thread.currentThread().isInterrupted()) {
+                  try {
+                    TimeUnit.SECONDS.sleep(discoveryIntervalSeconds);
+                    List<build.buildfarm.common.config.Queue> discoveredQueues =
+                        backplane.discoverWorkerQueues();
+                    boolean hasNewQueues = false;
+                    for (build.buildfarm.common.config.Queue q : discoveredQueues) {
+                      if (!knownQueueNames.contains(q.getName())) {
+                        hasNewQueues = true;
+                        log.log(
+                            Level.INFO, format("Discovered new worker queue: '%s'", q.getName()));
+                      }
+                    }
+
+                    // Build the merged set: discovered queues override, plus keep any
+                    // statically-configured queues that are still relevant
+                    Set<String> discoveredNames = new HashSet<>();
+                    for (build.buildfarm.common.config.Queue q : discoveredQueues) {
+                      discoveredNames.add(q.getName());
+                    }
+
+                    // Check if any previously known queues have expired (were in discovered
+                    // but are no longer)
+                    boolean hasExpiredQueues = false;
+                    for (String queueName : knownQueueNames) {
+                      if (!discoveredNames.contains(queueName)) {
+                        // Check if this was a statically-configured queue
+                        boolean isStatic = false;
+                        for (build.buildfarm.common.config.Queue sq :
+                            configs.getBackplane().getQueues()) {
+                          if (sq.getName().equals(queueName)) {
+                            isStatic = true;
+                            break;
+                          }
+                        }
+                        if (!isStatic) {
+                          hasExpiredQueues = true;
+                          log.log(
+                              Level.INFO,
+                              format(
+                                  "Worker queue '%s' has expired and will be removed", queueName));
+                        }
+                      }
+                    }
+
+                    if (hasNewQueues || hasExpiredQueues) {
+                      // Build merged queue list: static queues + discovered queues
+                      // Discovered queues take precedence over static ones with the same name
+                      Map<String, build.buildfarm.common.config.Queue> mergedQueues =
+                          new HashMap<>();
+                      for (build.buildfarm.common.config.Queue sq :
+                          configs.getBackplane().getQueues()) {
+                        mergedQueues.put(sq.getName(), sq);
+                      }
+                      for (build.buildfarm.common.config.Queue dq : discoveredQueues) {
+                        mergedQueues.put(dq.getName(), dq);
+                      }
+                      // Remove expired non-static queues
+                      for (String queueName : new HashSet<>(mergedQueues.keySet())) {
+                        if (!discoveredNames.contains(queueName)) {
+                          boolean isStatic = false;
+                          for (build.buildfarm.common.config.Queue sq :
+                              configs.getBackplane().getQueues()) {
+                            if (sq.getName().equals(queueName)) {
+                              isStatic = true;
+                              break;
+                            }
+                          }
+                          if (!isStatic) {
+                            mergedQueues.remove(queueName);
+                          }
+                        }
+                      }
+
+                      build.buildfarm.common.config.Queue[] queueArray =
+                          mergedQueues.values().toArray(new build.buildfarm.common.config.Queue[0]);
+                      backplane.updateExecutionQueues(queueArray);
+
+                      // Update known queues
+                      knownQueueNames.clear();
+                      knownQueueNames.addAll(mergedQueues.keySet());
+
+                      log.log(
+                          Level.INFO,
+                          format("Execution queues updated. Active queues: %s", knownQueueNames));
+                    }
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                  } catch (Exception e) {
+                    log.log(Level.SEVERE, "Error during queue auto-discovery", e);
+                  }
+                }
+              },
+              "Queue Auto-Discovery");
+    } else {
+      queueDiscoveryThread = null;
+    }
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
@@ -754,6 +865,10 @@ public class ServerInstance extends NodeInstance {
     if (prometheusMetricsThread != null) {
       prometheusMetricsThread.start();
     }
+
+    if (queueDiscoveryThread != null) {
+      queueDiscoveryThread.start();
+    }
   }
 
   @Override
@@ -774,6 +889,10 @@ public class ServerInstance extends NodeInstance {
     }
     if (prometheusMetricsThread != null) {
       prometheusMetricsThread.interrupt();
+    }
+    if (queueDiscoveryThread != null) {
+      queueDiscoveryThread.interrupt();
+      queueDiscoveryThread.join();
     }
     contextDeadlineScheduler.shutdown();
     operationDeletionService.shutdown();
