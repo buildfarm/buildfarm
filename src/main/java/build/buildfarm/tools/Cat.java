@@ -986,7 +986,11 @@ class Cat implements Callable<Integer> {
     private int run() throws Exception {
       Instance instance = parent.createInstance();
       try {
-        batchWorkerProfiles(instance, names != null ? names : ImmutableList.of());
+        if (names != null && !Iterables.isEmpty(names)) {
+          batchWorkerProfiles(instance, names);
+        } else {
+          printWorkerProfile(instance.getWorkerProfile("").get());
+        }
       } finally {
         instance.stop();
       }
