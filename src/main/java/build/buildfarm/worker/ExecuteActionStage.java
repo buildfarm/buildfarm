@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.worker.resources.ResourceLimits;
+import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -115,6 +116,11 @@ public class ExecuteActionStage extends PipelineStage {
   protected void complete(String operationName, long usecs, long stallUSecs, String status) {
     super.complete(operationName, usecs, stallUSecs, status);
     executions.remove(operationName);
+  }
+
+  @Override
+  public boolean isStalled() {
+    return Iterables.any(executions.values(), executor -> executor.isStalled());
   }
 
   @Override

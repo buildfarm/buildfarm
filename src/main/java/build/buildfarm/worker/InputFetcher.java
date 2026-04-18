@@ -57,25 +57,13 @@ import lombok.extern.java.Log;
 import org.jspecify.annotations.Nullable;
 
 @Log
-public class InputFetcher implements Runnable {
+public class InputFetcher extends Stallable implements Runnable {
   private final WorkerContext workerContext;
   private final ExecutionContext executionContext;
   private final InputFetchStage owner;
   private final Executor pollerExecutor;
   private boolean success = false;
   private boolean polling = false;
-  private volatile boolean stalled = false;
-
-  private class StallState implements AutoCloseable {
-    StallState() {
-      stalled = true;
-    }
-
-    @Override
-    public void close() {
-      stalled = false;
-    }
-  }
 
   InputFetcher(
       WorkerContext workerContext,
@@ -299,10 +287,6 @@ public class InputFetcher implements Runnable {
         }
       }
     }
-  }
-
-  public boolean isStalled() {
-    return stalled;
   }
 
   @SuppressWarnings(

@@ -76,7 +76,7 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
-public class Executor {
+public class Executor extends Stallable {
   private static final int INCOMPLETE_EXIT_CODE = -1;
   private static final long SAMPLE_NANOS = 100_000_000;
 
@@ -426,7 +426,10 @@ public class Executor {
             executionName, executionContext.executeResponse.getResultBuilder().getExitCode()));
 
     executionContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
-    boolean claimed = owner.output().claim(executionContext);
+    boolean claimed;
+    try (StallState state = new StallState()) {
+      claimed = owner.output().claim(executionContext);
+    }
     executionContext.poller.pause();
     if (claimed) {
       try {

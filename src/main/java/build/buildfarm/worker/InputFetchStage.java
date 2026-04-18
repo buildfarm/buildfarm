@@ -81,8 +81,10 @@ public class InputFetchStage extends SuperscalarPipelineStage {
 
   @Override
   public boolean isStalled() {
-    // true iff any of the current fetchers are waiting to advance to execute
-    return Iterables.any(inputFetchers.values(), inputFetcher -> inputFetcher.isStalled());
+    // true if any of the current fetchers are waiting to advance to execute
+    // or the output stage is stalled (likely due to IO)
+    return Iterables.any(inputFetchers.values(), inputFetcher -> inputFetcher.isStalled()) ||
+        output().isStalled();
   }
 
   @Override
