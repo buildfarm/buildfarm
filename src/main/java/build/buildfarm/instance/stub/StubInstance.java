@@ -91,6 +91,7 @@ import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
+import build.buildfarm.v1test.PipelineChange;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
@@ -100,6 +101,8 @@ import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerControlGrpc;
 import build.buildfarm.v1test.WorkerControlGrpc.WorkerControlBlockingStub;
+import build.buildfarm.v1test.WorkerPipelineChangeRequest;
+import build.buildfarm.v1test.WorkerPipelineChangeResponse;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileFutureStub;
 import build.buildfarm.v1test.WorkerProfileMessage;
@@ -1015,11 +1018,27 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
-  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String name) {
     throwIfStopped();
     return workerControlBlockingStub
         .get()
         .prepareWorkerForGracefulShutdown(
             PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
+  }
+
+  @Override
+  public ListenableFuture<WorkerPipelineChangeResponse> pipelineChange(
+      String name, List<PipelineChange> changes) {
+    throwIfStopped();
+    SettableFuture<WorkerPipelineChangeResponse> result = SettableFuture.create();
+
+    result.set(
+        deadlined(workerControlBlockingStub)
+            .pipelineChange(
+                WorkerPipelineChangeRequest.newBuilder()
+                    .setWorkerName(name)
+                    .addAllChanges(changes)
+                    .build()));
+    return result;
   }
 }
