@@ -141,6 +141,8 @@ public final class Worker extends LoggingMain {
           .register();
   private static final Counter workerPausedMetric =
       Counter.build().name("worker_paused").help("Worker paused.").register();
+  private static final Gauge executionSlotUsage = // now Market stock - balance
+      Gauge.build().name("execution_slot_usage").help("Execution slot Usage.").register();
   private static final Gauge executionSlotsTotal =
       Gauge.build()
           .name("execution_slots_total")
@@ -792,6 +794,10 @@ public final class Worker extends LoggingMain {
             resourceSet,
             writer);
 
+    // initial balance for market is available slots
+    final int marketStock = context.market().balance();
+    context.market().onChangeBalance(balance -> executionSlotUsage.set(marketStock - balance));
+
     pipeline = new Pipeline();
     SuperscalarPipelineStage inputFetchStage = null;
     ExecuteActionStage executeActionStage = null;
@@ -861,7 +867,7 @@ public final class Worker extends LoggingMain {
     pipeline.start();
     healthCheckMetric.labels("start").inc();
     inputFetchSlotsTotal.set(inputFetchStageWidth);
-    executionSlotsTotal.set(executeStageWidth);
+    executionSlotsTotal.set(marketStock);
     reportResultSlotsTotal.set(reportResultStageWidth);
   }
 

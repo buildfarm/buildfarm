@@ -33,9 +33,15 @@ public class Market implements Runnable, Resource {
   private final BlockingQueue<Order> orders = new LinkedBlockingQueue<>(); // buys
   private final Thread broker = new Thread(this);
   private int balance = 0;
+  private Consumer<Integer> onChangeBalance = balance -> {};
 
-  synchronized int balance() {
+  public synchronized int balance() {
     return balance;
+  }
+
+  // set this once, avoid reset
+  public void onChangeBalance(Consumer<Integer> onChangeBalance) {
+    this.onChangeBalance = onChangeBalance;
   }
 
   Order buy(int amount, Consumer<Integer> onBuy) {
@@ -82,6 +88,7 @@ public class Market implements Runnable, Resource {
                 balance = available = balance - totalBought;
                 totalBought = 0;
               }
+              onChangeBalance.accept(available);
               continue;
             }
           }
@@ -92,6 +99,7 @@ public class Market implements Runnable, Resource {
               synchronized (this) {
                 balance = available = balance - totalBought;
               }
+              onChangeBalance.accept(available);
               totalBought = 0;
             }
             // replace order if we bought something for it
@@ -128,14 +136,15 @@ public class Market implements Runnable, Resource {
 
   public void sell(int amount) {
     if (amount != 0) {
-      // checkState(amount > 0);
-      sellSyncPositive(amount);
+      int available = sellSyncPositive(amount);
+      onChangeBalance.accept(available);
     }
   }
 
-  synchronized void sellSyncPositive(int amount) {
+  synchronized int sellSyncPositive(int amount) {
     balance += amount;
     notifyAll();
+    return balance;
   }
 
   @Override
