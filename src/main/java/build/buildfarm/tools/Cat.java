@@ -971,7 +971,7 @@ class Cat implements Callable<Integer> {
   @picocli.CommandLine.Command(
       name = "WorkerProfile",
       mixinStandardHelpOptions = true,
-      description = "Status including Execution and CAS statistics (Worker only)")
+      description = "Worker Status including Execution and CAS statistics")
   static class CatWorkerProfile implements Callable<Integer> {
     @ParentCommand private Cat parent;
 
