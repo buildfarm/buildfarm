@@ -94,6 +94,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import picocli.CommandLine;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
@@ -131,6 +132,12 @@ class Cat implements Callable<Integer> {
 
   @Parameters(index = "1", description = CliConstants.INSTANCE_NAME)
   String instanceName;
+
+  @Option(
+      names = {"-t", "--timeout"},
+      description = "Limit overall request context to timeout (seconds), default ${DEFAULT-VALUE}",
+      defaultValue = "10")
+  private int timeoutSeconds;
 
   private static void printCapabilities(ServerCapabilities capabilities) {
     System.out.println(capabilities);
@@ -785,13 +792,6 @@ class Cat implements Callable<Integer> {
     }
   }
 
-  static int deadlineSecondsForType(String type) {
-    if (type.equals("Watch") || type.equals("Execute")) {
-      return 60 * 60 * 24;
-    }
-    return 10;
-  }
-
   private static void fetch(Instance instance, Iterable<String> uris) throws Exception {
     ListenableFuture<Digest> digest =
         instance.fetchBlob(
@@ -948,10 +948,14 @@ class Cat implements Callable<Integer> {
   }
 
   @SuppressWarnings("ThrowFromFinallyBlock")
-  static int runWithDeadline(int deadlineSeconds, Callable<Integer> action) throws Exception {
+  static int runWithDeadline(int timeoutSeconds, Callable<Integer> action) throws Exception {
+    if (timeoutSeconds <= 0) {
+      return action.call();
+    }
+
     ScheduledExecutorService service = newSingleThreadScheduledExecutor();
     Context.CancellableContext ctx =
-        Context.current().withDeadlineAfter(deadlineSeconds, TimeUnit.SECONDS, service);
+        Context.current().withDeadlineAfter(timeoutSeconds, TimeUnit.SECONDS, service);
     Context prevContext = ctx.attach();
     try {
       return action.call();
@@ -976,7 +980,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -999,7 +1003,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1026,7 +1030,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1050,7 +1054,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1076,7 +1080,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1111,7 +1115,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1139,7 +1143,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(deadlineSecondsForType("Watch"), this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1167,7 +1171,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1205,7 +1209,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1235,7 +1239,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1265,7 +1269,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1303,7 +1307,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1338,7 +1342,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1375,7 +1379,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1410,7 +1414,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1447,7 +1451,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1484,7 +1488,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1519,7 +1523,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1554,7 +1558,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
@@ -1580,7 +1584,7 @@ class Cat implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-      return runWithDeadline(10, this::run);
+      return runWithDeadline(parent.timeoutSeconds, this::run);
     }
 
     private int run() throws Exception {
