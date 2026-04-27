@@ -40,7 +40,7 @@ public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
     responseObserver.onNext(
         instance.getCapabilities().toBuilder()
             .setDeprecatedApiVersion(SemVer.newBuilder().setMajor(2))
-            .setLowApiVersion(SemVer.newBuilder().setMajor(2).setMinor(3))
+            .setLowApiVersion(SemVer.newBuilder().setMajor(2).setMinor(0))
             .setHighApiVersion(SemVer.newBuilder().setMajor(2).setMinor(11))
             .build());
     responseObserver.onCompleted();
