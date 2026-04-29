@@ -2427,7 +2427,7 @@ public class ServerInstance extends NodeInstance {
           return immediateFailedFuture(
               Status.RESOURCE_EXHAUSTED.withDescription("Too many jobs pending").asException());
         }
-        ignoreMerge = ignoreMerge || lookupAttempts != 0;
+        ignoreMerge = ignoreMerge || lookupAttempts == 0;
         execution =
             schedule(
                 actionDigest,
