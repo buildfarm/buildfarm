@@ -52,4 +52,11 @@ public class ServerCacheConfigs {
    * @details This will not dictate the max memory used.
    */
   private long recentServedExecutionsCacheMaxEntries = 64 * 1024;
+
+  /**
+   * @field actionCacheMaxEntries
+   * @brief The max number of entries that the action cache will hold.
+   * @details This will not dictate the max memory used.
+   */
+  private long actionCacheMaxEntries = 64 * 1024;
 }

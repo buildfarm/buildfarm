@@ -42,6 +42,7 @@ server:
     commandCacheMaxEntries: 10000
     digestToActionCacheMaxEntries: 10000
     recentServedExecutionsCacheMaxEntries: 10000
+    actionCacheMaxEntries: 10000
   admin:
     deploymentEnvironment: AWS
     clusterEndpoint: grpc://localhost
