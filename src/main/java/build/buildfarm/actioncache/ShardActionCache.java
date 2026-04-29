@@ -37,7 +37,7 @@ public class ShardActionCache implements ActionCache {
   private final AsyncLoadingCache<ActionKey, ActionResult> actionResultCache;
 
   public ShardActionCache(
-      int maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
+      long maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
     this.backplane = backplane;
 
     AsyncCacheLoader<ActionKey, ActionResult> loader =
