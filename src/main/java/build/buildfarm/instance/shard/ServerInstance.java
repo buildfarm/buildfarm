@@ -191,8 +191,6 @@ public class ServerInstance extends NodeInstance {
   private static final String TIMEOUT_OUT_OF_BOUNDS =
       "A timeout specified is out of bounds with a configured range";
 
-  private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
-
   private static final int TRANSFORM_TOKENS = 256;
 
   // Prometheus metrics
@@ -329,7 +327,9 @@ public class ServerInstance extends NodeInstance {
         name,
         backplane,
         new ShardActionCache(
-            DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE, backplane, actionCacheFetchService),
+            configs.getServer().getCaches().getActionCacheMaxEntries(),
+            backplane,
+            actionCacheFetchService),
         configs.getServer().isRunDispatchedMonitor(),
         configs.getServer().getDispatchedMonitorIntervalSeconds(),
         configs.getServer().isRunOperationQueuer(),

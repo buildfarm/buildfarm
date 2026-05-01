@@ -126,7 +126,6 @@ import picocli.CommandLine.ParentCommand;
       Cat.CatWriteStatus.class,
     })
 class Cat implements Callable<Integer> {
-
   @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   String host;
 

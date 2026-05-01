@@ -127,6 +127,7 @@ server:
 | commandCacheMaxEntries                | Long, _64 * 1024_             | The max number of entries that the command cache will hold.          |
 | digestToActionCacheMaxEntries         | Long, _64 * 1024_             | The max number of entries that the digest-to-action cache will hold. |
 | recentServedExecutionsCacheMaxEntries | Long, _64 * 1024_             | The max number of entries that the executions cache will hold.       |
+| actionCacheMaxEntries                 | Long, _64 * 1024_             | The max number of entries that the action cache will hold.           |
 
 Example:
 
@@ -137,6 +138,7 @@ server:
     commandCacheMaxEntries: 10000
     digestToActionCacheMaxEntries: 10000
     recentServedExecutionsCacheMaxEntries: 10000
+    actionCacheMaxEntries: 10000
 ```
 
 ### Admin
