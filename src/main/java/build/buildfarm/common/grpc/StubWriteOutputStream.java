@@ -16,6 +16,7 @@ package build.buildfarm.common.grpc;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.lang.String.format;
 import static java.util.logging.Level.WARNING;
@@ -28,6 +29,7 @@ import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
@@ -111,6 +113,22 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   @GuardedBy("this")
   private StreamObserver<WriteRequest> writeObserver = null;
 
+  @GuardedBy("this")
+  private boolean isGrpcRemoteCallClosed = false;
+
+  @GuardedBy("this")
+  private boolean isFullyClosed = false;
+
+  @VisibleForTesting
+  synchronized boolean isGrpcRemoteCallClosed() {
+    return isGrpcRemoteCallClosed;
+  }
+
+  @VisibleForTesting
+  synchronized boolean isFullyClosed() {
+    return isFullyClosed;
+  }
+
   private long deadlineAfter = 0;
   private TimeUnit deadlineAfterUnits = null;
   private Runnable onReadyHandler = null;
@@ -141,26 +159,46 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public void close() throws IOException {
+    if (isFullyClosed()) {
+      return;
+    }
     StreamObserver<WriteRequest> finishedWriteObserver;
     boolean cancelled = false;
-    if (!checkComplete()) {
-      boolean finishWrite =
-          expectedSize == COMPRESSED_EXPECTED_SIZE || expectedSize == UNLIMITED_EXPECTED_SIZE;
-      if (finishWrite || bufferOffset != 0) {
-        initiateWrite();
-        flushSome(finishWrite);
+    try {
+      if (!checkComplete()) {
+        boolean finishWrite =
+            expectedSize == COMPRESSED_EXPECTED_SIZE || expectedSize == UNLIMITED_EXPECTED_SIZE;
+        if (finishWrite || bufferOffset != 0) {
+          initiateWrite();
+          flushSome(finishWrite);
+        }
+        cancelled = !finishWrite && offset + writtenBytes + bufferOffset != expectedSize;
       }
-      cancelled = !finishWrite && offset + writtenBytes + bufferOffset != expectedSize;
-    }
-    synchronized (this) {
-      finishedWriteObserver = writeObserver;
-      writeObserver = null;
-    }
-    if (finishedWriteObserver != null) {
-      if (cancelled) {
-        finishedWriteObserver.onError(Status.CANCELLED.asException());
-      } else {
-        finishedWriteObserver.onCompleted();
+    } catch (Exception e) {
+      cancelled = true;
+      // If we're currently racing a concurrent tear down, then don't throw unnecessarily
+      if (!isFullyClosed()) {
+        throw e;
+      }
+    } finally {
+      synchronized (this) {
+        finishedWriteObserver = writeObserver;
+        writeObserver = null;
+      }
+
+      if (finishedWriteObserver != null) {
+        // Always complete the finishedWriteObserver, so it and its associated native memory gets
+        // properly cleaned up.
+        try {
+          if (cancelled) {
+            finishedWriteObserver.onError(Status.CANCELLED.asException());
+          } else {
+            finishedWriteObserver.onCompleted();
+          }
+        } catch (IllegalStateException e) {
+          // If gRPC has already terminated things we want to avoid needlessly throwing an
+          // IllegalStateException
+        }
       }
     }
   }
@@ -175,16 +213,16 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
       request.setResourceName(resourceName);
     }
     synchronized (this) {
-      // writeObserver can be nulled by a completion race
-      // expect that we are completed in this case
-      if (writeObserver != null) {
+      if (!isGrpcRemoteCallClosed && writeObserver != null) {
         writeObserver.onNext(request.build());
         wasReset = false;
         writtenBytes += bufferOffset;
         bufferOffset = 0;
         sentResourceName = true;
       } else {
-        checkState(writeFuture.isDone(), "writeObserver nulled without completion");
+        checkState(
+            writeFuture.isDone(),
+            "writeObserver nulled or server call closed without writeFuture completion");
       }
     }
   }
@@ -216,7 +254,25 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     return false;
   }
 
-  private synchronized void initiateWrite() {
+  @VisibleForTesting
+  synchronized boolean hasActiveWriteObserver() {
+    return writeObserver != null;
+  }
+
+  private synchronized void initiateWrite() throws IOException {
+    if (isFullyClosed) {
+      // If we're already fully closed, then don't initiate another write on this same instance
+      Throwable cause = null;
+      try {
+        writeFuture.get();
+      } catch (ExecutionException e) {
+        cause = e.getCause();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        cause = e;
+      }
+      throw new IOException("write already terminated", cause);
+    }
     if (writeObserver == null) {
       checkNotNull(deadlineAfterUnits);
       writeObserver =
@@ -263,12 +319,23 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
                                 offset + writtenBytes));
                       }
                       writeFuture.setException(exceptionTranslator.apply(t));
+                      synchronized (StubWriteOutputStream.this) {
+                        // onError means a RST_STREAM was sent, so we can assume the stream is
+                        // is closed on both sides.
+                        isGrpcRemoteCallClosed = true;
+                        writeObserver = null;
+                        isFullyClosed = true;
+                      }
                     }
 
                     @Override
                     public void onCompleted() {
+                      // We don't set isFullyClosed here because this is a graceful shutdown. At
+                      // this point we're only half closed. END_STREAM was sent to us and we need
+                      // to send an END_STREAM back. That's why we only mark the remote call as
+                      // closed here, so the class can cleanup and gracefully close.
                       synchronized (StubWriteOutputStream.this) {
-                        writeObserver = null;
+                        isGrpcRemoteCallClosed = true;
                       }
                     }
                   });
@@ -325,7 +392,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public synchronized boolean isReady() {
-    checkNotNull(writeObserver);
+    if (isGrpcRemoteCallClosed || writeObserver == null) {
+      return false;
+    }
     ClientCallStreamObserver<WriteRequest> clientCallStreamObserver =
         (ClientCallStreamObserver<WriteRequest>) writeObserver;
     return clientCallStreamObserver.isReady();
@@ -366,9 +435,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public FeedbackOutputStream getOutput(
-      long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+      throws IOException {
     // should we be exclusive on return here?
-    // should we react to writeFuture.isDone()?
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.onReadyHandler = onReadyHandler;
@@ -383,7 +452,11 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   @Override
   public ListenableFuture<FeedbackOutputStream> getOutputFuture(
       long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
-    return immediateFuture(getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));
+    try {
+      return immediateFuture(getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));
+    } catch (IOException e) {
+      return immediateFailedFuture(e);
+    }
   }
 
   @Override
