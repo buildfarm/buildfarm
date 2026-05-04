@@ -74,6 +74,7 @@ public class Worker {
   private boolean legacyDirectoryFileCache = false;
   private boolean absolutizeCommandProgram = isWindows();
   private boolean executionMarket = false;
+  private String openTelemetryURL = "";
 
   public List<ExecutionPolicy> getExecutionPolicies() {
     return executionPolicies;

@@ -76,6 +76,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
   protected final ExecutorService removeDirectoryService;
   private final ExecutorService accessRecorder;
   protected FileStore fileStore; // initialized with start
+  protected final WorkerEventObserver workerEventObserver;
 
   public CFCExecFileSystem(
       Path root,
@@ -84,7 +85,8 @@ public class CFCExecFileSystem implements ExecFileSystem {
       boolean allowSymlinkTargetAbsolute,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
-      ExecutorService fetchService) {
+      ExecutorService fetchService,
+      WorkerEventObserver workerEventObserver) {
     this.root = root;
     this.fileCache = fileCache;
     this.owners = owners;
@@ -92,6 +94,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
     this.fetchService = fetchService;
+    this.workerEventObserver = workerEventObserver;
   }
 
   @Override
@@ -294,6 +297,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
     }
 
     protected void fetchedBytes(long size) {
+      workerEventObserver.onFetched(size);
       synchronized (workerExecutedMetadata) {
         workerExecutedMetadata.setFetchedBytes(size + workerExecutedMetadata.getFetchedBytes());
       }
