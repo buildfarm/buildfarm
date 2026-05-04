@@ -33,8 +33,10 @@ import com.amazonaws.services.secretsmanager.model.GetSecretValueResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.logging.Level;
@@ -109,14 +111,14 @@ public class S3Bucket {
     try {
       S3Object o = s3.getObject(bucket.getName(), keyName);
       S3ObjectInputStream s3is = o.getObjectContent();
-      FileOutputStream fos = new FileOutputStream(new File(filePath));
-      byte[] read_buf = new byte[1024];
-      int read_len;
-      while ((read_len = s3is.read(read_buf)) > 0) {
-        fos.write(read_buf, 0, read_len);
+      try (OutputStream fos = Files.newOutputStream(Path.of(filePath))) {
+        byte[] read_buf = new byte[1024];
+        int read_len;
+        while ((read_len = s3is.read(read_buf)) > 0) {
+          fos.write(read_buf, 0, read_len);
+        }
       }
       s3is.close();
-      fos.close();
     } catch (AmazonServiceException e) {
       log.log(
           Level.SEVERE,
