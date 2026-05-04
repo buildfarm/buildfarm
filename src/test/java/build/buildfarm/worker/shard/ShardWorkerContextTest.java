@@ -106,7 +106,6 @@ public class ShardWorkerContextTest {
         ImmutableList.of("test"),
         /* operationPollPeriod= */ Duration.getDefaultInstance(),
         /* operationPoller= */ (queueEntry, stage, requeueAt) -> false,
-        /* inlineContentLimit= */
         /* inputFetchStageWidth= */ 0,
         /* executeStageWidth= */ 0,
         /* reportResultStageWidth= */ 1,
@@ -116,8 +115,6 @@ public class ShardWorkerContextTest {
         inputStreamFactory,
         policies,
         instance,
-        /* deadlineAfter= */
-        /* deadlineAfterUnits= */
         /* defaultActionTimeout= */ Duration.getDefaultInstance(),
         /* maximumActionTimeout= */ Duration.getDefaultInstance(),
         /* defaultMaxCores= */ 0,
