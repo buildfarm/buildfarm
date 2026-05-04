@@ -40,6 +40,7 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue.BalancedQueueEntry;
 import build.buildfarm.common.redis.Codec;
+import build.buildfarm.common.redis.LeaderElection;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.Unified;
 import build.buildfarm.instance.shard.ExecutionQueue.ExecutionQueueEntry;
@@ -112,6 +113,7 @@ public class RedisShardBackplane implements Backplane {
   private final Supplier<UnifiedJedis> jedisClusterFactory;
   private final Codec codec;
 
+  private @Nullable LeaderElection leaderElection = null;
   private @Nullable InterruptingRunnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
@@ -489,6 +491,7 @@ public class RedisShardBackplane implements Backplane {
       throws IOException {
     this.client = client;
     this.state = state;
+    this.leaderElection = new LeaderElection(clientPublicName);
     if (subscribeToBackplane) {
       startSubscriptionThread(onWorkerRemoved);
     }
@@ -542,6 +545,11 @@ public class RedisShardBackplane implements Backplane {
         log.log(Level.WARNING, "subscriberService has not stopped");
       }
     }
+    if (leaderElection != null) {
+      leaderElection.close();
+      leaderElection = null;
+      log.log(Level.FINER, "leaderElection has been closed");
+    }
     if (client != null) {
       client.close();
       client = null;
@@ -553,6 +561,25 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public boolean isStopped() {
     return client.isClosed();
+  }
+
+  @Override
+  public boolean tryBecomeLeader(String electionKey) throws IOException {
+    return client.call(jedis -> leaderElection.tryBecomeLeader(jedis, electionKey));
+  }
+
+  @Override
+  public boolean isLeader(String electionKey) throws IOException {
+    return client.call(jedis -> leaderElection.isLeader(jedis, electionKey));
+  }
+
+  @Override
+  public void resignLeadership(String electionKey) throws IOException {
+    client.call(
+        jedis -> {
+          leaderElection.resignLeadership(jedis, electionKey);
+          return null;
+        });
   }
 
   @Override
