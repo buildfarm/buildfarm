@@ -285,8 +285,8 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    String operationName = executionContext.operation.getName();
-    log.log(Level.FINER, "Executor: Operation " + operationName + " Executing command");
+    String executionName = executionContext.operation.getName();
+    log.log(Level.FINER, "Executor: Operation " + executionName + " Executing command");
 
     Command command = executionContext.command;
     Path workingDirectory = executionContext.execDir;
@@ -311,7 +311,7 @@ class Executor {
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
-            operationName,
+            executionName,
             executionContext.claim.owner(),
             arguments,
             executionContext.command,
@@ -339,7 +339,7 @@ class Executor {
 
       statusCode =
           executeCommand(
-              operationName,
+              executionName,
               workingDirectory,
               arguments.build(),
               command.getEnvironmentVariablesList(),
@@ -369,7 +369,7 @@ class Executor {
             .setMessage("command resources were referenced after execution completed");
       }
     } catch (IOException e) {
-      log.log(Level.SEVERE, format("error executing operation %s", operationName), e);
+      log.log(Level.SEVERE, format("error executing operation %s", executionName), e);
       executionContext.poller.pause();
       putError();
       return 0;
@@ -399,7 +399,7 @@ class Executor {
         Level.FINER,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
-            operationName, executionContext.executeResponse.getResultBuilder().getExitCode()));
+            executionName, executionContext.executeResponse.getResultBuilder().getExitCode()));
 
     executionContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
     boolean claimed = owner.output().claim(executionContext);
@@ -412,7 +412,7 @@ class Executor {
         throw e;
       }
     } else {
-      log.log(Level.FINER, "Executor: Operation " + operationName + " Failed to claim output");
+      log.log(Level.FINER, "Executor: Operation " + executionName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
         putError();
@@ -429,7 +429,7 @@ class Executor {
   public void run(ResourceLimits limits) {
     long stallUSecs = 0;
     Stopwatch stopwatch = Stopwatch.createStarted();
-    String operationName = executionContext.operation.getName();
+    String executionName = executionContext.operation.getName();
     try {
       stallUSecs = runInterruptible(stopwatch, limits);
     } catch (InterruptedException e) {
@@ -437,24 +437,24 @@ class Executor {
       try {
         putError();
       } catch (InterruptedException errorEx) {
-        log.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
+        log.log(Level.SEVERE, format("interrupted while erroring %s", executionName), errorEx);
       } finally {
         Thread.currentThread().interrupt();
       }
     } catch (Exception e) {
       // clear interrupt flag for error put
       boolean wasInterrupted = Thread.interrupted();
-      log.log(Level.SEVERE, format("errored during execution of %s", operationName), e);
+      log.log(Level.SEVERE, format("errored during execution of %s", executionName), e);
       try {
         putError();
       } catch (InterruptedException errorEx) {
         log.log(
             Level.SEVERE,
-            format("interrupted while erroring %s after error", operationName),
+            format("interrupted while erroring %s after error", executionName),
             errorEx);
       } catch (Exception errorEx) {
         log.log(
-            Level.SEVERE, format("errored while erroring %s after error", operationName), errorEx);
+            Level.SEVERE, format("errored while erroring %s after error", executionName), errorEx);
       }
       if (wasInterrupted) {
         Thread.currentThread().interrupt();
@@ -467,7 +467,7 @@ class Executor {
         // resources.
         executionContext.claim.release(EXECUTE_ACTION_STAGE);
         owner.releaseExecutor(
-            operationName,
+            executionName,
             limits.cpu.claimed,
             stopwatch.elapsed(MICROSECONDS),
             stallUSecs,
@@ -504,7 +504,7 @@ class Executor {
 
   @SuppressWarnings("ConstantConditions")
   private Code executeCommand(
-      String operationName,
+      String executionName,
       Path execDir,
       List<String> arguments,
       List<EnvironmentVariable> environmentVariables,
@@ -540,7 +540,7 @@ class Executor {
 
       return PersistentExecutor.runOnPersistentWorker(
           filesContext,
-          operationName,
+          executionName,
           ImmutableList.copyOf(arguments),
           ImmutableMap.copyOf(environment),
           limits,
@@ -571,7 +571,7 @@ class Executor {
       process = ProcessUtils.threadSafeStart(processBuilder);
       process.getOutputStream().close();
     } catch (IOException e) {
-      log.log(Level.SEVERE, format("error starting process for %s", operationName), e);
+      log.log(Level.SEVERE, format("error starting process for %s", executionName), e);
       // again, should we do something else here??
       resultBuilder.setExitCode(INCOMPLETE_EXIT_CODE);
       // The openjdk IOException for an exec failure here includes the working
@@ -622,7 +622,7 @@ class Executor {
               Level.INFO,
               format(
                   "process timed out for %s after %ds",
-                  operationName, Durations.toSeconds(timeout)));
+                  executionName, Durations.toSeconds(timeout)));
           statusCode = Code.DEADLINE_EXCEEDED;
         }
       }
@@ -633,7 +633,7 @@ class Executor {
         while (!process.waitFor(waitMillis, TimeUnit.MILLISECONDS)) {
           log.log(
               Level.INFO,
-              format("process did not respond to termination for %s, killing it", operationName));
+              format("process did not respond to termination for %s, killing it", executionName));
           process.destroyForcibly();
           waitMillis = 100;
         }
@@ -650,7 +650,7 @@ class Executor {
       stderr = stderrReader.getData();
 
     } catch (Exception e) {
-      log.log(Level.SEVERE, "error extracting stdout/stderr: ", e.getMessage());
+      log.log(Level.SEVERE, format("error extracting stdout/stderr for %s", executionName), e);
     }
 
     resultBuilder.setExitCode(exitCode).setStdoutRaw(stdout).setStderrRaw(stderr);
