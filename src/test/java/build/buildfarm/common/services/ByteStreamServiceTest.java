@@ -46,7 +46,13 @@ import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
+import io.grpc.ForwardingServerCallListener;
+import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
 import io.grpc.Server;
+import io.grpc.ServerCall;
+import io.grpc.ServerCallHandler;
+import io.grpc.ServerInterceptor;
 import io.grpc.Status;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
@@ -56,6 +62,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.Before;
@@ -93,6 +100,84 @@ public class ByteStreamServiceTest {
   public void tearDown() throws Exception {
     fakeServer.shutdownNow();
     fakeServer.awaitTermination();
+  }
+
+  @Test(timeout = 10000)
+  public void committedUploadDrainsQueuedMessagesAndClientHalfClose() throws Exception {
+    AtomicInteger deliveredMessages = new AtomicInteger();
+    SettableFuture<Void> halfClosed = SettableFuture.create();
+    fakeServer.shutdownNow().awaitTermination();
+    fakeServer =
+        InProcessServerBuilder.forName(fakeServerName)
+            .addService(new ByteStreamService(instance))
+            .intercept(
+                new ServerInterceptor() {
+                  @Override
+                  public <Q, S> ServerCall.Listener<Q> interceptCall(
+                      ServerCall<Q, S> call, Metadata headers, ServerCallHandler<Q, S> next) {
+                    return new ForwardingServerCallListener.SimpleForwardingServerCallListener<Q>(
+                        next.startCall(call, headers)) {
+                      @Override
+                      public void onMessage(Q message) {
+                        deliveredMessages.incrementAndGet();
+                        super.onMessage(message);
+                      }
+
+                      @Override
+                      public void onHalfClose() {
+                        halfClosed.set(null);
+                        super.onHalfClose();
+                      }
+                    };
+                  }
+                })
+            .directExecutor()
+            .build()
+            .start();
+    ByteString content = ByteString.copyFromUtf8("abc");
+    Digest digest = DIGEST_UTIL.compute(content);
+    UUID uuid = UUID.randomUUID();
+    Write write = mock(Write.class);
+    FeedbackOutputStream output = mock(FeedbackOutputStream.class);
+    SettableFuture<Long> written = SettableFuture.create();
+    when(write.getFuture()).thenReturn(written);
+    when(write.getOutput(
+            any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(output);
+    when(instance.getBlobWrite(
+            eq(Compressor.Value.IDENTITY), eq(digest), eq(uuid), any(RequestMetadata.class)))
+        .thenReturn(write);
+    String resourceName =
+        ByteStreamUploader.uploadResourceName(
+            null, uuid, HashCode.fromString(digest.getHash()), digest.getSize());
+    ManagedChannel channel =
+        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
+    try {
+      FutureWriteResponseObserver response = new FutureWriteResponseObserver();
+      StreamObserver<WriteRequest> requests = ByteStreamGrpc.newStub(channel).write(response);
+      for (int offset = 0; offset < content.size(); offset++) {
+        requests.onNext(
+            WriteRequest.newBuilder()
+                .setResourceName(offset == 0 ? resourceName : "")
+                .setWriteOffset(offset)
+                .setData(content.substring(offset, offset + 1))
+                .setFinishWrite(offset == content.size() - 1)
+                .build());
+      }
+      requests.onCompleted();
+      // The output is not ready, so only the initial message has inbound credit.
+      assertThat(deliveredMessages.get()).isEqualTo(1);
+      assertThat(halfClosed.isDone()).isFalse();
+
+      // Simulate a concurrent upload committing the same blob before this client finishes.
+      written.set(digest.getSize());
+
+      assertThat(response.get().getCommittedSize()).isEqualTo(content.size());
+      halfClosed.get(5, TimeUnit.SECONDS);
+      assertThat(deliveredMessages.get()).isEqualTo(3);
+    } finally {
+      channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+    }
   }
 
   @Test

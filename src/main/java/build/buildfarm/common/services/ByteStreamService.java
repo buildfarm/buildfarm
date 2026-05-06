@@ -488,6 +488,6 @@ public class ByteStreamService extends ByteStreamImplBase {
         deadlineAfter,
         TimeUnit.SECONDS,
         () -> serverCallStreamObserver.request(1),
-        responseObserver);
+        serverCallStreamObserver);
   }
 }
