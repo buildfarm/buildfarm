@@ -124,13 +124,13 @@ Histogram for the input fetch time on a worker (in milliseconds)
 
 Histogram for the input fetch stall time on a worker (in milliseconds)
 
-**queued_time_ms**
+**queued_time_s**
 
-Histogram for the operation queued time (in milliseconds)
+Histogram for the operation queued time (in seconds)
 
-**output_upload_time_ms**
+**output_upload_time_s**
 
-Histogram for the output upload time (in milliseconds)
+Histogram for the output upload time (in seconds)
 
 **completed_operations**
 
