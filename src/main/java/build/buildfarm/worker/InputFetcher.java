@@ -23,6 +23,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
@@ -242,12 +243,15 @@ public class InputFetcher implements Runnable {
 
       directoriesIndex = new ProxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap());
 
+      DigestFunction.Value digestFunction =
+          executionContext.queueEntry.getExecuteEntry().getActionDigest().getDigestFunction();
+      build.buildfarm.v1test.Digest inputRootDigest =
+          DigestUtil.fromDigest(queuedOperation.getAction().getInputRootDigest(), digestFunction);
       execDir =
           workerContext.createExecDir(
               executionName,
               directoriesIndex,
-              executionContext.queueEntry.getExecuteEntry().getActionDigest().getDigestFunction(),
-              queuedOperation.getAction(),
+              inputRootDigest,
               queuedOperation.getCommand(),
               executionContext.claim.owner(),
               executionContext.workerExecutedMetadata);
