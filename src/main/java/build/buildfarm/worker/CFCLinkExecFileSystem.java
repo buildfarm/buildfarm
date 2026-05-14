@@ -22,7 +22,6 @@ import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.Collections.synchronizedList;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
@@ -162,53 +161,87 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     }
   }
 
-  private static Iterator<String> directoriesIterator(
-      build.bazel.remote.execution.v2.Digest digest,
-      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex) {
-    Directory root = directoriesIndex.get(digest);
-    return new Iterator<>() {
-      boolean atEnd = root.getDirectoriesCount() == 0;
-      Stack<String> path = new Stack<>();
-      Stack<Iterator<DirectoryNode>> route = new Stack<>();
-      Iterator<DirectoryNode> current = root.getDirectoriesList().iterator();
+  private static final class DirectoryIterator implements Iterator<String> {
+    private final Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex;
+    private final Set<String> ignorePaths;
+    private Iterator<DirectoryNode> current;
+    private Stack<Iterator<DirectoryNode>> route = new Stack<>();
+    private Stack<String> path = new Stack<>();
+    private DirectoryNode next;
 
-      @Override
-      public boolean hasNext() {
-        return !atEnd;
-      }
-
-      @Override
-      public String next() {
-        String nextPath;
+    DirectoryIterator(
+        Directory root,
+        Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+        Set<String> ignorePaths) {
+      this.directoriesIndex = directoriesIndex;
+      this.ignorePaths = ignorePaths;
+      current = root.getDirectoriesList().iterator();
+      advance("");
+      // skip initial ignored
+      while (current.hasNext()) {
         DirectoryNode next = current.next();
-        String name = next.getName();
-        path.push(name);
-        nextPath = String.join("/", path);
-        build.bazel.remote.execution.v2.Digest digest = next.getDigest();
-        if (digest.getSizeBytes() != 0) {
-          route.push(current);
-          current = directoriesIndex.get(digest).getDirectoriesList().iterator();
-        } else {
-          path.pop();
+        if (!ignorePaths.contains(next.getName())) {
+          this.next = next;
+          break;
         }
-        while (!current.hasNext() && !route.isEmpty()) {
+      }
+    }
+
+    @Override
+    public boolean hasNext() {
+      return next != null;
+    }
+
+    private void advance(String prefix) {
+      next = null;
+      while (current.hasNext()) {
+        DirectoryNode next = current.next();
+        if (!ignorePaths.contains(prefix + next.getName())) {
+          this.next = next;
+          return;
+        }
+      }
+    }
+
+    @Override
+    public String next() {
+      String nextPath;
+      String name = next.getName();
+      path.push(name);
+      nextPath = String.join("/", path);
+      build.bazel.remote.execution.v2.Digest digest = next.getDigest();
+      if (digest.getSizeBytes() != 0) {
+        route.push(current);
+        current = directoriesIndex.get(digest).getDirectoriesList().iterator();
+        // nextPath guaranteed to be non-empty
+        advance(nextPath + "/");
+        if (!current.hasNext()) {
           current = route.pop();
           path.pop();
         }
-        atEnd = !current.hasNext();
-        return nextPath;
+      } else {
+        path.pop();
       }
-    };
+      while (!current.hasNext() && !route.isEmpty()) {
+        current = route.pop();
+        path.pop();
+        String prefix = path.isEmpty() ? "" : (String.join("/", path) + "/");
+        advance(prefix);
+      }
+      return nextPath;
+    }
   }
 
   private Set<String> linkedDirectories(
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
-      build.bazel.remote.execution.v2.Digest rootDigest) {
+      build.bazel.remote.execution.v2.Digest rootDigest,
+      Set<String> ignorePaths) {
     // skip this search if all the directories are real
     if (linkInputDirectories) {
       ImmutableSet.Builder<String> builder = ImmutableSet.builder();
 
-      Iterator<String> dirs = directoriesIterator(rootDigest, directoriesIndex);
+      Directory root = directoriesIndex.get(rootDigest);
+      Iterator<String> dirs = new DirectoryIterator(root, directoriesIndex, ignorePaths);
       while (dirs.hasNext()) {
         String dir = dirs.next();
         for (Pattern pattern : linkedInputDirectories) {
@@ -358,13 +391,11 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
-      DigestFunction.Value digestFunction,
-      Action action,
+      Digest inputRootDigest,
       Command command,
       @Nullable UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
-    Digest inputRootDigest = DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction);
     OutputDirectory outputDirectory = createOutputDirectory(command);
 
     Path execDir = root().resolve(operationName);
@@ -373,11 +404,15 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     }
     Files.createDirectories(execDir);
 
+    // output_paths should never be linked themselves, and their output path chain
+    // will terminate at their parent, making them appear valid for some selections
+    Set<String> ignorePaths = ImmutableSet.copyOf(command.getOutputPathsList());
     Set<Path> linkedInputDirectories =
         linkInputDirectories
             ? ImmutableSet.copyOf(
                 Iterables.transform(
-                    linkedDirectories(directoriesIndex, DigestUtil.toDigest(inputRootDigest)),
+                    linkedDirectories(
+                        directoriesIndex, DigestUtil.toDigest(inputRootDigest), ignorePaths),
                     execDir::resolve))
             : ImmutableSet.of(); // does this work on windows with / separators?
 
@@ -430,12 +465,12 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     } finally {
       if (!success) {
         fileCache.decrementReferences(
-            visitor.inputFiles(), visitor.inputDirectories(), digestFunction);
+            visitor.inputFiles(), visitor.inputDirectories(), inputRootDigest.getDigestFunction());
         Directories.remove(execDir, fileStore);
       }
     }
 
-    rootInputDigestFunction.put(execDir, digestFunction);
+    rootInputDigestFunction.put(execDir, inputRootDigest.getDigestFunction());
     rootInputFiles.put(execDir, visitor.inputFiles());
     rootInputDirectories.put(execDir, visitor.inputDirectories());
 
