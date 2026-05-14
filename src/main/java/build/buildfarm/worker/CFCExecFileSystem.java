@@ -27,15 +27,12 @@ import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.cas.cfc.CASFileCache.PathResult;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.Dirent;
 import build.buildfarm.v1test.Digest;
@@ -340,8 +337,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
-      DigestFunction.Value digestFunction,
-      Action action,
+      Digest inputRootDigest,
       Command command,
       @Nullable UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
@@ -354,8 +350,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
     log.log(Level.FINER, operationName + " walking execTree");
     ExecTree execTree = new ExecTree(directoriesIndex);
     ExecFileVisitor visitor = new ExecFileVisitor(workerExecutedMetadata);
-    execTree.walk(
-        execDir, DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction), visitor);
+    execTree.walk(execDir, inputRootDigest, visitor);
 
     // TODO refactor into single future that produces all exceptions in a list
     Iterable<ListenableFuture<Void>> fetchedFutures = visitor.futures();

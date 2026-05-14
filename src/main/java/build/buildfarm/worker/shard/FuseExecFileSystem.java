@@ -16,13 +16,10 @@ package build.buildfarm.worker.shard;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.ExecFileSystem;
@@ -84,15 +81,13 @@ class FuseExecFileSystem implements ExecFileSystem {
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
-      DigestFunction.Value digestFunction,
-      Action action,
+      Digest inputRootDigest,
       Command command,
       UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
     // FIXME insist that the FUSE perform permission checks against the owner
-    fuseCAS.createInputRoot(
-        operationName, DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction));
+    fuseCAS.createInputRoot(operationName, inputRootDigest);
     return root.resolve(operationName);
   }
 

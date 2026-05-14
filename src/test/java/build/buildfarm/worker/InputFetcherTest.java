@@ -23,9 +23,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.cas.cfc.PutDirectoryException;
@@ -96,15 +94,14 @@ public class InputFetcherTest {
           public Path createExecDir(
               String operationName,
               Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
-              DigestFunction.Value digestFunction,
-              Action action,
+              Digest inputRootDigest,
               Command command,
               UserPrincipal owner,
               WorkerExecutedMetadata.Builder workerExecutedMetadata)
               throws IOException {
             Path root = Path.of(operationName);
             throw new ExecDirException(
-                Path.of(operationName),
+                root,
                 ImmutableList.of(
                     new ViolationException(
                         Digest.getDefaultInstance(),

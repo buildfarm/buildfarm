@@ -21,11 +21,9 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
@@ -822,20 +820,13 @@ class ShardWorkerContext implements WorkerContext {
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
-      DigestFunction.Value digestFunction,
-      Action action,
+      Digest inputRootDigest,
       Command command,
       @Nullable UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
     return execFileSystem.createExecDir(
-        operationName,
-        directoriesIndex,
-        digestFunction,
-        action,
-        command,
-        owner,
-        workerExecutedMetadata);
+        operationName, directoriesIndex, inputRootDigest, command, owner, workerExecutedMetadata);
   }
 
   // might want to split for removeDirectory and decrement references to avoid removing for streamed
