@@ -193,3 +193,14 @@ tasks:
     - export EXECUTION_STAGE_WIDTH=10
     - export TEST_ARG1=--experimental_remote_cache_compression
     - ./.bazelci/integration_test.sh
+
+  # Test that cgroups v2 works correctly with linux-sandbox.
+  # This validates the cgexec-wrapper evacuation path handling.
+  integration_test_cgroups_sandbox:
+    name: Integration Test (Cgroups + Linux Sandbox)
+    platform: ubuntu2004
+    shell_commands:
+    - export RUN_TEST=./.bazelci/run_cgroups_sandbox_test.sh
+    - export BUILDFARM_CONFIG="/buildfarm/examples/config.cgroups-sandbox.yml"
+    - export EXECUTION_STAGE_WIDTH=5
+    - ./.bazelci/integration_test.sh
