@@ -22,7 +22,9 @@ set -o xtrace
 cd src/test/many;
 # Force all actions to execute remotely, not locally
 # --remote_executor alone isn't enough; need to explicitly disable local execution
-MANY_CC_BINARIES=20 MANY_CC_LIBRARIES=2 MANY_CC_LIBRARY_SOURCES=1 ../../../bazel build :cc \
+MANY_CC_BINARIES=20 MANY_CC_LIBRARIES=2 MANY_CC_LIBRARY_SOURCES=1 ../../../bazel \
+  --host_jvm_args=-Xmx4g \
+  build :cc \
   --remote_executor=grpc://localhost:8980 \
   --remote_download_minimal \
   $1

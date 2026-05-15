@@ -122,6 +122,7 @@ start_server_and_worker(){
   if [[ "$BUILDFARM_CONFIG" == *"cgroups-sandbox"* ]]; then
     echo "Building execution wrappers for sandbox support..."
     mkdir -p /app/build_buildfarm
+    mkdir -p /var/lib/buildfarm/worker
 
     # Build our custom wrappers
     echo "Building as-nobody..."

@@ -8,6 +8,7 @@ server: !include "server.yml"
 backplane: !include "backplane.yml"
 worker:
   publicName: localhost:8981
+  root: /var/lib/buildfarm/worker
   executeStageWidth: 5
   limitGlobalExecution: true
   dequeueMatchSettings:

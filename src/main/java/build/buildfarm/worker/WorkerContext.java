@@ -145,8 +145,7 @@ public interface WorkerContext {
    * @param command the command being executed
    * @return an IOResource for the cgroup, or null if cgroups are not enabled
    */
-  @Nullable
-  IOResource applyCgroupsLimitation(
+  @Nullable IOResource applyCgroupsLimitation(
       String operationName,
       @Nullable UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
