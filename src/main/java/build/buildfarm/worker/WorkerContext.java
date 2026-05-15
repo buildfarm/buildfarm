@@ -14,11 +14,9 @@
 
 package build.buildfarm.worker;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -100,8 +98,7 @@ public interface WorkerContext {
   Path createExecDir(
       String operationName,
       Map<Digest, Directory> directoriesIndex,
-      DigestFunction.Value digestFunction,
-      Action action,
+      build.buildfarm.v1test.Digest inputRootDigest,
       Command command,
       @Nullable UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
