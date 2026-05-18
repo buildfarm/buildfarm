@@ -45,8 +45,8 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
@@ -66,12 +66,13 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
   private void withCancellation(
       ServerCallStreamObserver<Operation> serverCallStreamObserver, ListenableFuture<Void> future) {
+    Context context = Context.current();
     addCallback(
         future,
         new FutureCallback<Void>() {
           boolean isCancelled() {
             return serverCallStreamObserver.isCancelled()
-                || Context.current().isCancelled()
+                || context.isCancelled()
                 || future.isCancelled();
           }
 
@@ -95,7 +96,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
             }
           }
         },
-        Context.current().fixedContextExecutor(directExecutor()));
+        context.fixedContextExecutor(directExecutor()));
     serverCallStreamObserver.setOnCancelHandler(() -> future.cancel(false));
   }
 
@@ -111,8 +112,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       serverCallStreamObserver.setOnCancelHandler(this::cancel);
     }
 
-    @Nullable
-    ListenableFuture<?> getFuture() {
+    @Nullable ListenableFuture<?> getFuture() {
       return keepaliveFuture;
     }
 

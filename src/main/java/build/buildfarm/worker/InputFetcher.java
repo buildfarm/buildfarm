@@ -52,8 +52,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public class InputFetcher implements Runnable {

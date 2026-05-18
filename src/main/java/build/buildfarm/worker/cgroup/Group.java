@@ -40,12 +40,12 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import jnr.constants.platform.Signal;
 import jnr.posix.POSIX;
 import jnr.posix.POSIXFactory;
 import lombok.Getter;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a cgroup abstraction.

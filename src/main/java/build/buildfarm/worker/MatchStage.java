@@ -40,8 +40,8 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public class MatchStage extends PipelineStage {

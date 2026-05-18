@@ -16,7 +16,7 @@ package build.buildfarm.worker;
 
 import build.buildfarm.common.Claim;
 import build.buildfarm.v1test.QueueEntry;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public interface MatchListener {
   // start/end pair called for each wait period

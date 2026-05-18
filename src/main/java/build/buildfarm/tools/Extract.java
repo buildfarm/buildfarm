@@ -67,7 +67,6 @@ import picocli.CommandLine.Parameters;
     mixinStandardHelpOptions = true,
     description = "Extract action contents from buildfarm CAS by reading action digests from stdin")
 class Extract implements Callable<Integer> {
-
   @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   private String host;
 

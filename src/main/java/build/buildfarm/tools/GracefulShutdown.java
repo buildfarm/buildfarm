@@ -38,7 +38,6 @@ import picocli.CommandLine.Parameters;
       GracefulShutdown.DisableProtection.class
     })
 class GracefulShutdown implements Callable<Integer> {
-
   @Override
   public Integer call() {
     CommandLine.usage(this, System.out);

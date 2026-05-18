@@ -17,11 +17,11 @@ package build.buildfarm.common.io;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.Serializable;
-import javax.annotation.Nullable;
 import jnr.posix.FileStat;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 
 /** Directory entry representation returned by . */
 @EqualsAndHashCode

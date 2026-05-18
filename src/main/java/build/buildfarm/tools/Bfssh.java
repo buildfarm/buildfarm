@@ -60,7 +60,6 @@ import picocli.CommandLine.Parameters;
     mixinStandardHelpOptions = true,
     description = "Execute remote commands on buildfarm workers via SSH-like interface")
 class Bfssh implements Callable<Integer> {
-
   @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   private String host;
 

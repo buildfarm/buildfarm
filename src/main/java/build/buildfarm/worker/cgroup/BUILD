@@ -12,6 +12,7 @@ java_library(
         "@buildfarm_maven//:com_google_code_findbugs_jsr305",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:io_grpc_grpc_api",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
     ],
 )

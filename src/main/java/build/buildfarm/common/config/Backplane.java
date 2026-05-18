@@ -2,9 +2,9 @@ package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;
 import java.net.URI;
-import javax.annotation.Nullable;
 import lombok.Data;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 import oshi.util.FileUtil;
 import redis.clients.jedis.util.JedisURIHelper;
 

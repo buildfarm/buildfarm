@@ -63,9 +63,9 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public class LegacyDirectoryCFC extends CASFileCache {

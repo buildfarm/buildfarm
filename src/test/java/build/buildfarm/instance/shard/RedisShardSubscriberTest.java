@@ -29,7 +29,7 @@ import static redis.clients.jedis.Protocol.ResponseKeyword;
 
 import build.buildfarm.common.redis.Codec;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
-import build.buildfarm.instance.shard.codec.json.JsonCodec;
+import build.buildfarm.instance.shard.codec.ShardCodec;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
@@ -204,7 +204,8 @@ public class RedisShardSubscriberTest {
 
   RedisShardSubscriber createSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
-    return createSubscriber(watchers, /* workers= */ null, executor, name -> {}, JsonCodec.CODEC);
+    return createSubscriber(
+        watchers, /* workers= */ null, executor, name -> {}, ShardCodec.DEFAULT_CODEC);
   }
 
   RedisShardSubscriber createSubscriber(ListMultimap<String, TimedWatchFuture> watchers) {
@@ -342,7 +343,7 @@ public class RedisShardSubscriberTest {
     operationSubscriber.watch(doneMessageChannel, doneMessageWatcher);
     operationSubscriber.onMessage(
         doneMessageChannel,
-        JsonCodec.CODEC
+        ShardCodec.DEFAULT_CODEC
             .operationChange()
             .print(
                 OperationChange.newBuilder()
@@ -395,7 +396,7 @@ public class RedisShardSubscriberTest {
 
     operationSubscriber.onMessage(
         expireChannel,
-        JsonCodec.CODEC
+        ShardCodec.DEFAULT_CODEC
             .operationChange()
             .print(
                 OperationChange.newBuilder()
@@ -437,9 +438,9 @@ public class RedisShardSubscriberTest {
             WORKER_CHANNEL,
             name -> {},
             directExecutor(),
-            JsonCodec.CODEC);
+            ShardCodec.DEFAULT_CODEC);
     String workerChangeJson =
-        JsonCodec.CODEC
+        ShardCodec.DEFAULT_CODEC
             .workerChange()
             .print(
                 WorkerChange.newBuilder()
@@ -462,9 +463,9 @@ public class RedisShardSubscriberTest {
             WORKER_CHANNEL,
             name -> {},
             directExecutor(),
-            JsonCodec.CODEC);
+            ShardCodec.DEFAULT_CODEC);
     String workerChangeJson =
-        JsonCodec.CODEC
+        ShardCodec.DEFAULT_CODEC
             .workerChange()
             .print(
                 WorkerChange.newBuilder()
@@ -486,7 +487,8 @@ public class RedisShardSubscriberTest {
     workers.put(removeWorkerName, ShardWorker.getDefaultInstance());
     Consumer<String> onWorkerRemoved = mock(Consumer.class);
     RedisShardSubscriber operationSubscriber =
-        createSubscriber(null, workers, directExecutor(), onWorkerRemoved, JsonCodec.CODEC);
+        createSubscriber(
+            null, workers, directExecutor(), onWorkerRemoved, ShardCodec.DEFAULT_CODEC);
 
     WorkerChange workerRemove =
         WorkerChange.newBuilder()
@@ -495,13 +497,13 @@ public class RedisShardSubscriberTest {
             .build();
 
     operationSubscriber.onMessage(
-        WORKER_CHANNEL, JsonCodec.CODEC.workerChange().print(workerRemove));
+        WORKER_CHANNEL, ShardCodec.DEFAULT_CODEC.workerChange().print(workerRemove));
     verify(onWorkerRemoved, times(1)).accept(removeWorkerName);
     assertThat(workers).isEmpty();
 
     // validate callback regardless of map status, now missing the worker
     operationSubscriber.onMessage(
-        WORKER_CHANNEL, JsonCodec.CODEC.workerChange().print(workerRemove));
+        WORKER_CHANNEL, ShardCodec.DEFAULT_CODEC.workerChange().print(workerRemove));
     verify(onWorkerRemoved, times(2)).accept(removeWorkerName);
   }
 }

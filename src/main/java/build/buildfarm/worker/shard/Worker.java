@@ -57,7 +57,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
-import build.buildfarm.instance.shard.codec.json.JsonCodec;
+import build.buildfarm.instance.shard.codec.ShardCodec;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.Digest;
@@ -82,6 +82,7 @@ import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -99,6 +100,7 @@ import io.grpc.Status.Code;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
+import io.grpc.services.ChannelzService;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import java.io.File;
@@ -118,10 +120,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public final class Worker extends LoggingMain {
@@ -248,6 +251,9 @@ public final class Worker extends LoggingMain {
     serverBuilder.addService(new ByteStreamService(instance));
     serverBuilder.addService(new WorkerControl(this));
     serverBuilder.addService(ProtoReflectionServiceV1.newInstance());
+    if (configs.getWorker().isGrpcChannelz()) {
+      serverBuilder.addService(ChannelzService.newInstance(/* maxPageSize= */ 100));
+    }
     serverBuilder.addService(workerProfileService);
 
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
@@ -363,7 +369,7 @@ public final class Worker extends LoggingMain {
     }
   }
 
-  private ContentAddressableStorage createStorages(
+  private CASFileCache createStorages(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       Executor accessRecorder,
@@ -386,7 +392,7 @@ public final class Worker extends LoggingMain {
       delegate = storage;
       delegateSkipLoad = cas.isSkipLoad();
     }
-    return storage;
+    return (CASFileCache) storage;
   }
 
   private ContentAddressableStorage createStorage(
@@ -567,7 +573,7 @@ public final class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
-  private void startFailsafeRegistration() {
+  private void startFailsafeRegistration(Supplier<Boolean> isReadOnly) {
     String endpoint = configs.getWorker().getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
     worker.setWorkerType(configs.getWorker().getWorkerType());
@@ -580,7 +586,10 @@ public final class Worker extends LoggingMain {
               long workerRegistrationExpiresAt = 0;
 
               ShardWorker nextRegistration(long now) {
-                return worker.setExpireAt(now + registrationOffsetMillis).build();
+                return worker
+                    .setExpireAt(now + registrationOffsetMillis)
+                    .setReadOnly(isReadOnly.get())
+                    .build();
               }
 
               long nextInterval(long now) {
@@ -662,7 +671,7 @@ public final class Worker extends LoggingMain {
               /* subscribeToBackplane= */ true,
               /* runFailsafeOperation= */ false,
               this::stripOperation,
-              JsonCodec.CODEC);
+              ShardCodec.DEFAULT_CODEC);
       backplane.start(configs.getWorker().getPublicName(), workerStubs::invalidate);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
@@ -704,7 +713,7 @@ public final class Worker extends LoggingMain {
             new Random(),
             workerStubs,
             (worker, t, context) -> {});
-    ContentAddressableStorage storage =
+    CASFileCache storage =
         createStorages(
             remoteInputStreamFactory,
             removeDirectoryService,
@@ -734,9 +743,13 @@ public final class Worker extends LoggingMain {
       writer = new LocalCasWriter(execFileSystem);
     }
 
+    String endpointName = configs.getWorker().getPublicName();
+    String hostName = InetAddress.getLocalHost().getHostName();
+
     context =
         new ShardWorkerContext(
-            configs.getWorker().getPublicName(),
+            endpointName,
+            ImmutableList.of(endpointName, hostName, identifier),
             Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build(),
             backplane::pollExecution,
             inputFetchStageWidth,
@@ -786,13 +799,11 @@ public final class Worker extends LoggingMain {
       pipeline.add(reportResultStage, 1);
     }
 
-    String workerName = InetAddress.getLocalHost().getHostName();
-
     WorkerProfileService workerProfileService =
         new WorkerProfileService(
-            workerName,
+            endpointName,
             configs.getWorker().getPublicName(),
-            (CASFileCache) storage,
+            storage,
             matchStage,
             inputFetchStage,
             executeActionStage,
@@ -815,6 +826,7 @@ public final class Worker extends LoggingMain {
         new FutureCallback<>() {
           @Override
           public void onSuccess(Void result) {
+            log.log(INFO, String.format("%s initialized", identifier));
             healthStatusManager.setStatus(
                 HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
             PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
@@ -826,15 +838,13 @@ public final class Worker extends LoggingMain {
           }
         },
         directExecutor());
-    startFailsafeRegistration();
+    startFailsafeRegistration(storage::isReadOnly);
 
     pipeline.start();
     healthCheckMetric.labels("start").inc();
     inputFetchSlotsTotal.set(inputFetchStageWidth);
     executionSlotsTotal.set(executeStageWidth);
     reportResultSlotsTotal.set(reportResultStageWidth);
-
-    log.log(INFO, String.format("%s initialized", identifier));
   }
 
   @Override

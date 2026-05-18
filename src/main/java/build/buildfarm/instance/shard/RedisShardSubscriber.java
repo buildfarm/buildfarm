@@ -38,8 +38,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 import redis.clients.jedis.Connection;
 import redis.clients.jedis.JedisPubSub;
 
@@ -211,7 +211,7 @@ class RedisShardSubscriber extends JedisPubSub {
   @Override
   public void onMessage(String channel, String message) {
     if (channel.equals(workerChannel)) {
-      onWorkerChange(codec.workerChange().parse(message));
+      onWorkerChange(codec.workerChange().parse(message).value());
     } else {
       onOperationMessage(channel, message);
     }
@@ -258,7 +258,7 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   void onOperationMessage(String channel, String message) {
-    OperationChange change = codec.operationChange().parse(message);
+    OperationChange change = codec.operationChange().parse(message).value();
     if (change != null) {
       onOperationChange(channel, change);
     } else {

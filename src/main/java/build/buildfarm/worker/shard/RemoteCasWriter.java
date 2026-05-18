@@ -27,6 +27,7 @@ import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.shard.Shard;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.Digest;
 import com.google.common.base.Throwables;
@@ -40,9 +41,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Iterator;
 import java.util.Random;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
@@ -53,6 +52,7 @@ public class RemoteCasWriter implements CasWriter {
   private final Backplane backplane;
   private final LoadingCache<String, StubInstance> workerStubs;
   private final Retrier retrier;
+  private final Random rand = new Random();
 
   public RemoteCasWriter(
       Backplane backplane, LoadingCache<String, StubInstance> workerStubs, Retrier retrier) {
@@ -119,19 +119,7 @@ public class RemoteCasWriter implements CasWriter {
   }
 
   private String getRandomWorker() throws IOException {
-    Set<String> workerSet = backplane.getStorageWorkers();
-    if (workerSet.isEmpty()) {
-      throw new IOException("no available workers");
-    }
-    Random rand = new Random();
-    int index = rand.nextInt(workerSet.size());
-    // best case no allocation average n / 2 selection
-    Iterator<String> iter = workerSet.iterator();
-    String worker = null;
-    while (iter.hasNext() && index-- >= 0) {
-      worker = iter.next();
-    }
-    return worker;
+    return Shard.getRandomWritingWorker(backplane, rand);
   }
 
   private Instance workerStub(String worker) {

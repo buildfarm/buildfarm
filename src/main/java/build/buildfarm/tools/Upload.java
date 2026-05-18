@@ -30,7 +30,6 @@ import picocli.CommandLine.Parameters;
     mixinStandardHelpOptions = true,
     description = "Upload a file to the buildfarm CAS")
 class Upload implements Callable<Integer> {
-
   @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   private String host;
 

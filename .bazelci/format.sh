@@ -83,12 +83,12 @@ run_java_formatter () {
     if [ "${REMOVE_NEWLINES_AFTER_START_BRACKET:-false}" = true ]; then
         for file in $files
         do
-    	# Remove whitespace lines after starting bracket '{'
-    	# Ignore any issues if this does not succeed.
-    	# The CI doesn't gate on this adjustment.
+            # Remove whitespace lines after starting bracket '{'
+            # Ignore any issues if this does not succeed.
+            # The CI doesn't gate on this adjustment.
             awk -i inplace -v n=-2 'NR==n+1 && !NF{next} /\{/ {n=NR}1' $file > /dev/null 2>&1
         done
-    fi;
+    fi
 
     # Fixes formatting issues
     $LOCAL_FORMATTER -i $files

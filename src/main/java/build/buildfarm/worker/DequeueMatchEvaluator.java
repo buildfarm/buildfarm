@@ -22,8 +22,8 @@ import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
-import javax.annotation.Nullable;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * @class DequeueMatchEvaluator

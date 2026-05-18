@@ -15,7 +15,11 @@
 package build.buildfarm.common.redis;
 
 public interface StringTranslator<T> {
-  T parse(String value);
+  // dirty bit to indicate that the result should be printed to reflect
+  // translation preference
+  record Result<T>(T value, boolean dirty) {}
+
+  Result<T> parse(String value);
 
   String print(T value);
 }

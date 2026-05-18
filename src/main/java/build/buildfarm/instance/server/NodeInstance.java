@@ -145,9 +145,9 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 import org.apache.http.auth.Credentials;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public abstract class NodeInstance extends InstanceBase {

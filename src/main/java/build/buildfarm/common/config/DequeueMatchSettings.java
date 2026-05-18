@@ -7,7 +7,6 @@ import lombok.Data;
 
 @Data
 public class DequeueMatchSettings {
-
   private boolean allowUnmatched = false;
   private List<Property> properties = new ArrayList<>();
 
