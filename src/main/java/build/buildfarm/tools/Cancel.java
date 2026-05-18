@@ -33,7 +33,6 @@ import picocli.CommandLine.Parameters;
     mixinStandardHelpOptions = true,
     description = "Cancel operations on the buildfarm server")
 class Cancel implements Callable<Integer> {
-
   @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
   private String host;
 

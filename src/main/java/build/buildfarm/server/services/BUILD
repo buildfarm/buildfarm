@@ -27,6 +27,7 @@ java_library(
         "@buildfarm_maven//:io_grpc_grpc_services",
         "@buildfarm_maven//:io_grpc_grpc_stub",
         "@buildfarm_maven//:io_prometheus_simpleclient",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@googleapis//google/bytestream:bytestream_java_proto",
         "@googleapis//google/devtools/build/v1:build_java_grpc",

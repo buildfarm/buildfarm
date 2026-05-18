@@ -42,7 +42,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import jnr.constants.platform.OpenFlags;
 import jnr.ffi.LibraryLoader;
 import jnr.ffi.Pointer;
@@ -52,6 +51,7 @@ import lombok.extern.java.Log;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.IOUtils;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public final class Utils {

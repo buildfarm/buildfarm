@@ -33,7 +33,6 @@ import picocli.CommandLine.Parameters;
     mixinStandardHelpOptions = true,
     description = "Display a live histogram of dispatched operations")
 class Hist implements Callable<Integer> {
-
   @Parameters(index = "0", description = CliConstants.INSTANCE_NAME)
   private String instanceName;
 

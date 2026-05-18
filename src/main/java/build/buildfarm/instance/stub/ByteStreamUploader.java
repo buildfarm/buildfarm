@@ -54,9 +54,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A client implementing the {@code Write} method of the {@code ByteStream} gRPC service.

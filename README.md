@@ -12,7 +12,7 @@ This repository hosts a [remote caching and execution](https://github.com/bazelb
 Background information on the status of caching and remote execution in bazel can be
 found in the [bazel documentation](https://docs.bazel.build/versions/master/remote-caching.html).
 
-File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-4zy8f5j5-KwiJuBoAAUorB_mdQHwF7Q) in the #buildfarm channel.
+File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-3xzjl2hc3-SGhLytWezvmIKD6uwwpI6Q) in the #buildfarm channel.
 
 [Buildfarm Docs](https://buildfarm.github.io/buildfarm/)
 

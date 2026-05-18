@@ -14,6 +14,7 @@ java_library(
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:io_prometheus_simpleclient",
         "@buildfarm_maven//:org_apache_commons_commons_lang3",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
     ],
 )

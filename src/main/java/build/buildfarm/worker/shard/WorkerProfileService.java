@@ -25,7 +25,7 @@ import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
 import build.buildfarm.worker.SuperscalarPipelineStage;
 import com.google.common.base.Strings;
 import io.grpc.stub.StreamObserver;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
   private final String name;

@@ -73,11 +73,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import javax.naming.ConfigurationException;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Implementation of {@link SimpleBlobStore} that can talk to a HTTP/1.1 backend.

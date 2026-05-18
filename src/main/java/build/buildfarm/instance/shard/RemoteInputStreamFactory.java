@@ -54,8 +54,9 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
+import java.util.stream.Collectors;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 @Log
 public class RemoteInputStreamFactory implements InputStreamFactory {
@@ -171,7 +172,10 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     Set<String> remoteWorkers;
     Set<String> locationSet;
     try {
-      remoteWorkers = backplane.getStorageWorkers();
+      remoteWorkers =
+          backplane.getStorageWorkers().stream()
+              .map(w -> w.getEndpoint())
+              .collect(Collectors.toSet());
       if (publicName != null) {
         remoteWorkers.remove(publicName);
       }

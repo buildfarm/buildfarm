@@ -35,13 +35,14 @@ import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 import lombok.Data;
 import net.jcip.annotations.ThreadSafe;
+import org.jspecify.annotations.Nullable;
 
 @ThreadSafe
 public interface Backplane {
@@ -124,8 +125,8 @@ public interface Backplane {
   /** Returns the insert time epoch in seconds for the digest. */
   long getDigestInsertTime(Digest blobDigest) throws IOException;
 
-  /** Returns a set of the names of all active storage workers. */
-  Set<String> getStorageWorkers() throws IOException;
+  /** Returns the entry iterable of all active storage workers. */
+  Collection<ShardWorker> getStorageWorkers() throws IOException;
 
   // TODO this is just a namespace, but kind of jank for just digest function as a string...
   /**
@@ -286,8 +287,7 @@ public interface Backplane {
    * @return An execution if the actionKey has an association, null otherwise.
    * @note Suggested return identifier: execution.
    */
-  @Nullable
-  Operation mergeExecution(ActionKey actionKey) throws IOException;
+  @Nullable Operation mergeExecution(ActionKey actionKey) throws IOException;
 
   /**
    * @brief Remove actionKey execution merge association.

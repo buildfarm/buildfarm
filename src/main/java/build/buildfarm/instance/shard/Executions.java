@@ -23,8 +23,8 @@ import build.buildfarm.common.redis.RedisSetMap;
 import build.buildfarm.common.redis.StringTranslator;
 import com.google.longrunning.Operation;
 import java.util.Map;
-import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.resps.ScanResult;
 

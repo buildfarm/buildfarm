@@ -36,6 +36,7 @@ java_library(
         "@buildfarm_maven//:io_netty_netty_transport_native_epoll",
         "@buildfarm_maven//:io_netty_netty_transport_native_kqueue",
         "@buildfarm_maven//:io_netty_netty_transport_native_unix_common",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@googleapis//google/bytestream:bytestream_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_proto",

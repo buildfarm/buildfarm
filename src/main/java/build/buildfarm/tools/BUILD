@@ -178,7 +178,10 @@ java_binary(
 
 java_binary(
     name = "bf-cat",
-    srcs = ["Cat.java"],
+    srcs = [
+        "Cat.java",
+        "CliConstants.java",
+    ],
     data = [
         "//examples:example_properties",
     ],
@@ -196,6 +199,7 @@ java_binary(
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",

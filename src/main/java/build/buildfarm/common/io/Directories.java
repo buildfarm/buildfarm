@@ -81,7 +81,7 @@ public final class Directories {
     }
   }
 
-  private static void makeWritable(Path dir, boolean writable, FileStore fileStore)
+  public static void makeWritable(Path dir, boolean writable, FileStore fileStore)
       throws IOException {
     if (fileStore.supportsFileAttributeView("posix")) {
       if (writable) {
@@ -203,8 +203,19 @@ public final class Directories {
         });
   }
 
+  public static void disableAllWriteAccess(
+      Path directory, FileStore fileStore, boolean excludeTopLevel) throws IOException {
+    forAllPostDirs(
+        directory,
+        dir -> {
+          if (!excludeTopLevel || !dir.equals(directory)) {
+            makeWritable(dir, false, fileStore);
+          }
+        });
+  }
+
   public static void disableAllWriteAccess(Path directory, FileStore fileStore) throws IOException {
-    forAllPostDirs(directory, dir -> makeWritable(dir, false, fileStore));
+    disableAllWriteAccess(directory, fileStore, /* excludeTopLevel= */ false);
   }
 
   public static void disableAllFileWriteAccess(Path directory, FileStore fileStore)

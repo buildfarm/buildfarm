@@ -277,7 +277,9 @@ message ShardWorker {
 
   int64 first_registered_at = 4;
 
-  repeated string tags = 5;
+  bool read_only = 5;
+
+  repeated string tags = 6;
 }
 
 message WorkerChange {
@@ -456,6 +458,8 @@ message BackplaneStatus {
   repeated string active_workers = 4;
 
   repeated string active_storage_workers = 12;
+
+  repeated ShardWorker workers = 14;
 
   repeated string active_execute_workers = 13;
 

@@ -51,6 +51,7 @@ public class Server {
   private int maxInboundMetadataSize = 0;
   private ServerCacheConfigs caches = new ServerCacheConfigs();
   private boolean findMissingBlobsViaBackplane = false;
+  private boolean grpcChannelz = false;
   private int gracefulShutdownSeconds = 0;
   private Set<String> correlatedInvocationsIndexScopes = ImmutableSet.of("host", "username");
 

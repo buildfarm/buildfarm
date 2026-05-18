@@ -32,6 +32,7 @@ java_library(
         "@buildfarm_maven//:io_netty_netty_codec_http",
         "@buildfarm_maven//:io_prometheus_simpleclient",
         "@buildfarm_maven//:net_jcip_jcip_annotations",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@googleapis//google/bytestream:bytestream_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_proto",

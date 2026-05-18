@@ -37,6 +37,7 @@ java_library(
         "@buildfarm_maven//:io_grpc_grpc_stub",
         "@buildfarm_maven//:io_prometheus_simpleclient",
         "@buildfarm_maven//:javax_annotation_javax_annotation_api",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@googleapis//google/rpc:rpc_java_proto",
         "@io_grpc_grpc_proto//:health_java_proto",

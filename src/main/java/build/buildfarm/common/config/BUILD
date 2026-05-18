@@ -20,6 +20,7 @@ java_library(
         "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:me_dinowernli_java_grpc_prometheus",
+        "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@buildfarm_maven//:org_yaml_snakeyaml",
         "@buildfarm_maven//:redis_clients_jedis",
