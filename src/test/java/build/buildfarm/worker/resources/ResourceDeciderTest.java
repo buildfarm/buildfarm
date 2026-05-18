@@ -858,7 +858,6 @@ public class ResourceDeciderTest {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command,
-            "worker",
             /* defaultMaxCores= */ 0,
             /* onlyMulticoreTests= */ false,
             /* limitGlobalExecution= */ false,
