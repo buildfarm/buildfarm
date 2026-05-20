@@ -19,7 +19,6 @@ import static com.google.common.base.Preconditions.checkState;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -27,13 +26,15 @@ import java.util.UUID;
  * A writer that atomically presents a target file only on successful close.
  *
  * <p>Writes are performed to a temporary file with a unique UUID suffix. On successful close(), the
- * target file is atomically replaced via hard link, and the temporary file is deleted.
+ * temp file is installed at the target using a {@link FileSystemMover} whose strategy is determined
+ * once at startup.
  *
  * <p>Usage:
  *
  * <pre>{@code
- * try (AtomicFileWriter atomicWriter = new AtomicFileWriter(target)) {
- *   writer.write("data");
+ * try (AtomicFileWriter atomicWriter = new AtomicFileWriter(target, fileSystemMover)) {
+ *   atomicWriter.write("data");
+ *   atomicWriter.onSuccess();
  * } // Automatic atomic swap and cleanup on close
  * }</pre>
  *
@@ -48,6 +49,7 @@ import java.util.UUID;
 public class AtomicFileWriter extends BufferedWriter {
   private final Path target;
   private final Path temp;
+  private final FileSystemMover fileSystemMover;
   private boolean closed = false;
   private boolean success = false;
 
@@ -61,17 +63,20 @@ public class AtomicFileWriter extends BufferedWriter {
    * Creates an AtomicFileWriter for the specified target path.
    *
    * @param target the final destination path for the file
+   * @param fileSystemMover the replacement strategy selected for the target filesystem
    * @throws IOException if the temporary file cannot be created
    */
-  public AtomicFileWriter(Path target) throws IOException {
-    this(target, createSiblingRandomUUIDTemp(target));
+  public AtomicFileWriter(Path target, FileSystemMover fileSystemMover) throws IOException {
+    this(target, createSiblingRandomUUIDTemp(target), fileSystemMover);
   }
 
-  private AtomicFileWriter(Path target, Path temp) throws IOException {
+  private AtomicFileWriter(Path target, Path temp, FileSystemMover fileSystemMover)
+      throws IOException {
     super(Files.newBufferedWriter(temp));
     checkState(!target.equals(temp));
     this.target = target;
     this.temp = temp;
+    this.fileSystemMover = fileSystemMover;
   }
 
   public void onSuccess() {
@@ -79,20 +84,12 @@ public class AtomicFileWriter extends BufferedWriter {
   }
 
   /**
-   * Closes the writer and atomically replaces the target file.
+   * Closes the writer and replaces the target using the selected filesystem strategy.
    *
-   * <p>This method:
+   * <p>On success, the configured filesystem mover installs the temp file at the target. On failure
+   * (close threw, onSuccess was never called, or the move threw), the temp file is removed.
    *
-   * <ol>
-   *   <li>Closes the BufferedWriter
-   *   <li>Deletes the target file if it exists
-   *   <li>Creates a hard link from temp file to target (atomic replacement)
-   *   <li>Deletes the temporary file
-   * </ol>
-   *
-   * The temporary file is always deleted, even if an error occurs during the atomic swap.
-   *
-   * @throws IOException if an error occurs during the atomic swap
+   * @throws IOException if an error occurs during replacement
    */
   @Override
   public void close() throws IOException {
@@ -109,19 +106,13 @@ public class AtomicFileWriter extends BufferedWriter {
         replace();
       }
     } finally {
-      Files.delete(temp);
+      // After a successful atomic move the temp no longer exists; deleteIfExists handles both
+      // that case and the failure paths where the temp survived.
+      Files.deleteIfExists(temp);
     }
   }
 
   private void replace() throws IOException {
-    // Delete target file (ignore if doesn't exist)
-    try {
-      Files.delete(target);
-    } catch (NoSuchFileException e) {
-      // Ignore - file may not exist
-    }
-
-    // Create hard link to atomically replace
-    Files.createLink(target, temp);
+    fileSystemMover.move(temp, target);
   }
 }

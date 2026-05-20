@@ -30,11 +30,13 @@ import org.junit.runners.JUnit4;
 public class AtomicFileWriterTest {
   private Path root;
   private FileStore fileStore;
+  private FileSystemMover fileSystemMover;
 
   @Before
   public void setUp() throws IOException {
     root = Files.createTempDirectory("atomic-file-writer-test");
     fileStore = Files.getFileStore(root);
+    fileSystemMover = FileSystemMover.probe(root);
   }
 
   @After
@@ -46,7 +48,7 @@ public class AtomicFileWriterTest {
   public void successCreatesTarget() throws IOException {
     Path target = root.resolve("test.txt");
 
-    try (AtomicFileWriter writer = new AtomicFileWriter(target)) {
+    try (AtomicFileWriter writer = new AtomicFileWriter(target, fileSystemMover)) {
       writer.write("test content");
       writer.onSuccess();
     }
@@ -63,7 +65,7 @@ public class AtomicFileWriterTest {
     Path target = root.resolve("test.txt");
     Files.writeString(target, "old content");
 
-    try (AtomicFileWriter writer = new AtomicFileWriter(target)) {
+    try (AtomicFileWriter writer = new AtomicFileWriter(target, fileSystemMover)) {
       writer.write("new content");
       writer.onSuccess();
     }
@@ -72,10 +74,23 @@ public class AtomicFileWriterTest {
   }
 
   @Test
+  public void hardLinkMoverSuccessCleansUpTempFile() throws IOException {
+    Path target = root.resolve("test.txt");
+
+    try (AtomicFileWriter writer = new AtomicFileWriter(target, FileSystemMover.hardLinkMover())) {
+      writer.write("test content");
+      writer.onSuccess();
+    }
+
+    assertThat(Files.readString(target)).isEqualTo("test content");
+    assertThat(Files.list(root)).containsExactly(target);
+  }
+
+  @Test
   public void atomicFileWriterCleansUpOnException() throws IOException {
     Path target = root.resolve("test.txt");
 
-    try (AtomicFileWriter writer = new AtomicFileWriter(target)) {
+    try (AtomicFileWriter writer = new AtomicFileWriter(target, fileSystemMover)) {
       writer.write("partial");
       throw new IOException("simulated error");
     } catch (IOException e) {
@@ -94,7 +109,7 @@ public class AtomicFileWriterTest {
   public void closeWithoutSuccessPreventsReplace() throws IOException {
     Path target = root.resolve("test.txt");
 
-    try (AtomicFileWriter writer = new AtomicFileWriter(target)) {
+    try (AtomicFileWriter writer = new AtomicFileWriter(target, fileSystemMover)) {
       writer.write("partial");
     }
 
@@ -111,7 +126,7 @@ public class AtomicFileWriterTest {
 
     Files.writeString(target, "complete");
 
-    try (AtomicFileWriter writer = new AtomicFileWriter(target)) {
+    try (AtomicFileWriter writer = new AtomicFileWriter(target, fileSystemMover)) {
       writer.write("partial");
     }
 
@@ -127,8 +142,8 @@ public class AtomicFileWriterTest {
     Path target = root.resolve("test.txt");
 
     // Create two writers to same target - should have different temp files
-    AtomicFileWriter writer1 = new AtomicFileWriter(target);
-    AtomicFileWriter writer2 = new AtomicFileWriter(target);
+    AtomicFileWriter writer1 = new AtomicFileWriter(target, fileSystemMover);
+    AtomicFileWriter writer2 = new AtomicFileWriter(target, fileSystemMover);
 
     // Both should succeed without collision
     writer1.write("content1");
@@ -151,7 +166,7 @@ public class AtomicFileWriterTest {
   public void writeAppends() throws IOException {
     Path target = root.resolve("multiline.txt");
 
-    try (AtomicFileWriter writer = new AtomicFileWriter(target)) {
+    try (AtomicFileWriter writer = new AtomicFileWriter(target, fileSystemMover)) {
       writer.write("line1\n");
       writer.write("line2\n");
       writer.write("line3\n");
@@ -166,7 +181,7 @@ public class AtomicFileWriterTest {
   public void closeIsIdempotent() throws IOException {
     Path target = root.resolve("test.txt");
 
-    AtomicFileWriter writer = new AtomicFileWriter(target);
+    AtomicFileWriter writer = new AtomicFileWriter(target, fileSystemMover);
     writer.write("test content");
     writer.onSuccess();
     writer.close();
