@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.ToolDetails;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.Digest;
@@ -340,4 +341,23 @@ public interface Backplane {
   void incrementRequestCounters(
       String actionId, String toolInvocationId, String actionMnemonic, String targetId)
       throws IOException;
+
+  /**
+   * Publish a worker's queue configuration to the backplane so that the server can auto-discover
+   * it. The queue key is set with an expiration so it is automatically removed when the worker
+   * stops refreshing it.
+   */
+  void publishWorkerQueue(Queue queue) throws IOException;
+
+  /**
+   * Discover all worker-published queue configurations currently in the backplane. Returns the list
+   * of Queue configs whose Redis keys have not yet expired.
+   */
+  List<Queue> discoverWorkerQueues() throws IOException;
+
+  /**
+   * Rebuild the execution queue with the given queue configurations. This allows the server to
+   * dynamically adopt new queues discovered from workers without a restart.
+   */
+  void updateExecutionQueues(Queue[] queues) throws IOException;
 }
