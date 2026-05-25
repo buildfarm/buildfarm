@@ -537,16 +537,27 @@ class Executor {
 
       WorkFilesContext filesContext =
           WorkFilesContext.fromContext(execDir, execTree, executionContext.command);
-
-      return PersistentExecutor.runOnPersistentWorker(
-          filesContext,
-          operationName,
-          ImmutableList.copyOf(arguments),
-          ImmutableMap.copyOf(environment),
-          limits,
-          timeout,
-          PersistentExecutor.defaultWorkRootsDir,
-          resultBuilder);
+      try {
+        return PersistentExecutor.runOnPersistentWorker(
+            filesContext,
+            operationName,
+            ImmutableList.copyOf(arguments),
+            ImmutableMap.copyOf(environment),
+            limits,
+            timeout,
+            PersistentExecutor.defaultWorkRootsDir,
+            resultBuilder);
+      } catch (RuntimeException e) {
+        log.log(
+            Level.SEVERE,
+            format(
+                "error starting persistent worker for %s. argslist=%s",
+                operationName, String.join(",", arguments)),
+            e);
+        resultBuilder.setExitCode(INCOMPLETE_EXIT_CODE);
+        resultBuilder.setStderrRaw(ByteString.copyFromUtf8(e.getMessage()));
+        return Code.INVALID_ARGUMENT;
+      }
     }
 
     // run the action under docker
