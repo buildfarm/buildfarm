@@ -6,6 +6,7 @@ import static java.lang.String.format;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 class HexBucketEntryPathStrategy implements EntryPathStrategy {
@@ -22,16 +23,27 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
     checkState(levels <= MAX_LEVEL);
     this.path = path;
     this.levels = levels;
-    String match = format("[0-9a-f]{%d}.*", levels * 2);
+    // Match a key as an optional `<digestfn>_` prefix (e.g. `blake3_`)
+    // followed by the hex hash. Group 1 captures the hex hash so bucketing
+    // works for non-omitted digest functions (BLAKE3) the same way it does
+    // for the omitted ones (SHA*, MD5), whose keys are bare hex hashes.
+    String match = format("(?:[a-z0-9]+_)?([0-9a-f]{%d}.*)", levels * 2);
     pattern = Pattern.compile(match);
   }
 
   @Override
   public Path getPath(String key) {
-    checkState(levels == 0 || pattern.matcher(key).matches());
+    Matcher matcher = pattern.matcher(key);
+    checkState(levels == 0 || matcher.matches());
+    // Bucket on the hex hash, skipping any `<digestfn>_` prefix. Without
+    // this, a BLAKE3 key like `blake3_220fcb...` would shard on `bl/ak/`,
+    // which aren't hex bucket directories, and every read/write would land
+    // in a non-existent path.
+    int hashStart = levels == 0 ? 0 : matcher.start(1);
     Path keyPath = path;
     for (int i = 0; i < levels; i++) {
-      keyPath = keyPath.resolve(key.substring(i * 2, i * 2 + 2));
+      int from = hashStart + i * 2;
+      keyPath = keyPath.resolve(key.substring(from, from + 2));
     }
     return keyPath.resolve(key);
   }
