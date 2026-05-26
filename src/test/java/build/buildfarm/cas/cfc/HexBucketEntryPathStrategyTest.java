@@ -73,4 +73,29 @@ public class HexBucketEntryPathStrategyTest {
     assertThat(blobPath.toString())
         .isEqualTo(path.resolve("aa").resolve("55").resolve(key).toString());
   }
+
+  @Test
+  public void getPathStripsDigestFunctionPrefix() {
+    Path path = Path.of("cache");
+    EntryPathStrategy entryPathStrategy = new HexBucketEntryPathStrategy(path, 2);
+
+    // The hash starts with `aa`, but the prefix `blake3` ends in `3` (hex)
+    // and starts with `b` (also hex) — so detection cannot rely on the
+    // first character of the key being non-hex.
+    String key = "blake3_aa55bb1100bb";
+    Path blobPath = entryPathStrategy.getPath(key);
+    assertThat(blobPath.toString())
+        .isEqualTo(path.resolve("aa").resolve("55").resolve(key).toString());
+  }
+
+  @Test
+  public void getPathTreatsExecSuffixAsPartOfHash() {
+    Path path = Path.of("cache");
+    EntryPathStrategy entryPathStrategy = new HexBucketEntryPathStrategy(path, 2);
+
+    String key = "aa55bb1100bb_exec";
+    Path blobPath = entryPathStrategy.getPath(key);
+    assertThat(blobPath.toString())
+        .isEqualTo(path.resolve("aa").resolve("55").resolve(key).toString());
+  }
 }
