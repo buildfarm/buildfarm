@@ -9,7 +9,7 @@ bazel_dep(name = "protobuf", version = "33.4", repo_name = "com_google_protobuf"
 archive_override(
     module_name = "protobuf",
     integrity = "sha256-aH6YpHGXO1xf1xF1DEC4uCwK3jP2Sdtl4AspDyk0Wis=",
-    patch_args = ["-p1"],
+    patch_strip = 1,
     patches = [
         "//third_party:protobuf.patch",
     ],
@@ -65,7 +65,7 @@ bazel_dep(name = "bazel_remote_apis", version = "b02e15a6d354e2fb553216132ccec79
 archive_override(
     module_name = "bazel_remote_apis",
     integrity = "sha256-6/f8P1tElIJnbGlKyYjWfu4GicS/Ai/ECay+Uqy/JyY=",
-    patch_args = ["-p1"],
+    patch_strip = 1,
     patches = [
         "//third_party:remote-apis.patch",
     ],
