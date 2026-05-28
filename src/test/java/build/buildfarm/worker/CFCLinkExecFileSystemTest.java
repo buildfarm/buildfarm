@@ -179,4 +179,117 @@ public class CFCLinkExecFileSystemTest {
     verify(cfc, times(1)).put(fileDigest, true, fetchService);
     verifyNoMoreInteractions(cfc);
   }
+
+  // DirectoryIterator constructor calls advance("") and then
+  // unconditionally re-advances `current` in a trailing while loop, so the first
+  // non-ignored root child gets skipped whenever there are >= 2 root children.
+  // Concretely: the linked-directories pattern matches only the second root child,
+  // not the first. If the first child were skipped, putDirectory would never be
+  // requested for the second.
+  @Test
+  public void directoryIteratorDoesNotSkipFirstRootChild() throws Exception {
+    // Two root children "a" and "b". Pattern matches only "b".
+    // No output_paths, so ignorePaths is empty.
+    Command command = Command.newBuilder().build();
+    Digest aFileDigest =
+        DIGEST_UTIL.toDigest(
+            build.bazel.remote.execution.v2.Digest.newBuilder()
+                .setHash("a-file-hash")
+                .setSizeBytes(1)
+                .build());
+    Digest bFileDigest =
+        DIGEST_UTIL.toDigest(
+            build.bazel.remote.execution.v2.Digest.newBuilder()
+                .setHash("b-file-hash")
+                .setSizeBytes(1)
+                .build());
+    Directory aDirectory =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("af")
+                    .setIsExecutable(false)
+                    .setDigest(DigestUtil.toDigest(aFileDigest))
+                    .build())
+            .build();
+    Digest aDigest = DIGEST_UTIL.compute(aDirectory);
+    Directory bDirectory =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("bf")
+                    .setIsExecutable(false)
+                    .setDigest(DigestUtil.toDigest(bFileDigest))
+                    .build())
+            .build();
+    Digest bDigest = DIGEST_UTIL.compute(bDirectory);
+    Directory inputRootDirectory =
+        Directory.newBuilder()
+            .addDirectories(
+                DirectoryNode.newBuilder()
+                    .setName("a")
+                    .setDigest(DigestUtil.toDigest(aDigest))
+                    .build())
+            .addDirectories(
+                DirectoryNode.newBuilder()
+                    .setName("b")
+                    .setDigest(DigestUtil.toDigest(bDigest))
+                    .build())
+            .build();
+    Digest inputRootDigest = DIGEST_UTIL.compute(inputRootDirectory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(
+            DigestUtil.toDigest(inputRootDigest), inputRootDirectory,
+            DigestUtil.toDigest(aDigest), aDirectory,
+            DigestUtil.toDigest(bDigest), bDirectory);
+    Path root =
+        Iterables.getFirst(
+            Jimfs.newFileSystem(
+                    Configuration.unix().toBuilder()
+                        .setAttributeViews("basic", "owner", "posix", "unix")
+                        .build())
+                .getRootDirectories(),
+            null);
+    Path afEntry = root.resolve("cfc-entry-af");
+    Files.write(afEntry, new byte[] {'a'});
+    Path bfEntry = root.resolve("cfc-entry-bf");
+    Files.write(bfEntry, new byte[] {'b'});
+    CASFileCache cfc = mock(CASFileCache.class);
+    ExecutorService fetchService = newDirectExecutorService();
+    when(cfc.put(aFileDigest, false, fetchService))
+        .thenReturn(immediateFuture(new PathResult(afEntry, /* isMissed= */ false)));
+    when(cfc.put(bFileDigest, false, fetchService))
+        .thenReturn(immediateFuture(new PathResult(bfEntry, /* isMissed= */ false)));
+    when(cfc.putDirectory(aDigest, directoriesIndex, fetchService))
+        .thenReturn(
+            immediateFuture(new PathResult(root.resolve("cfc-entry-a"), /* isMissed= */ false)));
+    when(cfc.putDirectory(bDigest, directoriesIndex, fetchService))
+        .thenReturn(
+            immediateFuture(new PathResult(root.resolve("cfc-entry-b"), /* isMissed= */ false)));
+    CFCLinkExecFileSystem efs =
+        new CFCLinkExecFileSystem(
+            root,
+            cfc,
+            ImmutableMap.of(),
+            /* linkInputDirectories= */ true,
+            // Match only "a" (the first root child). If the iterator skips "a", the
+            // linkedDirectories set will be empty and "a" will be created as a real dir
+            // instead of a symlink.
+            ImmutableList.of("a"),
+            /* allowSymlinkTargetAbsolute= */ false,
+            /* removeDirectoryService= */ null,
+            /* accessRecorder= */ null,
+            fetchService);
+    efs.createExecDir(
+        "iteratorSkipOp",
+        directoriesIndex,
+        inputRootDigest,
+        command,
+        /* owner= */ null,
+        WorkerExecutedMetadata.newBuilder());
+
+    // "a" matched the linked-directories pattern; it should have been linked via
+    // putDirectory. If the constructor double-advance bug skipped "a", this fails.
+    verify(cfc, times(1)).putDirectory(aDigest, directoriesIndex, fetchService);
+  }
 }
