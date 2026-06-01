@@ -344,8 +344,8 @@ class CASFileCacheTest {
     FileStore fileStore = Files.getFileStore(root);
     ByteString blob = ByteString.copyFromUtf8("blob");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
-    Path path = fileCache.getPath(fileCache.getKey(blobDigest, false));
-    Path execPath = fileCache.getPath(fileCache.getKey(blobDigest, true));
+    Path path = fileCache.getPath(blobDigest, fileCache.getKey(blobDigest, false));
+    Path execPath = fileCache.getPath(blobDigest, fileCache.getKey(blobDigest, true));
     Files.write(path, blob.toByteArray());
     EvenMoreFiles.setReadOnlyPerms(path, false, fileStore);
     Files.write(execPath, blob.toByteArray());
@@ -367,8 +367,8 @@ class CASFileCacheTest {
     FileStore fileStore = Files.getFileStore(root);
     ByteString blob = ByteString.copyFromUtf8("blob");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
-    Path path = fileCache.getPath(fileCache.getKey(blobDigest, false));
-    Path execPath = fileCache.getPath(fileCache.getKey(blobDigest, true));
+    Path path = fileCache.getPath(blobDigest, fileCache.getKey(blobDigest, false));
+    Path execPath = fileCache.getPath(blobDigest, fileCache.getKey(blobDigest, true));
     Files.write(path, blob.toByteArray());
     EvenMoreFiles.setReadOnlyPerms(path, false, fileStore);
     Files.write(execPath, blob.toByteArray());
@@ -389,7 +389,8 @@ class CASFileCacheTest {
     Path invalidDigest = root.resolve("00").resolve("digest");
     ByteString validBlob = ByteString.copyFromUtf8("valid");
     Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
-    Path invalidExec = fileCache.getPath(CASFileCache.getKey(validDigest, false) + "_regular");
+    Path invalidExec =
+        fileCache.getPath(validDigest, CASFileCache.getKey(validDigest, false) + "_regular");
 
     Files.write(tooFewComponents, ImmutableList.of("Too Few Components"), StandardCharsets.UTF_8);
     Files.write(tooManyComponents, ImmutableList.of("Too Many Components"), StandardCharsets.UTF_8);
@@ -544,7 +545,7 @@ class CASFileCacheTest {
     assertThat(notified.get()).isTrue();
     String key = fileCache.getKey(digest, false);
     assertThat(storage.get(key)).isNotNull();
-    try (InputStream in = Files.newInputStream(fileCache.getPath(key))) {
+    try (InputStream in = Files.newInputStream(fileCache.getPath(digest, key))) {
       assertThat(ByteString.readFrom(in)).isEqualTo(content);
     }
   }
@@ -624,7 +625,7 @@ class CASFileCacheTest {
 
     UUID writeId = UUID.randomUUID();
     String key = fileCache.getKey(digest, false);
-    Path writePath = fileCache.getPath(key).resolveSibling(key + "." + writeId);
+    Path writePath = fileCache.getPath(digest, key).resolveSibling(key + "." + writeId);
     try (OutputStream out = Files.newOutputStream(writePath)) {
       content.substring(0, 6).writeTo(out);
     }
@@ -710,7 +711,7 @@ class CASFileCacheTest {
     fileCache.put(blob);
     String key = fileCache.getKey(blob.getDigest(), /* isExecutable= */ false);
     // putCreatesFile verifies this
-    Files.delete(fileCache.getPath(key));
+    Files.delete(fileCache.getPath(blob.getDigest(), key));
     // update entry with expired deadline
     storage.get(key).existsDeadline = Deadline.after(0, SECONDS);
 
@@ -903,7 +904,7 @@ class CASFileCacheTest {
     // assert expiration of non-executable digest
     String expiringKey = fileCache.getKey(expiringBlob.getDigest(), /* isExecutable= */ false);
     assertThat(storage.containsKey(expiringKey)).isFalse();
-    assertThat(Files.exists(fileCache.getPath(expiringKey))).isFalse();
+    assertThat(Files.exists(fileCache.getPath(expiringBlob.getDigest(), expiringKey))).isFalse();
   }
 
   @SuppressWarnings("unchecked")

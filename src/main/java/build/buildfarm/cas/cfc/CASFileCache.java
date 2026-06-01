@@ -406,7 +406,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Entry entry = getEntry(key);
     if (entry != null && entry.referenceCount < 0) {
       try {
-        entry = new Entry(key, Files.size(getPath(key)), null);
+        entry = new Entry(key, Files.size(getPath(digest, key)), null);
       } catch (IOException e) {
         return false;
       }
@@ -475,7 +475,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return true;
     }
 
-    if (Files.exists(getPath(e.key))) {
+    Digest digest = entryDigest(e.key, e.size);
+    if (digest != null && Files.exists(getPath(digest, e.key))) {
       e.existsDeadline = Deadline.after(10, SECONDS);
       return true;
     }
@@ -572,7 +573,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       if (e != null) {
         InputStream input = null;
         try {
-          input = compressorInputStream(compressor, Files.newInputStream(getPath(key)));
+          input = compressorInputStream(compressor, Files.newInputStream(getPath(digest, key)));
           input.skip(offset);
         } catch (IOException ioEx) {
           if (!(ioEx instanceof NoSuchFileException)) {
@@ -587,7 +588,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             boolean removed = false;
             synchronized (this) {
               invalidateWrite(digest);
-              Entry removedEntry = safeStorageRemoval(key);
+              Entry removedEntry = safeStorageRemoval(digest, key);
               if (removedEntry == e) { // Intentional reference comparison
                 unlinkEntry(removedEntry);
                 removed = true;
@@ -994,7 +995,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               if (fileCommittedSize < 0) {
                 // we need to cache this from disk until an out stream is acquired
                 String blobKey = getKey(key.getDigest(), false);
-                Path blobKeyPath = getPath(blobKey);
+                Path blobKeyPath = getPath(key.getDigest(), blobKey);
                 try {
                   fileCommittedSize =
                       Files.size(blobKeyPath.resolveSibling(blobKey + "." + key.getIdentifier()));
@@ -1460,7 +1461,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try (BufferedReader br = Files.newBufferedReader(lru)) {
       for (SizeEntry entry : db.entries(br)) {
         // ignore files in the lru that are not present in the directories
-        Path path = entryPathStrategy.getPath(entry.key());
+        Digest digest = entryDigest(entry.key(), entry.size());
+        if (digest == null) {
+          // unparseable lru entry: no managed file can correspond to it, skip
+          continue;
+        }
+        Path path = entryPathStrategy.getPath(digest, entry.key());
         if (files.remove(path)) {
           processRootFile(onStartPut, path, entry, computeDirsBuilder, deleteFilesBuilder);
         }
@@ -1617,12 +1623,34 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return entriesDereferenced;
   }
 
-  public Path getPath(String filename) {
-    return entryPathStrategy.getPath(filename);
+  public Path getPath(Digest digest, String filename) {
+    return entryPathStrategy.getPath(digest, filename);
   }
 
-  protected Path getRemovingPath(String filename) {
-    return entryPathStrategy.getPath(filename + "_removed");
+  protected Path getRemovingPath(Digest digest, String filename) {
+    return entryPathStrategy.getPath(digest, filename + "_removed");
+  }
+
+  /**
+   * Recovers the digest a stored key was computed from, for the bookkeeping paths that only carry
+   * the key string (LRU reconciliation, existence checks, removal). Handles blob keys (bare hex or
+   * {@code <digestfn>_} prefixed, with an optional {@code _exec} suffix) and {@code _dir} keys.
+   * Returns null if the key is unparseable.
+   */
+  protected static @Nullable Digest entryDigest(String key, long size) {
+    if (key.endsWith("_dir")) {
+      DigestUtil digestUtil = parseDirectoryDigestUtil(key);
+      if (digestUtil == null) {
+        return null;
+      }
+      try {
+        return keyToDigest(key, size, digestUtil);
+      } catch (NumberFormatException e) {
+        return null;
+      }
+    }
+    FileEntryKey fileEntryKey = parseFileEntryKey(key, size);
+    return fileEntryKey == null ? null : fileEntryKey.digest();
   }
 
   private synchronized void dischargeAndNotify(String key, long size) {
@@ -1653,7 +1681,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @VisibleForTesting
   public Path getDirectoryPath(Digest digest) {
-    return getPath(getDirectoryKey(digest));
+    return getPath(digest, getDirectoryKey(digest));
   }
 
   @GuardedBy("this")
@@ -1813,9 +1841,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  private Entry safeStorageRemoval(String key) throws IOException {
-    Path path = getPath(key);
-    Path expiredPath = getRemovingPath(key);
+  private Entry safeStorageRemoval(Digest digest, String key) throws IOException {
+    Path path = getPath(digest, key);
+    Path expiredPath = getRemovingPath(digest, key);
     boolean deleteExpiredPath = false;
 
     Lock lock;
@@ -1873,8 +1901,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 + " references");
       }
       boolean interrupted = false;
+      FileEntryKey fileEntryKey = null;
       if (!e.key.endsWith("_dir")) {
-        FileEntryKey fileEntryKey = parseFileEntryKey(e.key, e.size);
+        fileEntryKey = parseFileEntryKey(e.key, e.size);
         if (fileEntryKey == null) {
           log.log(Level.SEVERE, format("error parsing expired key %s", e.key));
         } else {
@@ -1886,7 +1915,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           invalidateWrite(fileEntryKey.digest());
         }
       }
-      Entry removedEntry = safeStorageRemoval(e.key);
+      // Reuse the parsed blob digest where we have one; recover it from a `_dir` key otherwise.
+      Digest digest = fileEntryKey != null ? fileEntryKey.digest() : entryDigest(e.key, e.size);
+      Entry removedEntry = safeStorageRemoval(digest, e.key);
       // reference compare on purpose
       if (removedEntry == e) {
         ListenableFuture<Entry> entryFuture = dischargeEntryFuture(e, service);
@@ -2123,7 +2154,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
       }
     }
-    return new PathResult(getPath(key), downloadComplete);
+    return new PathResult(getPath(digest, key), downloadComplete);
   }
 
   private void copyExternalInputProgressive(Digest digest, CancellableOutputStream out)
@@ -2347,8 +2378,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  protected void deleteExpiredKey(String key) throws IOException {
-    Path path = getRemovingPath(key);
+  protected void deleteExpiredKey(Digest digest, String key) throws IOException {
+    Path path = getRemovingPath(digest, key);
     long createdTimeMs = Files.getLastModifiedTime(path).to(MILLISECONDS);
 
     Files.delete(path);
@@ -2386,8 +2417,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     expiredFuture,
                     (expiredEntry) -> {
                       String expiredKey = expiredEntry.key;
+                      Digest expiredDigest = entryDigest(expiredKey, expiredEntry.size);
                       try {
-                        deleteExpiredKey(expiredKey);
+                        deleteExpiredKey(expiredDigest, expiredKey);
                       } catch (NoSuchFileException eNoEnt) {
                         log.log(
                             Level.SEVERE,
@@ -2456,8 +2488,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     DigestUtil digestUtil = new DigestUtil(HashFunction.get(digestFunction));
+    Digest digest = keyToDigest(key, blobSizeInBytes, digestUtil);
     String writeKey = key + "." + writeId;
-    Path writePath = getPath(key).resolveSibling(writeKey);
+    Path writePath = getPath(digest, key).resolveSibling(writeKey);
     final long committedSize;
     HashingOutputStream hashOut;
     if (!isReset && Files.exists(writePath)) {
@@ -2481,7 +2514,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     CountingOutputStream countingOut = new CountingOutputStream(committedSize, hashOut);
     return new CancellableOutputStream(countingOut) {
       long written = committedSize;
-      final Digest expectedDigest = keyToDigest(key, blobSizeInBytes, digestUtil);
+      final Digest expectedDigest = digest;
 
       @Override
       public long getWritten() {
@@ -2588,7 +2621,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         boolean inserted = false;
         try {
           // acquire the key lock
-          Files.createLink(CASFileCache.this.getPath(key), writePath);
+          Files.createLink(CASFileCache.this.getPath(actual, key), writePath);
           existingEntry = safeStorageInsertion(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
@@ -2795,14 +2828,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               UUID.randomUUID(),
               RequestMetadata.getDefaultInstance());
       if (write != null) {
-        performCopy(write, fileEntryKey.key());
+        performCopy(write, fileEntryKey.digest(), fileEntryKey.key());
       }
     }
   }
 
-  private void performCopy(Write write, String key) throws IOException {
+  private void performCopy(Write write, Digest digest, String key) throws IOException {
     try (OutputStream out = write.getOutput(1, MINUTES, () -> {});
-        InputStream in = Files.newInputStream(getPath(key))) {
+        InputStream in = Files.newInputStream(getPath(digest, key))) {
       ByteStreams.copy(in, out);
     } catch (IOException ioEx) {
       boolean interrupted = causedByInterrupted(ioEx);
