@@ -14,11 +14,13 @@
 
 package build.buildfarm.cas.cfc;
 
+import build.buildfarm.v1test.Digest;
 import java.nio.file.Path;
 
 interface EntryPathStrategy extends Iterable<Path> {
-  // key must begin with a hexdigest
-  Path getPath(String key);
+  // Resolves the on-disk path for an entry. The leaf is fileName; any hash bucketing is derived
+  // from digest.getHash(), the bare hex hash the fileName was computed from.
+  Path getPath(Digest digest, String fileName);
 
   // BFS of all directories involved from a root
   Iterable<Path> branchDirectories();

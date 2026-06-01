@@ -28,7 +28,7 @@ abstract class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   Path path(Digest digest) {
-    return entryPathStrategy.getPath(digest.getHash() + "_dir_inputs");
+    return entryPathStrategy.getPath(digest, digest.getHash() + "_dir_inputs");
   }
 
   @Override

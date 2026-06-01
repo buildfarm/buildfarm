@@ -156,13 +156,13 @@ public class DirectoryEntryCFC extends CASFileCache {
   }
 
   @Override
-  protected void deleteExpiredKey(String expiredKey) throws IOException {
+  protected void deleteExpiredKey(Digest digest, String expiredKey) throws IOException {
     if (expiredKey.endsWith("_dir")) {
-      Path path = getRemovingPath(expiredKey);
+      Path path = getRemovingPath(digest, expiredKey);
       Directories.remove(path, fileStore);
       // accounting for expiration metric?
     } else {
-      super.deleteExpiredKey(expiredKey);
+      super.deleteExpiredKey(digest, expiredKey);
     }
   }
 
