@@ -26,14 +26,35 @@ import com.google.protobuf.util.Durations;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import javax.naming.ConfigurationException;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 
-class WorkerProfile {
-  private static Instance instance;
+@Command(
+    name = "worker-profile",
+    mixinStandardHelpOptions = true,
+    description = "Profile workers on the buildfarm server")
+class WorkerProfile implements Callable<Integer> {
+  @Parameters(index = "0", description = CliConstants.BUILDFARM_HOST)
+  private String host;
 
-  private static void analyzeMessage(String worker, WorkerProfileMessage response) {
+  @Parameters(index = "1", description = CliConstants.INSTANCE_NAME)
+  private String instanceName;
+
+  @Option(
+      names = {"-h", "--help"},
+      usageHelp = true,
+      description = "Display this help message")
+  private boolean helpRequested;
+
+  private Instance instance;
+
+  private void analyzeMessage(String worker, WorkerProfileMessage response) {
     System.out.println("\nWorkerProfile:");
     System.out.println(worker);
     String strIntFormat = "%-50s : %d";
@@ -76,13 +97,13 @@ class WorkerProfile {
   }
 
   @SuppressWarnings("ConstantConditions")
-  private static Set<String> getWorkers() throws ConfigurationException, IOException {
+  private Set<String> getWorkers() throws ConfigurationException, IOException {
     return instance.backplaneStatus().getActiveExecuteWorkersList().stream()
         .collect(Collectors.toUnmodifiableSet());
   }
 
   @SuppressWarnings("BusyWait")
-  private static void workerProfile() throws IOException, ExecutionException, InterruptedException {
+  private void workerProfile() throws IOException, ExecutionException, InterruptedException {
     Set<String> workers = null;
 
     //noinspection InfiniteLoopStatement
@@ -121,11 +142,17 @@ class WorkerProfile {
     }
   }
 
-  // how to run the binary: bf-workerprofile <instance> <uri>
-  public static void main(String[] args) throws Exception {
+  @Override
+  public Integer call() throws Exception {
     instance =
         new StubInstance(
-            args[0], "bf-workerprofile", createChannel(args[1]), Durations.fromMinutes(1));
+            instanceName, "bf-workerprofile", createChannel(host), Durations.fromMinutes(1));
     workerProfile();
+    return 0;
+  }
+
+  public static void main(String[] args) {
+    int exitCode = new CommandLine(new WorkerProfile()).execute(args);
+    System.exit(exitCode);
   }
 }
