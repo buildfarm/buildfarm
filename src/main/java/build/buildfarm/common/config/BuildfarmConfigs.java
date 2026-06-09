@@ -214,6 +214,7 @@ public final class BuildfarmConfigs {
         .setPublicName(
             adjustPublicName(configs.getWorker().getPublicName(), configs.getWorker().getPort()));
     adjustRedisUri(configs);
+    adjustCompressedBlobTransfer(configs);
 
     // Automatically set disk space to 90% of available space on the worker volume.
     // User configured value in .yaml will always take presedence.
@@ -287,6 +288,20 @@ public final class BuildfarmConfigs {
     }
 
     return publicName;
+  }
+
+  private static void adjustCompressedBlobTransfer(BuildfarmConfigs configs) {
+    // use environment override (useful for containerized deployment)
+    if (!Strings.isNullOrEmpty(System.getenv("COMPRESSED_BLOB_TRANSFER"))) {
+      configs
+          .getWorker()
+          .setCompressedBlobTransfer(
+              Boolean.parseBoolean(System.getenv("COMPRESSED_BLOB_TRANSFER")));
+      log.info(
+          String.format(
+              "compressedBlobTransfer modified to %b",
+              configs.getWorker().isCompressedBlobTransfer()));
+    }
   }
 
   private static void adjustRedisUri(BuildfarmConfigs configs) {

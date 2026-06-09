@@ -24,6 +24,7 @@ java_library(
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_grpc",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_github_ben_manes_caffeine_caffeine",
+        "@buildfarm_maven//:com_github_luben_zstd_jni",
         "@buildfarm_maven//:com_github_pcj_google_options",
         "@buildfarm_maven//:com_google_code_findbugs_jsr305",
         "@buildfarm_maven//:com_google_guava_guava",

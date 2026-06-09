@@ -44,6 +44,7 @@ import build.buildfarm.common.FailoverInputStreamFactory;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
+import build.buildfarm.common.ZstdDecompressingOutputStream.ZstdFixedBufferPool;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.config.GrpcMetrics;
@@ -80,6 +81,7 @@ import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
+import com.github.luben.zstd.ZstdInputStreamNoFinalizer;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -105,6 +107,7 @@ import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
@@ -712,6 +715,18 @@ public final class Worker extends LoggingMain {
             new Random(),
             workerStubs,
             (worker, t, context) -> {});
+    if (configs.getWorker().isCompressedBlobTransfer()) {
+      InputStreamFactory base = remoteInputStreamFactory;
+      remoteInputStreamFactory =
+          (compressor, digest, offset) -> {
+            InputStream zstdStream = base.newInput(Compressor.Value.ZSTD, digest, offset);
+            if (compressor == Compressor.Value.IDENTITY) {
+              return new ZstdInputStreamNoFinalizer(
+                  zstdStream, new ZstdFixedBufferPool(zstdBufferPool));
+            }
+            return zstdStream;
+          };
+    }
     CASFileCache storage =
         createStorages(
             remoteInputStreamFactory,
@@ -737,7 +752,9 @@ public final class Worker extends LoggingMain {
     CasWriter writer;
     if (!configs.getWorker().getCapabilities().isCas()) {
       Retrier retrier = new Retrier(Backoff.sequential(5), Retrier.DEFAULT_IS_RETRIABLE);
-      writer = new RemoteCasWriter(backplane, workerStubs, retrier);
+      writer =
+          new RemoteCasWriter(
+              backplane, workerStubs, retrier, configs.getWorker().isCompressedBlobTransfer());
     } else {
       writer = new LocalCasWriter(execFileSystem);
     }
