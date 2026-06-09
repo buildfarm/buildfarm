@@ -156,6 +156,7 @@ worker:
     selectForTmpFs: false
   createSymlinkOutputs: false
   zstdBufferPoolSize: 2048
+  compressedBlobTransfer: false
   executionPolicies:
   - name: test
     prioritized: false
