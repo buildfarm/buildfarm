@@ -228,11 +228,10 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       build.bazel.remote.execution.v2.Digest rootDigest,
       Set<String> ignorePaths) {
-    // skip this search if all the directories are real
-    if (linkInputDirectories) {
+    if (rootDigest.getSizeBytes() != 0) {
       ImmutableSet.Builder<String> builder = ImmutableSet.builder();
 
-      Directory root = directoriesIndex.get(rootDigest);
+      Directory root = checkNotNull(directoriesIndex.get(rootDigest));
       Iterator<String> dirs = new DirectoryIterator(root, directoriesIndex, ignorePaths);
       while (dirs.hasNext()) {
         String dir = dirs.next();
