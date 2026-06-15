@@ -251,11 +251,11 @@ class LinkDirectoryScanner implements Callable<Integer> {
      * </ul>
      */
     double savedLinks() {
-      return (double) (weightedFileSum - uniqueFileSum - totalAppearances);
+      return weightedFileSum - uniqueFileSum - totalAppearances;
     }
 
     double totalSizeMb() {
-      return (double) uniqueSizeSum / 1024.0 / 1024.0;
+      return uniqueSizeSum / 1024.0 / 1024.0;
     }
 
     /**
@@ -275,9 +275,12 @@ class LinkDirectoryScanner implements Callable<Integer> {
     final Map<String, DirStats> statsCache = new HashMap<>();
     final Map<String, List<SubtreeEntry>> subtreeMemo = new HashMap<>();
 
-    long statsCacheHits, statsCacheMisses;
-    long subtreeMemoHits, subtreeMemoMisses;
-    long dirCacheHits, dirCacheMisses;
+    long statsCacheHits;
+    long statsCacheMisses;
+    long subtreeMemoHits;
+    long subtreeMemoMisses;
+    long dirCacheHits;
+    long dirCacheMisses;
 
     DirStats getStats(String hash) {
       DirStats s = statsCache.get(hash);
