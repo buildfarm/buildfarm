@@ -74,6 +74,9 @@ tasks:
     - '...'
   macos:
     name: Unit Tests
+    environment:
+      ANDROID_HOME: ""
+      ANDROID_NDK_HOME: ""
     build_flags:
     - --cxxopt=-std=c++14
     - --build_tag_filters=-container
