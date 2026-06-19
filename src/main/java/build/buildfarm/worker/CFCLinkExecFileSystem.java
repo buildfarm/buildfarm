@@ -50,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.CancellationException;
@@ -162,12 +163,20 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   }
 
   private static final class DirectoryIterator implements Iterator<String> {
+    private static final class Frame {
+      private final String prefix;
+      private final Iterator<DirectoryNode> directories;
+
+      private Frame(String prefix, Iterator<DirectoryNode> directories) {
+        this.prefix = prefix;
+        this.directories = directories;
+      }
+    }
+
     private final Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex;
     private final Set<String> ignorePaths;
-    private Iterator<DirectoryNode> current;
-    private Stack<Iterator<DirectoryNode>> route = new Stack<>();
-    private Stack<String> path = new Stack<>();
-    private DirectoryNode next;
+    private final Stack<Frame> route = new Stack<>();
+    private String next;
 
     DirectoryIterator(
         Directory root,
@@ -175,8 +184,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         Set<String> ignorePaths) {
       this.directoriesIndex = directoriesIndex;
       this.ignorePaths = ignorePaths;
-      current = root.getDirectoriesList().iterator();
-      advance("");
+      route.push(new Frame("", root.getDirectoriesList().iterator()));
+      advance();
     }
 
     @Override
@@ -184,44 +193,49 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       return next != null;
     }
 
-    private void advance(String prefix) {
+    private void advance() {
       next = null;
-      while (current.hasNext()) {
-        DirectoryNode next = current.next();
-        if (!ignorePaths.contains(prefix + next.getName())) {
-          this.next = next;
-          return;
+      while (!route.isEmpty()) {
+        Frame frame = route.peek();
+        if (!frame.directories.hasNext()) {
+          route.pop();
+          continue;
         }
+
+        DirectoryNode nextNode = frame.directories.next();
+        String nextPath =
+            frame.prefix.isEmpty() ? nextNode.getName() : frame.prefix + "/" + nextNode.getName();
+        if (ignorePaths.contains(nextPath)) {
+          continue;
+        }
+
+        build.bazel.remote.execution.v2.Digest digest = nextNode.getDigest();
+        if (digest.getSizeBytes() != 0) {
+          Directory directory = checkNotNull(directoriesIndex.get(digest));
+          route.push(new Frame(nextPath, directory.getDirectoriesList().iterator()));
+        }
+        next = nextPath;
+        return;
       }
     }
 
     @Override
     public String next() {
-      String nextPath;
-      String name = next.getName();
-      path.push(name);
-      nextPath = String.join("/", path);
-      build.bazel.remote.execution.v2.Digest digest = next.getDigest();
-      if (digest.getSizeBytes() != 0) {
-        route.push(current);
-        current = directoriesIndex.get(digest).getDirectoriesList().iterator();
-        // nextPath guaranteed to be non-empty
-        advance(nextPath + "/");
-        if (!current.hasNext()) {
-          current = route.pop();
-          path.pop();
-        }
-      } else {
-        path.pop();
+      if (next == null) {
+        throw new NoSuchElementException();
       }
-      while (!current.hasNext() && !route.isEmpty()) {
-        current = route.pop();
-        path.pop();
-        String prefix = path.isEmpty() ? "" : (String.join("/", path) + "/");
-        advance(prefix);
-      }
+      String nextPath = next;
+      advance();
       return nextPath;
     }
+  }
+
+  @VisibleForTesting
+  static Iterator<String> directoriesIterator(
+      Directory root,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      Set<String> ignorePaths) {
+    return new DirectoryIterator(root, directoriesIndex, ignorePaths);
   }
 
   private Set<String> linkedDirectories(
@@ -233,7 +247,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       ImmutableSet.Builder<String> builder = ImmutableSet.builder();
 
       Directory root = directoriesIndex.get(rootDigest);
-      Iterator<String> dirs = new DirectoryIterator(root, directoriesIndex, ignorePaths);
+      Iterator<String> dirs = directoriesIterator(root, directoriesIndex, ignorePaths);
       while (dirs.hasNext()) {
         String dir = dirs.next();
         for (Pattern pattern : linkedInputDirectories) {
