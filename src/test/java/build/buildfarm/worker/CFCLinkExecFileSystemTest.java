@@ -35,11 +35,13 @@ import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.junit.Test;
@@ -291,5 +293,42 @@ public class CFCLinkExecFileSystemTest {
     // "a" matched the linked-directories pattern; it should have been linked via
     // putDirectory. If the constructor double-advance bug skipped "a", this fails.
     verify(cfc, times(1)).putDirectory(aDigest, directoriesIndex, fetchService);
+  }
+
+  @Test
+  public void directoryIteratorAdvancesPastEmptyDirectory() {
+    Digest emptyDigest = DIGEST_UTIL.compute(Directory.getDefaultInstance());
+    Directory nonEmptyDirectory =
+        Directory.newBuilder()
+            .addDirectories(
+                DirectoryNode.newBuilder()
+                    .setName("child")
+                    .setDigest(DigestUtil.toDigest(emptyDigest))
+                    .build())
+            .build();
+    Digest nonEmptyDigest = DIGEST_UTIL.compute(nonEmptyDirectory);
+    Directory inputRootDirectory =
+        Directory.newBuilder()
+            .addDirectories(
+                DirectoryNode.newBuilder()
+                    .setName("empty")
+                    .setDigest(DigestUtil.toDigest(emptyDigest))
+                    .build())
+            .addDirectories(
+                DirectoryNode.newBuilder()
+                    .setName("nonempty")
+                    .setDigest(DigestUtil.toDigest(nonEmptyDigest))
+                    .build())
+            .build();
+    Iterator<String> dirs =
+        CFCLinkExecFileSystem.directoriesIterator(
+            inputRootDirectory,
+            ImmutableMap.of(DigestUtil.toDigest(nonEmptyDigest), nonEmptyDirectory),
+            ImmutableSet.of());
+
+    assertThat(dirs.next()).isEqualTo("empty");
+    assertThat(dirs.next()).isEqualTo("nonempty");
+    assertThat(dirs.next()).isEqualTo("nonempty/child");
+    assertThat(dirs.hasNext()).isFalse();
   }
 }
