@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -115,6 +116,13 @@ public class LeaderElection implements Closeable {
   private final Map<String, ElectionState> activeElections = new ConcurrentHashMap<>();
 
   /**
+   * @field candidateElections Election keys this node wants to lead. Persistent across acquisition
+   *     failures and leadership losses so the renewal task can re-attempt acquisition until {@link
+   *     #stopParticipating} or {@link #close} is called.
+   */
+  private final Map<String, UnifiedJedis> candidateElections = new ConcurrentHashMap<>();
+
+  /**
    * @field leadershipCallbacks List of callbacks to invoke on leadership changes
    */
   private final List<BiConsumer<String, Boolean>> leadershipCallbacks =
@@ -126,11 +134,13 @@ public class LeaderElection implements Closeable {
    */
   private static class ElectionState {
     final UnifiedJedis jedis;
+    final String leaderValue;
     final long acquisitionTimestamp;
     volatile boolean wasLeader;
 
-    ElectionState(UnifiedJedis jedis) {
+    ElectionState(UnifiedJedis jedis, String leaderValue) {
       this.jedis = jedis;
+      this.leaderValue = leaderValue;
       this.acquisitionTimestamp = System.currentTimeMillis();
       this.wasLeader = true;
     }
@@ -214,23 +224,27 @@ public class LeaderElection implements Closeable {
     }
 
     String redisKey = getRedisKey(electionKey);
-    String value = getLeaderValue();
 
     try {
-      // Check if we're already the leader
-      String currentLeader = jedis.get(redisKey);
-      if (value.equals(currentLeader)) {
+      // Register as a candidate so the renewal task keeps re-attempting after losses
+      // or initial failures (e.g., stale lease from a prior leader).
+      candidateElections.put(electionKey, jedis);
+
+      // If we already hold this election in-process, nothing to do.
+      ElectionState existing = activeElections.get(electionKey);
+      if (existing != null) {
         log.fine(String.format("Node '%s' already leader for '%s'", nodeId, electionKey));
         return true;
       }
 
       // Attempt to acquire leadership with SET NX PX (atomic operation)
+      String value = newLeaderValue();
       SetParams params = new SetParams().nx().px(leaseDuration.toMillis());
       String result = jedis.set(redisKey, value, params);
 
       boolean acquired = "OK".equals(result);
       if (acquired) {
-        activeElections.put(electionKey, new ElectionState(jedis));
+        activeElections.put(electionKey, new ElectionState(jedis, value));
         log.info(String.format("Node '%s' became leader for '%s'", nodeId, electionKey));
         notifyLeadershipChange(electionKey, true);
       } else {
@@ -263,8 +277,13 @@ public class LeaderElection implements Closeable {
       return false;
     }
 
+    ElectionState state = activeElections.get(electionKey);
+    if (state == null) {
+      return false;
+    }
+
     String redisKey = getRedisKey(electionKey);
-    String value = getLeaderValue();
+    String value = state.leaderValue;
 
     try {
       // Use Lua script for atomic check-and-renew
@@ -304,12 +323,16 @@ public class LeaderElection implements Closeable {
       return false;
     }
 
+    ElectionState state = activeElections.get(electionKey);
+    if (state == null) {
+      return false;
+    }
+
     String redisKey = getRedisKey(electionKey);
-    String value = getLeaderValue();
 
     try {
       String currentLeader = jedis.get(redisKey);
-      return value.equals(currentLeader);
+      return state.leaderValue.equals(currentLeader);
     } catch (JedisException e) {
       log.severe(
           String.format("Error checking leadership for '%s': %s", electionKey, e.getMessage()));
@@ -336,12 +359,17 @@ public class LeaderElection implements Closeable {
         return null;
       }
 
-      // Parse nodeId from value (format: nodeId:timestamp)
-      int separatorIndex = value.lastIndexOf(':');
-      if (separatorIndex > 0) {
-        return value.substring(0, separatorIndex);
+      // Parse nodeId from value (format: nodeId:timestamp:uuid)
+      int firstSeparator = value.indexOf(':');
+      // nodeId itself is "host:port", so the nodeId/timestamp boundary is the second-to-last ':'.
+      int lastSeparator = value.lastIndexOf(':');
+      int penultimate = lastSeparator > 0 ? value.lastIndexOf(':', lastSeparator - 1) : -1;
+      if (penultimate > 0) {
+        return value.substring(0, penultimate);
       }
-
+      if (firstSeparator > 0) {
+        return value.substring(0, firstSeparator);
+      }
       return value;
     } catch (JedisException e) {
       log.severe(
@@ -364,8 +392,17 @@ public class LeaderElection implements Closeable {
       return false;
     }
 
+    ElectionState state = activeElections.get(electionKey);
+    if (state == null) {
+      log.warning(
+          String.format(
+              "Node '%s' failed to resign leadership for '%s' (not current leader)",
+              nodeId, electionKey));
+      return false;
+    }
+
     String redisKey = getRedisKey(electionKey);
-    String value = getLeaderValue();
+    String value = state.leaderValue;
 
     try {
       // Use Lua script for atomic check-and-delete
@@ -484,6 +521,7 @@ public class LeaderElection implements Closeable {
       }
 
       activeElections.clear();
+      candidateElections.clear();
       leadershipCallbacks.clear();
       log.info(String.format("LeaderElection closed for node '%s'", nodeId));
     }
@@ -500,12 +538,13 @@ public class LeaderElection implements Closeable {
             return;
           }
 
+          // Renew leases we currently hold.
           activeElections.forEach(
               (electionKey, state) -> {
                 try {
                   if (!renewLeadership(state.jedis, electionKey)) {
-                    // Renewal failed - leadership was lost
-                    handleLeadershipLoss(electionKey);
+                    // Renewal failed - leadership was lost (handleLeadershipLoss already
+                    // invoked inside renewLeadership).
                   }
                 } catch (Exception e) {
                   log.severe(
@@ -514,12 +553,41 @@ public class LeaderElection implements Closeable {
                   handleLeadershipLoss(electionKey);
                 }
               });
+
+          // Re-attempt acquisition for any election we want but don't hold. This covers
+          // initial start-up against a stale lease, and recovery after losing leadership.
+          candidateElections.forEach(
+              (electionKey, jedis) -> {
+                if (activeElections.containsKey(electionKey)) {
+                  return;
+                }
+                try {
+                  tryBecomeLeader(jedis, electionKey);
+                } catch (Exception e) {
+                  log.fine(
+                      String.format(
+                          "Candidate acquisition attempt failed for '%s': %s",
+                          electionKey, e.getMessage()));
+                }
+              });
         },
         renewalInterval.toMillis(),
         renewalInterval.toMillis(),
         TimeUnit.MILLISECONDS);
 
     log.fine(String.format("Renewal task started (interval: %dms)", renewalInterval.toMillis()));
+  }
+
+  /**
+   * @brief Stop participating in an election. Cancels candidacy and resigns if currently leader.
+   * @param jedis UnifiedJedis client for Redis operations
+   * @param electionKey Unique identifier for the election
+   */
+  public void stopParticipating(UnifiedJedis jedis, String electionKey) {
+    candidateElections.remove(electionKey);
+    if (activeElections.containsKey(electionKey)) {
+      resignLeadership(jedis, electionKey);
+    }
   }
 
   /**
@@ -571,11 +639,12 @@ public class LeaderElection implements Closeable {
   }
 
   /**
-   * @brief Get the value to store in Redis for this node's leadership.
-   * @details Format: nodeId:timestamp
-   * @return The leader value string
+   * @brief Mint a new unique value to store in Redis for a fresh acquisition.
+   * @details Format: nodeId:timestamp:uuid. The value must remain stable for the lifetime of an
+   *     acquisition so renewal/resign Lua scripts can verify ownership.
+   * @return A freshly minted leader value string
    */
-  private String getLeaderValue() {
-    return nodeId + ":" + Instant.now().toEpochMilli();
+  private String newLeaderValue() {
+    return nodeId + ":" + Instant.now().toEpochMilli() + ":" + UUID.randomUUID();
   }
 }
