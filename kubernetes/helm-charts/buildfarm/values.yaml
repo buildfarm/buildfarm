@@ -417,6 +417,14 @@ redis:
     enabled: false
   replica:
     replicaCount: 1
+  ## Bitnami relocated free public images from `bitnami/*` to `bitnamilegacy/*`
+  ## in late 2025; the original `bitnami/redis` tags referenced by this pinned
+  ## subchart (~18.14.2) no longer resolve. Point at the legacy mirror.
+  image:
+    repository: bitnamilegacy/redis
+  sentinel:
+    image:
+      repository: bitnamilegacy/redis-sentinel
 
 externalRedis:
   uri: "redis://localhost:6379"
