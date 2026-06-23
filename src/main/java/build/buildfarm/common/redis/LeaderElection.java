@@ -542,10 +542,9 @@ public class LeaderElection implements Closeable {
           activeElections.forEach(
               (electionKey, state) -> {
                 try {
-                  if (!renewLeadership(state.jedis, electionKey)) {
-                    // Renewal failed - leadership was lost (handleLeadershipLoss already
-                    // invoked inside renewLeadership).
-                  }
+                  // Renewal failures are handled inside renewLeadership via
+                  // handleLeadershipLoss; the boolean result is intentionally ignored.
+                  renewLeadership(state.jedis, electionKey);
                 } catch (Exception e) {
                   log.severe(
                       String.format(
