@@ -51,7 +51,8 @@ public class ShardActionCache implements ActionCache {
                     },
                     executor));
 
-    actionResultCache = Caffeine.newBuilder().maximumSize(maxLocalCacheSize).buildAsync(loader);
+    actionResultCache =
+        Caffeine.newBuilder().maximumSize(maxLocalCacheSize).executor(service).buildAsync(loader);
   }
 
   @Override
