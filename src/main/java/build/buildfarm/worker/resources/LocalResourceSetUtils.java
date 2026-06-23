@@ -21,7 +21,6 @@ import build.buildfarm.common.Claim;
 import build.buildfarm.common.config.LimitedResource;
 import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import build.buildfarm.worker.resources.LocalResourceSet.SemaphoreResource;
-import java.nio.file.attribute.UserPrincipal;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -105,11 +104,6 @@ public class LocalResourceSetUtils {
         PoolResource resource = resourceSet.poolResources.get(resourceName);
         poolRelease(resource.pool(), resourceName, pool.claims());
       }
-    }
-
-    @Override
-    public UserPrincipal owner() {
-      return null;
     }
 
     @Override

@@ -63,6 +63,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -308,14 +309,16 @@ class Executor {
       }
     }
 
+    UserPrincipal execOwner = null;
+    if (executionContext.claim.get(UserPrincipalLease.RESOURCE_NAME)
+        instanceof UserPrincipalLease ownerLease) {
+      execOwner = ownerLease.owner();
+    }
+
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
-            executionName,
-            executionContext.claim.owner(),
-            arguments,
-            executionContext.command,
-            workingDirectory)) {
+            executionName, execOwner, arguments, executionContext.command, workingDirectory)) {
       // Apply all other custom execution policies AFTER built-in wrappers
       for (ExecutionPolicy policy : policies) {
         if (!policy.isPrioritized() && policy.getExecutionWrapper() != null) {
