@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.worker.resources.ResourceLimits;
+import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -29,6 +30,13 @@ import lombok.extern.java.Log;
 
 @Log
 public class ExecuteActionStage extends PipelineStage {
+  private static final Histogram executionTime =
+      Histogram.build().name("execution_time_ms").help("Execution time in ms.").register();
+  private static final Histogram executionStallTime =
+      Histogram.build()
+          .name("execution_stall_time_ms")
+          .help("Execution stall time in ms.")
+          .register();
   private static final int IDLE_STAGE_CLOSED_MS = 10;
   private static final TimeUnit IDLE_STAGE_CLOSED_UNIT = TimeUnit.MILLISECONDS;
 
@@ -237,6 +245,8 @@ public class ExecuteActionStage extends PipelineStage {
   }
 
   void releaseExecutor(String executionName, long usecs, long stallUSecs, int exitCode) {
+    executionTime.observe(usecs / 1000.0);
+    executionStallTime.observe(stallUSecs / 1000.0);
     complete(executionName, usecs, stallUSecs, String.format("exit code: %d", exitCode));
   }
 }
