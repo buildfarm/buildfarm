@@ -59,6 +59,7 @@ import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.RetryingMatchListener;
+import build.buildfarm.worker.UserPrincipalLease;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
@@ -345,7 +346,6 @@ class ShardWorkerContext implements WorkerContext {
     return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
-  // FIXME make OwnedClaim with owner
   // how will this play out with persistent workers, should we have one per user?
   private @Nullable Claim acquireClaim(Platform platform) {
     // expand platform requirements with exec owner
@@ -363,34 +363,13 @@ class ShardWorkerContext implements WorkerContext {
           continue;
         }
         String name = (String) Iterables.getOnlyElement(pool.getValue());
-
-        return new Claim() {
-          UserPrincipal owner = execFileSystem.getOwner(name);
-
-          @Override
-          public void release(Claim.Stage stage) {
-            claim.release(stage);
-          }
-
-          @Override
-          public void release() {
-            owner = null;
-            claim.release();
-          }
-
-          @Override
-          public UserPrincipal owner() {
-            if (owner != null) {
-              return owner;
-            }
-            return claim.owner();
-          }
-
-          @Override
-          public Iterable<Entry<String, List<Object>>> getPools() {
-            return claim.getPools();
-          }
-        };
+        UserPrincipalLease userPrincipalLease =
+            new UserPrincipalLease(
+                UserPrincipalLease.RESOURCE_NAME,
+                /* amount= */ 1,
+                Claim.Stage.REPORT_RESULT_STAGE,
+                execFileSystem.getOwner(name));
+        claim.add(userPrincipalLease);
       }
       // claim was not provided with owner name value
     }
