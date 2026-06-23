@@ -48,6 +48,7 @@ import com.google.rpc.Status;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -247,13 +248,20 @@ public class InputFetcher implements Runnable {
           executionContext.queueEntry.getExecuteEntry().getActionDigest().getDigestFunction();
       build.buildfarm.v1test.Digest inputRootDigest =
           DigestUtil.fromDigest(queuedOperation.getAction().getInputRootDigest(), digestFunction);
+
+      UserPrincipal owner = null;
+      if (executionContext.claim.get(UserPrincipalLease.RESOURCE_NAME)
+          instanceof UserPrincipalLease ownerLease) {
+        owner = ownerLease.owner();
+      }
+
       execDir =
           workerContext.createExecDir(
               executionName,
               directoriesIndex,
               inputRootDigest,
               queuedOperation.getCommand(),
-              executionContext.claim.owner(),
+              owner,
               executionContext.workerExecutedMetadata);
     } catch (IOException e) {
       Status.Builder status = Status.newBuilder().setMessage("Error creating exec dir");

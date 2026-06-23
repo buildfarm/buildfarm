@@ -1,4 +1,4 @@
-// Copyright 2024 The Buildfarm Authors. All rights reserved.
+// Copyright 2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.worker;
 
-import java.util.List;
-import java.util.Map.Entry;
+import build.buildfarm.common.Claim.Lease;
+import build.buildfarm.common.Claim.Stage;
+import java.nio.file.attribute.UserPrincipal;
 
-public interface Claim {
-  enum Stage {
-    EXECUTE_ACTION_STAGE,
-    REPORT_RESULT_STAGE,
-  }
-
-  void release(Stage stage);
-
-  void release();
-
-  Iterable<Entry<String, List<Object>>> getPools();
+public record UserPrincipalLease(String name, int amount, Stage stage, UserPrincipal owner)
+    implements Lease {
+  public static final String RESOURCE_NAME = "user-principal";
 }
