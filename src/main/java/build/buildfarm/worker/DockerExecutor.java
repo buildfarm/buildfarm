@@ -37,7 +37,6 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -381,7 +380,7 @@ public class DockerExecutor {
       cmd.withResource(path.toString());
 
       try (TarArchiveInputStream tarStream = new TarArchiveInputStream(cmd.exec())) {
-        Utils.unTar(tarStream, new File(path.toString()));
+        Utils.unTar(tarStream, path);
       }
     } catch (Exception e) {
       log.log(Level.WARNING, "Could not extract file from container: ", e);

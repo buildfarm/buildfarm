@@ -48,8 +48,7 @@ public final class BuildfarmConfigs {
     public Object construct(Node node) {
       final ScalarNode scalarNode = (ScalarNode) node;
       final String value = scalarNode.getValue();
-      try {
-        final InputStream input = Files.newInputStream(Path.of(configsBasePath + "/" + value));
+      try (InputStream input = Files.newInputStream(Path.of(configsBasePath + "/" + value))) {
         final Yaml yaml = new Yaml(constructor);
         return yaml.load(input);
       } catch (NoSuchFileException ex) {

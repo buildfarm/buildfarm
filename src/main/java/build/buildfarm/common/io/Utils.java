@@ -498,17 +498,17 @@ public final class Utils {
    *     execution is performed in the docker container, it will return ta stream object so that
    *     files can be extracted.
    */
-  public static void unTar(TarArchiveInputStream tis, File destinationPath) throws IOException {
+  public static void unTar(TarArchiveInputStream tis, Path destinationPath) throws IOException {
     TarArchiveEntry tarEntry;
     while ((tarEntry = tis.getNextTarEntry()) != null) {
       // Directories don't need copied over. We ensure the destination path exists.
       if (tarEntry.isDirectory()) {
-        destinationPath.mkdirs();
+        Files.createDirectories(destinationPath);
       }
 
       // Copy tar files to the destination path
       else {
-        try (OutputStream fos = Files.newOutputStream(destinationPath.toPath())) {
+        try (OutputStream fos = Files.newOutputStream(destinationPath)) {
           IOUtils.copy(tis, fos);
         }
       }
