@@ -18,6 +18,8 @@ import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.worker.ExecuteActionStage.SHARES_PER_SLOT;
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
@@ -27,6 +29,7 @@ import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.Claim;
@@ -54,11 +57,14 @@ import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
+import build.buildfarm.worker.CPULease;
 import build.buildfarm.worker.DequeueMatchEvaluator;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecutionPolicies;
+import build.buildfarm.worker.Market;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.RetryingMatchListener;
+import build.buildfarm.worker.UserPrincipalLease;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
@@ -69,6 +75,7 @@ import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
@@ -93,6 +100,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -129,6 +137,7 @@ class ShardWorkerContext implements WorkerContext {
   private final int reportResultStageWidth;
   private final Backplane backplane;
   private final ExecFileSystem execFileSystem;
+  private final Market market = new Market();
   private final InputStreamFactory inputStreamFactory;
   private final ListMultimap<String, ExecutionPolicy> policies;
   private final Instance instance;
@@ -145,6 +154,8 @@ class ShardWorkerContext implements WorkerContext {
   private final boolean errorOperationRemainingResources;
   private final LocalResourceSet resourceSet;
   private final boolean errorOperationOutputSizeExceeded;
+  private final boolean marketExecution;
+  private final Set<String> ignoreMarketExecutionMnemonics;
   private final boolean provideOwnedClaim;
   private boolean inGracefulShutdown = false;
   private boolean pauseMatch = false;
@@ -181,6 +192,7 @@ class ShardWorkerContext implements WorkerContext {
    * @param inputFetchDeadline The duration input fetch must complete in before return to queue
    * @param backplane A source of truth and reporting for execution and content
    * @param execFileSystem Manager of execution filesystem presentation
+   * @param market CPU Marketplace for worker-scope trade of cpu shares
    * @param inputStreamFactory Supplier of CAS streams for reading
    * @param policies Policies which will/can be applied to executions
    * @param instance Instance used for ActionResult post and Operation lease reporting
@@ -221,6 +233,8 @@ class ShardWorkerContext implements WorkerContext {
       boolean allowBringYourOwnContainer,
       boolean errorOperationRemainingResources,
       boolean errorOperationOutputSizeExceeded,
+      boolean marketExecution,
+      Set<String> ignoreMarketExecutionMnemonics,
       LocalResourceSet resourceSet,
       CasWriter writer) {
     this.name = name;
@@ -244,8 +258,13 @@ class ShardWorkerContext implements WorkerContext {
     this.allowBringYourOwnContainer = allowBringYourOwnContainer;
     this.errorOperationRemainingResources = errorOperationRemainingResources;
     this.errorOperationOutputSizeExceeded = errorOperationOutputSizeExceeded;
+    this.marketExecution = marketExecution;
+    this.ignoreMarketExecutionMnemonics = ignoreMarketExecutionMnemonics;
     this.resourceSet = resourceSet;
     this.writer = writer;
+
+    checkState(resourceSet.resources.put(CPULease.RESOURCE_NAME, market) == null);
+    market.sell(executeStageWidth * SHARES_PER_SLOT);
 
     provideOwnedClaim = this.resourceSet.poolResources.containsKey(EXEC_OWNER_RESOURCE_NAME);
   }
@@ -259,6 +278,11 @@ class ShardWorkerContext implements WorkerContext {
             /*options.experimentalRemoteRetryJitter=*/ 0.1,
             /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
         Retrier.REDIS_IS_RETRIABLE);
+  }
+
+  @Override
+  public Market market() {
+    return market;
   }
 
   @Override
@@ -279,6 +303,12 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public boolean shouldErrorOperationOnRemainingResources() {
     return errorOperationRemainingResources;
+  }
+
+  @Override
+  public boolean shouldMarketExecution(RequestMetadata requestMetadata) {
+    return marketExecution
+        && !ignoreMarketExecutionMnemonics.contains(requestMetadata.getActionMnemonic());
   }
 
   @Override
@@ -345,7 +375,6 @@ class ShardWorkerContext implements WorkerContext {
     return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
-  // FIXME make OwnedClaim with owner
   // how will this play out with persistent workers, should we have one per user?
   private @Nullable Claim acquireClaim(Platform platform) {
     // expand platform requirements with exec owner
@@ -363,34 +392,13 @@ class ShardWorkerContext implements WorkerContext {
           continue;
         }
         String name = (String) Iterables.getOnlyElement(pool.getValue());
-
-        return new Claim() {
-          UserPrincipal owner = execFileSystem.getOwner(name);
-
-          @Override
-          public void release(Claim.Stage stage) {
-            claim.release(stage);
-          }
-
-          @Override
-          public void release() {
-            owner = null;
-            claim.release();
-          }
-
-          @Override
-          public UserPrincipal owner() {
-            if (owner != null) {
-              return owner;
-            }
-            return claim.owner();
-          }
-
-          @Override
-          public Iterable<Entry<String, List<Object>>> getPools() {
-            return claim.getPools();
-          }
-        };
+        UserPrincipalLease userPrincipalLease =
+            new UserPrincipalLease(
+                UserPrincipalLease.RESOURCE_NAME,
+                /* amount= */ 1,
+                Claim.Stage.REPORT_RESULT_STAGE,
+                execFileSystem.getOwner(name));
+        claim.add(userPrincipalLease);
       }
       // claim was not provided with owner name value
     }
@@ -873,11 +881,12 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   boolean shouldLimitCoreUsage() {
-    return limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0;
+    return marketExecution || limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0;
   }
 
   @Override
   public void createExecutionLimits() {
+    market.start();
     if (shouldLimitCoreUsage() && configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
       createOperationExecutionLimits();
     }
@@ -908,6 +917,12 @@ class ShardWorkerContext implements WorkerContext {
       try {
         operationsGroup.getCpu().close();
         executionsGroup.getCpu().close();
+        try {
+          market.stop();
+        } catch (InterruptedException e) {
+          log.log(Level.SEVERE, "market await shutdown interrupted", e);
+          Thread.currentThread().interrupt();
+        }
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -933,7 +948,7 @@ class ShardWorkerContext implements WorkerContext {
         command,
         defaultMaxCores,
         onlyMulticoreTests,
-        limitGlobalExecution,
+        marketExecution || limitGlobalExecution,
         getExecuteStageWidth(),
         allowBringYourOwnContainer,
         configs.getWorker().getSandboxSettings());
@@ -963,6 +978,14 @@ class ShardWorkerContext implements WorkerContext {
             public boolean isReferenced() {
               return false;
             }
+
+            @Override
+            public Map<String, Long> sample() {
+              return ImmutableMap.of();
+            }
+
+            @Override
+            public void setCpu(int cpu_us) {}
           };
     }
 
@@ -1188,6 +1211,24 @@ class ShardWorkerContext implements WorkerContext {
           }
         }
         return false;
+      }
+
+      @Override
+      public Map<String, Long> sample() {
+        Map<String, Long> sample = new HashMap<>();
+        for (IOResource resource : resources) {
+          sample.putAll(resource.sample());
+        }
+        return sample;
+      }
+
+      @Override
+      public void setCpu(int cpu_us) throws IOException {
+        for (IOResource resource : resources) {
+          if (resource instanceof Cpu) {
+            resource.setCpu(cpu_us);
+          }
+        }
       }
     };
   }

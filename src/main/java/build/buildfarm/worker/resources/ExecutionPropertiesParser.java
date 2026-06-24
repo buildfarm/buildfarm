@@ -70,6 +70,13 @@ public class ExecutionPropertiesParser {
     parser.put(
         ExecutionProperties.PERSISTENT_WORKER_KEY,
         ExecutionPropertiesParser::storePersistentWorkerKey);
+    // todo reconcile with min-cores/max-cores for broker
+    parser.put(ExecutionProperties.CPU_SHARE_FLOOR, ExecutionPropertiesParser::storeCpuShareFloor);
+    parser.put(ExecutionProperties.PCT_MIN_UNUSED, ExecutionPropertiesParser::storePctMinUnused);
+    parser.put(
+        ExecutionProperties.PCT_MIN_THROTTLED, ExecutionPropertiesParser::storePctMinThrottled);
+    parser.put(ExecutionProperties.MIN_SHARES_SOLD, ExecutionPropertiesParser::storeMinSharesSold);
+    parser.put(ExecutionProperties.MAX_SHARES_SOLD, ExecutionPropertiesParser::storeMaxSharesSold);
 
     ResourceLimits limits = new ResourceLimits();
     command
@@ -347,6 +354,41 @@ public class ExecutionPropertiesParser {
     ArrayList<String> xs = new ArrayList<>();
     xs.add("Hash of tool inputs for remote persistent workers");
     describeChange(xs, "persistentWorkerKey(hash of tool inputs)", property.getValue(), property);
+  }
+
+  private static void storeCpuShareFloor(ResourceLimits limits, Property property) {
+    limits.cpuShareFloor = Integer.parseInt(property.getValue());
+    ArrayList<String> xs = new ArrayList<>();
+    xs.add("Meaningless, lost");
+    describeChange(xs, "cpu share floor", property.getValue(), property);
+  }
+
+  private static void storePctMinUnused(ResourceLimits limits, Property property) {
+    limits.pctMinUnused = Integer.parseInt(property.getValue());
+    ArrayList<String> xs = new ArrayList<>();
+    xs.add("Meaningless, lost");
+    describeChange(xs, "cpu percent minimum unused", property.getValue(), property);
+  }
+
+  private static void storePctMinThrottled(ResourceLimits limits, Property property) {
+    limits.pctMinThrottled = Integer.parseInt(property.getValue());
+    ArrayList<String> xs = new ArrayList<>();
+    xs.add("Meaningless, lost");
+    describeChange(xs, "cpu percent minimum throttled", property.getValue(), property);
+  }
+
+  private static void storeMinSharesSold(ResourceLimits limits, Property property) {
+    limits.minSharesSold = Integer.parseInt(property.getValue());
+    ArrayList<String> xs = new ArrayList<>();
+    xs.add("Meaningless, lost");
+    describeChange(xs, "minimum cpu shares sold", property.getValue(), property);
+  }
+
+  private static void storeMaxSharesSold(ResourceLimits limits, Property property) {
+    limits.maxSharesSold = Integer.parseInt(property.getValue());
+    ArrayList<String> xs = new ArrayList<>();
+    xs.add("Meaningless, lost");
+    describeChange(xs, "maximum cpu shares sold", property.getValue(), property);
   }
 
   /**

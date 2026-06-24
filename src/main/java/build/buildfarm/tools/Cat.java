@@ -292,6 +292,11 @@ class Cat implements Callable<Integer> {
         out.push().println(linkedInputDirectory);
       }
     }
+    if (metadata.getUsageCount() > 0) {
+      for (Map.Entry<String, Long> usage : metadata.getUsageMap().entrySet()) {
+        out.push().format("%s: %d", usage.getKey(), usage.getValue());
+      }
+    }
   }
 
   private static void printExecutedActionMetadata(

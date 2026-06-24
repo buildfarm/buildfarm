@@ -16,9 +16,12 @@ package build.buildfarm.worker.shard;
 
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.v1test.StageInformation;
+import build.buildfarm.v1test.WorkerExecution;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
+import build.buildfarm.worker.ExecuteActionStage;
+import build.buildfarm.worker.Executor;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
@@ -33,7 +36,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final @Nullable CASFileCache storage;
   private final @Nullable PipelineStage matchStage;
   private final @Nullable SuperscalarPipelineStage inputFetchStage;
-  private final @Nullable SuperscalarPipelineStage executeActionStage;
+  private final @Nullable ExecuteActionStage executeActionStage;
   private final @Nullable SuperscalarPipelineStage reportResultStage;
   private final @Nullable PutOperationStage completeStage;
 
@@ -43,7 +46,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
       @Nullable CASFileCache storage,
       @Nullable PipelineStage matchStage,
       @Nullable SuperscalarPipelineStage inputFetchStage,
-      @Nullable SuperscalarPipelineStage executeActionStage,
+      @Nullable ExecuteActionStage executeActionStage,
       @Nullable SuperscalarPipelineStage reportResultStage,
       @Nullable PutOperationStage completeStage) {
     this.name = name;
@@ -65,7 +68,22 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     return builder.build();
   }
 
-  private StageInformation superscalarStageInformation(SuperscalarPipelineStage stage) {
+  private StageInformation executeActionStageInformation(ExecuteActionStage stage) {
+    StageInformation.Builder builder =
+        StageInformation.newBuilder()
+            .setName(stage.getName())
+            .setSlotsConfigured(stage.getSharesConfigured())
+            .setSlotsUsed(stage.getSharesUsed());
+    for (Executor execution : stage.getExecutions()) {
+      builder.addExecutions(
+          WorkerExecution.newBuilder()
+              .setName(execution.name())
+              .addAllResources(execution.resources()));
+    }
+    return builder.build();
+  }
+
+  private StageInformation superscalarStageInformation(PipelineStage stage) {
     return StageInformation.newBuilder()
         .setName(stage.getName())
         .setSlotsConfigured(stage.getWidth())
@@ -108,7 +126,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
       String matchOperation = matchStage.getOperationName();
       replyBuilder
           .addStages(superscalarStageInformation(reportResultStage))
-          .addStages(superscalarStageInformation(executeActionStage))
+          .addStages(executeActionStageInformation(executeActionStage))
           .addStages(superscalarStageInformation(inputFetchStage))
           .addStages(unaryStageInformation(matchStage.getName(), matchOperation));
     }

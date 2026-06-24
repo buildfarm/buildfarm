@@ -48,6 +48,7 @@ import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Jimfs;
 import com.google.protobuf.Duration;
@@ -123,6 +124,8 @@ public class ShardWorkerContextTest {
         /* allowBringYourOwnContainer= */ false,
         /* errorOperationRemainingResources= */ false,
         /* errorOperationOutputSizeExceeded= */ false,
+        /* marketExecution= */ false,
+        /* ignoreMarketExecutionMnemonics= */ ImmutableSet.of(),
         resourceSet,
         writer);
   }

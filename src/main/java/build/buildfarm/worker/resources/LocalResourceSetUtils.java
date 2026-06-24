@@ -18,10 +18,10 @@ import static com.google.common.collect.Iterables.transform;
 
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.Claim;
+import build.buildfarm.common.Resource;
 import build.buildfarm.common.config.LimitedResource;
 import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import build.buildfarm.worker.resources.LocalResourceSet.SemaphoreResource;
-import java.nio.file.attribute.UserPrincipal;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -33,6 +33,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.Nullable;
@@ -45,36 +46,55 @@ import org.jspecify.annotations.Nullable;
 public class LocalResourceSetUtils {
   private static final LocalResourceSetMetrics metrics = new LocalResourceSetMetrics();
 
-  private record SemaphoreLease(String name, int amount, Claim.Stage stage) {}
+  private record SemaphoreLease(String name, int amount, Claim.Stage stage)
+      implements Claim.Lease {}
 
   private record PoolLease(String name, List<Object> claims, Claim.Stage stage) {}
 
   public static final class LocalResourceSetClaim implements Claim {
-    private final List<SemaphoreLease> semaphores;
+    private final List<Lease> leases;
     private final List<PoolLease> pools;
     private final LocalResourceSet resourceSet;
 
-    LocalResourceSetClaim(
-        List<SemaphoreLease> semaphores, List<PoolLease> pools, LocalResourceSet resourceSet) {
-      this.semaphores = semaphores;
+    LocalResourceSetClaim(List<Lease> leases, List<PoolLease> pools, LocalResourceSet resourceSet) {
+      this.leases = leases;
       this.pools = pools;
       this.resourceSet = resourceSet;
+    }
+
+    public void add(Lease lease) {
+      leases.add(lease);
+    }
+
+    public Lease get(String name) {
+      // O(n), use sparingly
+      for (Lease lease : leases) {
+        if (lease.name().equals(name)) {
+          return lease;
+        }
+      }
+      return null;
+    }
+
+    @Override
+    public Iterable<build.buildfarm.v1test.Resource> resources() {
+      return leases.stream().map(Claim.Lease::toResource).collect(Collectors.toList());
     }
 
     @Override
     public synchronized void release(Stage stage) {
       // only remove resources that match the specified stage
       // O(n) search for staged resources
-      Iterator<SemaphoreLease> semaphoreIter = semaphores.iterator();
-      while (semaphoreIter.hasNext()) {
-        SemaphoreLease semaphore = semaphoreIter.next();
-        if (semaphore.stage() != stage) {
+      Iterator<Lease> leaseIter = leases.iterator();
+      while (leaseIter.hasNext()) {
+        Lease lease = leaseIter.next();
+        if (lease.stage() != stage) {
           continue;
         }
-        semaphoreIter.remove();
-        String resourceName = semaphore.name();
-        SemaphoreResource resource = resourceSet.resources.get(resourceName);
-        semaphoreRelease(resource.semaphore(), resourceName, semaphore.amount());
+        leaseIter.remove();
+        String resourceName = lease.name();
+        Resource resource = resourceSet.resources.get(resourceName);
+        expire(resource, resourceName, lease.amount());
       }
       Iterator<PoolLease> poolIter = pools.iterator();
       while (poolIter.hasNext()) {
@@ -92,11 +112,11 @@ public class LocalResourceSetUtils {
     // safe for multiple sequential calls with removal to release
     @Override
     public synchronized void release() {
-      while (!semaphores.isEmpty()) {
-        SemaphoreLease semaphore = semaphores.removeFirst();
-        String resourceName = semaphore.name();
-        SemaphoreResource resource = resourceSet.resources.get(resourceName);
-        semaphoreRelease(resource.semaphore(), resourceName, semaphore.amount());
+      while (!leases.isEmpty()) {
+        Lease lease = leases.removeFirst();
+        String resourceName = lease.name();
+        Resource resource = resourceSet.resources.get(resourceName);
+        expire(resource, resourceName, lease.amount());
       }
 
       while (!pools.isEmpty()) {
@@ -105,11 +125,6 @@ public class LocalResourceSetUtils {
         PoolResource resource = resourceSet.poolResources.get(resourceName);
         poolRelease(resource.pool(), resourceName, pool.claims());
       }
-    }
-
-    @Override
-    public UserPrincipal owner() {
-      return null;
     }
 
     @Override
@@ -145,8 +160,8 @@ public class LocalResourceSetUtils {
 
   public static Set<String> exhausted(LocalResourceSet resourceSet) {
     Set<String> exhausted = new HashSet<>();
-    for (Entry<String, SemaphoreResource> resource : resourceSet.resources.entrySet()) {
-      if (resource.getValue().semaphore().availablePermits() == 0) {
+    for (Entry<String, Resource> resource : resourceSet.resources.entrySet()) {
+      if (resource.getValue().availablePermits() == 0) {
         exhausted.add(resource.getKey());
       }
     }
@@ -159,7 +174,7 @@ public class LocalResourceSetUtils {
   }
 
   public static @Nullable Claim claimResources(Platform platform, LocalResourceSet resourceSet) {
-    List<SemaphoreLease> semaphoreClaimed = new ArrayList<>();
+    List<Claim.Lease> semaphoreClaimed = new ArrayList<>();
     List<PoolLease> poolClaimed = new ArrayList<>();
 
     boolean allClaimed = true;
@@ -167,10 +182,10 @@ public class LocalResourceSetUtils {
       String resourceName = getResourceName(property.getName());
       int requestAmount = getResourceRequestAmount(property);
       if (resourceSet.resources.containsKey(resourceName)) {
-        SemaphoreResource resource = resourceSet.resources.get(resourceName);
+        Resource resource = resourceSet.resources.get(resourceName);
 
         // Attempt to claim.  If claiming fails, we must return all other claims.
-        boolean wasAcquired = semaphoreAquire(resource.semaphore(), resourceName, requestAmount);
+        boolean wasAcquired = acquire(resource, resourceName, requestAmount);
         if (wasAcquired) {
           semaphoreClaimed.add(new SemaphoreLease(resourceName, requestAmount, resource.stage()));
         } else {
@@ -192,11 +207,8 @@ public class LocalResourceSetUtils {
 
     // cleanup remaining resources if they were not all claimed.
     if (!allClaimed) {
-      for (SemaphoreLease semaphore : semaphoreClaimed) {
-        semaphoreRelease(
-            resourceSet.resources.get(semaphore.name()).semaphore(),
-            semaphore.name(),
-            semaphore.amount());
+      for (Claim.Lease semaphore : semaphoreClaimed) {
+        expire(resourceSet.resources.get(semaphore.name()), semaphore.name(), semaphore.amount());
       }
       for (PoolLease pool : poolClaimed) {
         poolRelease(resourceSet.poolResources.get(pool.name()).pool(), pool.name(), pool.claims());
@@ -208,7 +220,7 @@ public class LocalResourceSetUtils {
         : null;
   }
 
-  private static boolean semaphoreAquire(Semaphore resource, String resourceName, int amount) {
+  private static boolean acquire(Resource resource, String resourceName, int amount) {
     boolean wasAcquired = resource.tryAcquire(amount);
     if (wasAcquired) {
       metrics.resourceUsageMetric.labels(resourceName).inc(amount);
@@ -233,7 +245,7 @@ public class LocalResourceSetUtils {
     return true;
   }
 
-  private static void semaphoreRelease(Semaphore resource, String resourceName, int amount) {
+  private static void expire(Resource resource, String resourceName, int amount) {
     resource.release(amount);
     metrics.resourceUsageMetric.labels(resourceName).dec(amount);
     metrics.requestersMetric.labels(resourceName).dec();

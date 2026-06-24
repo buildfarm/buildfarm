@@ -18,6 +18,7 @@ import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.Getter;
@@ -49,6 +50,10 @@ public abstract class PipelineStage implements Runnable {
     return false;
   }
 
+  public boolean isEmpty() {
+    return !claimed;
+  }
+
   protected void runInterruptible() throws InterruptedException {
     while (!output.isClosed() || isClaimed()) {
       iterate();
@@ -57,6 +62,17 @@ public abstract class PipelineStage implements Runnable {
 
   public @Nullable String getOperationName() {
     return operationName;
+  }
+
+  public Iterable<String> getOperationNames() {
+    if (operationName != null) {
+      return ImmutableList.of(operationName);
+    }
+    return ImmutableList.of();
+  }
+
+  public int getSlotUsage() {
+    return operationName != null ? 1 : 0;
   }
 
   @Override

@@ -28,6 +28,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.OperationFailer;
 import build.buildfarm.common.ProxyDirectoriesIndex;
@@ -48,6 +49,7 @@ import com.google.rpc.Status;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -247,13 +249,20 @@ public class InputFetcher implements Runnable {
           executionContext.queueEntry.getExecuteEntry().getActionDigest().getDigestFunction();
       build.buildfarm.v1test.Digest inputRootDigest =
           DigestUtil.fromDigest(queuedOperation.getAction().getInputRootDigest(), digestFunction);
+
+      UserPrincipal owner = null;
+      if (executionContext.claim.get(UserPrincipalLease.RESOURCE_NAME)
+          instanceof UserPrincipalLease ownerLease) {
+        owner = ownerLease.owner();
+      }
+
       execDir =
           workerContext.createExecDir(
               executionName,
               directoriesIndex,
               inputRootDigest,
               queuedOperation.getCommand(),
-              executionContext.claim.owner(),
+              owner,
               executionContext.workerExecutedMetadata);
     } catch (IOException e) {
       Status.Builder status = Status.newBuilder().setMessage("Error creating exec dir");
@@ -323,12 +332,15 @@ public class InputFetcher implements Runnable {
         Thread.currentThread()::interrupt,
         Deadline.after(10, DAYS),
         pollerExecutor);
+    RequestMetadata requestMetadata =
+        executionContext.queueEntry.getExecuteEntry().getRequestMetadata();
     ExecutionContext fetchedExecutionContext =
         executionContext.toBuilder()
             .setExecDir(execDir)
             .setAction(action)
             .setCommand(command)
             .setTree(tree)
+            .setMarketExecution(workerContext.shouldMarketExecution(requestMetadata))
             .build();
     boolean claimed;
     // PMD exemption false positive: unused variable
