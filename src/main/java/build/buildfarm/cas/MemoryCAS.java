@@ -293,7 +293,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @SuppressWarnings("PMD.CompareObjectsWithEquals")
   private synchronized boolean add(Blob blob, Runnable onExpiration) {
-    Entry e = storage.get(blob.getDigest().getHash());
+    Entry e = storage.get(DigestUtil.toString(blob.getDigest()));
     if (e != null) {
       if (onExpiration != null) {
         e.addOnExpiration(onExpiration);
@@ -319,7 +319,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     createEntry(blob, onExpiration);
 
-    storage.put(blob.getDigest().getHash(), header.before);
+    storage.put(DigestUtil.toString(blob.getDigest()), header.before);
 
     return true;
   }
@@ -359,7 +359,7 @@ public class MemoryCAS implements ContentAddressableStorage {
             Level.SEVERE, String.format("error delegating %s", DigestUtil.toString(digest)), ioEx);
       }
     }
-    storage.remove(e.key);
+    storage.remove(DigestUtil.toString(digest));
     e.expire();
     sizeInBytes -= digest.getSize();
   }
