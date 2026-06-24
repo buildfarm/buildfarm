@@ -25,5 +25,6 @@ java_test(
         "@buildfarm_maven//:redis_clients_jedis",
         "@googleapis//google/bytestream:bytestream_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
