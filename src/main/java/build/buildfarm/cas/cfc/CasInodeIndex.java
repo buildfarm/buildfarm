@@ -15,6 +15,7 @@
 package build.buildfarm.cas.cfc;
 
 import build.buildfarm.cas.cfc.CASFileCache.Entry;
+import io.prometheus.client.Counter;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
 
@@ -36,6 +37,16 @@ import org.jspecify.annotations.Nullable;
  * record, unaware of the indexing strategy.
  */
 final class CasInodeIndex {
+  // Accounting-bug canary. decrement() already fails fast on underflow (throws below), but that is
+  // only visible in logs/crashes; this counter makes it dashboard-visible. Nonzero ⇒ a double-
+  // decrement / decrement-without-increment / double-visit ⇒ either a leak or premature eviction of
+  // a live hardlinked file — exactly the failure mode Phase 3's accounting exists to prevent.
+  private static final Counter hardlinkCountUnderflowTotal =
+      Counter.build()
+          .name("cas_hardlink_count_underflow_total")
+          .help("casDirectoryHardlinkCount decrement underflows (accounting-bug canary; expect 0).")
+          .register();
+
   // Keyed by Object because BasicFileAttributes.fileKey() returns Object — the JDK does not provide
   // a shared interface across UnixFileKey (Linux/macOS), WindowsFileKey, and other providers'
   // implementations. Each concrete class implements equals() and hashCode() on the underlying inode
@@ -85,6 +96,7 @@ final class CasInodeIndex {
     int old = entry.getAndAddCasDirectoryHardlinkCount(-1);
     if (old <= 0) {
       entry.getAndAddCasDirectoryHardlinkCount(1);
+      hardlinkCountUnderflowTotal.inc();
       throw new IllegalStateException(
           "entry " + entry.key + " casDirectoryHardlinkCount underflow (was " + old + ")");
     }

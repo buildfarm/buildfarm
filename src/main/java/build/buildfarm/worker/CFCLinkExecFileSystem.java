@@ -43,6 +43,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -68,6 +70,24 @@ import org.jspecify.annotations.Nullable;
 
 @Log
 public class CFCLinkExecFileSystem extends CFCExecFileSystem {
+  // --- Phase 5 (LinkedInputExclusions) directory-link ratio ---
+  // The risk here is asymmetric: exclusions too broad push linkable directories back to per-file
+  // hardlinking (silent loss of the speedup). These two counters are that tripwire -- if a denylist
+  // change quietly drops the symlinked share, the ratio symlinked/(symlinked+fallback) falls before
+  // users notice. Counted at the per-directory link decision in preVisitDirectory.
+  private static final Counter execDirDirectoriesSymlinkedTotal =
+      Counter.build()
+          .name("exec_dir_directories_symlinked_total")
+          .help("Input directories materialized as a single directory symlink (the cheap path).")
+          .register();
+  private static final Counter execDirDirectoriesHardlinkedFallbackTotal =
+      Counter.build()
+          .name("exec_dir_directories_hardlinked_fallback_total")
+          .help(
+              "Link-candidate input directories excluded from directory symlinking, descended as "
+                  + "real directories and materialized via per-file hardlinking.")
+          .register();
+
   // perform first-available non-output symlinking and retain directories in cache
   private final boolean linkInputDirectories;
 
@@ -157,6 +177,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
           if (digest.getSize() != 0) {
             try {
               Files.createLink(path, pathResult.path());
+              materializePathTotal.labels("hardlink_file").inc();
             } catch (IOException e) {
               return immediateFailedFuture(e);
             }
@@ -188,6 +209,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
                     "putDirectory(%s, %s) created", execPath, DigestUtil.toString(digest)));
           }
           Files.createSymbolicLink(execPath, path);
+          materializePathTotal.labels("symlink_dir").inc();
           return immediateFuture(pathResult);
         },
         fetchService);
@@ -315,9 +337,12 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
             parentOutputDirectory != null ? parentOutputDirectory.getChild(name) : null;
       }
       String relativePath = LinkedInputExclusions.pathToRelativeString(root, dir);
-      if (linkInputDirectories
-          && outputDirectory == null
-          && !linkedInputExclusions.excludes(relativePath)) {
+      // A directory is a symlink candidate when input-dir linking is on and it is not an output
+      // directory; of those, an exclusion is what forces the per-file-hardlink fallback.
+      boolean linkCandidate = linkInputDirectories && outputDirectory == null;
+      boolean excluded = linkCandidate && linkedInputExclusions.excludes(relativePath);
+      if (linkCandidate && !excluded) {
+        execDirDirectoriesSymlinkedTotal.inc();
         Digest digest = (Digest) attrs.fileKey();
         build.bazel.remote.execution.v2.Digest reapiDigest = DigestUtil.toDigest(digest);
         workerExecutedMetadata.addLinkedInputDirectories(relativePath);
@@ -333,6 +358,9 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
                 },
                 fetchService));
         return FileVisitResult.SKIP_SUBTREE;
+      }
+      if (excluded) {
+        execDirDirectoriesHardlinkedFallbackTotal.inc();
       }
 
       FileVisitResult result = super.preVisitDirectory(dir, attrs);
@@ -380,6 +408,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       @Nullable UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
+    Histogram.Timer materializeTimer = materializeExecRootSeconds.labels("regular").startTimer();
+    try {
     Digest inputRootDigest = DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction);
     OutputDirectory outputDirectory = createOutputDirectory(command);
 
@@ -470,6 +500,9 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       Directories.setAllOwner(execDir, owner);
     }
     return execDir;
+    } finally {
+      materializeTimer.observeDuration();
+    }
   }
 
   @Override

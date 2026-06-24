@@ -173,6 +173,26 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private static final Counter readIOErrors =
       Counter.build().name("read_io_errors").help("Number of IO errors on read.").register();
 
+  // --- A/B comparable metrics (baseline + change) for the CAS concurrency project ---
+  // cas_charge_seconds: wall time of charge() (admit a write). On the baseline this includes the
+  // global-lock stop-the-world inline eviction; on this change branch eviction has moved to an
+  // async sharded evictor, so charge() now only delegates to casShards.charge() (which may apply
+  // backpressure). Keeping the timer here keeps the admit-latency series comparable across both.
+  private static final Histogram casChargeSeconds =
+      Histogram.build()
+          .name("cas_charge_seconds")
+          .buckets(0.0001, 0.001, 0.01, 0.1, 1, 5, 30, 60, 120)
+          .help("Wall time of CASFileCache.charge() to admit a write.")
+          .register();
+  // cas_lookups_total{result}: blob-presence lookups in findMissingBlobs by result. The hit rate
+  // (hit/(hit+miss)) proves sharding-by-digest did not hurt CAS dedup effectiveness.
+  private static final Counter casLookups =
+      Counter.build()
+          .name("cas_lookups_total")
+          .labelNames("result")
+          .help("CAS blob presence lookups in findMissingBlobs (result=hit present / miss absent).")
+          .register();
+
   @Getter private final Path root;
   protected final EntryPathStrategy entryPathStrategy;
   protected final long maxSizeInBytes;
@@ -772,12 +792,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     build.bazel.remote.execution.v2.Digest.Builder result =
         build.bazel.remote.execution.v2.Digest.newBuilder();
     for (build.bazel.remote.execution.v2.Digest digest : digests) {
-      if (digest.getSizeBytes() != 0
-          && !containsLocal(DigestUtil.fromDigest(digest, digestFunction), result, found::add)) {
+      boolean missing =
+          digest.getSizeBytes() != 0
+              && !containsLocal(DigestUtil.fromDigest(digest, digestFunction), result, found::add);
+      if (missing) {
         builder.add(digest);
+        if (digest.getSizeBytes() > 0) {
+          casLookups.labels("miss").inc();
+        }
       } else if (digest.getSizeBytes() == -1) {
         // may misbehave with delegate
         builder.add(result.build());
+      } else if (digest.getSizeBytes() > 0) {
+        casLookups.labels("hit").inc();
       }
     }
     if (state.shouldRecordAccess()) {
@@ -1784,7 +1811,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 try {
                   casSizeMetric.set(size());
                   casEntryCountMetric.set(entryCount());
-                  MINUTES.sleep(5);
+                  // 15s, not 5min: the coarse interval is useless for an A/B and hides the
+                  // cache-fill dynamics this project is about.
+                  Thread.sleep(15_000);
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -3110,13 +3139,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})
   protected boolean charge(String key, long blobSizeInBytes, AtomicBoolean requiresDischarge)
       throws IOException, InterruptedException {
-    if (referenceIfExists(key)) {
-      return false;
+    Histogram.Timer chargeTimer = casChargeSeconds.startTimer();
+    try {
+      if (referenceIfExists(key)) {
+        return false;
+      }
+      long diskSize = estimateSizeOnDisk(blobSizeInBytes, blockSize, /* isHardlink= */ false);
+      casShards.charge(key, diskSize);
+      requiresDischarge.set(true);
+      return true;
+    } finally {
+      chargeTimer.observeDuration();
     }
-    long diskSize = estimateSizeOnDisk(blobSizeInBytes, blockSize, /* isHardlink= */ false);
-    casShards.charge(key, diskSize);
-    requiresDischarge.set(true);
-    return true;
   }
 
   private CancellableOutputStream putOrReferenceGuarded(

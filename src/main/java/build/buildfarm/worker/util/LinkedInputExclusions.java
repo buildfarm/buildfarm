@@ -16,6 +16,7 @@ package build.buildfarm.worker.util;
 
 import build.bazel.remote.execution.v2.Command;
 import com.google.common.collect.ImmutableSet;
+import io.prometheus.client.Counter;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.HashSet;
@@ -31,6 +32,17 @@ import java.util.Set;
  * persistent worker input linking).
  */
 public final class LinkedInputExclusions {
+  // Diagnostic: why directories get excluded from directory-level linking. Counted once per source
+  // declaration (not per expanded ancestor) at computeExclusionSet time. A new or ballooning reason
+  // after a config/REAPI change is a tripwire that linking coverage is shrinking.
+  private static final Counter linkedInputExclusionsTotal =
+      Counter.build()
+          .name("linked_input_exclusions_total")
+          .labelNames("reason")
+          .help("Directory-linking exclusions by source (output_path / output_file / "
+              + "output_directory / tool_input / exclude_directory).")
+          .register();
+
   private LinkedInputExclusions() {}
 
   public static final class ExclusionSet {
@@ -203,6 +215,7 @@ public final class LinkedInputExclusions {
         String resolved = resolveAgainstWorkingDirectory(workingDirectory, outputPath);
         addPathAndAncestors(resolved, exclusions);
         recursiveExclusions.add(resolved);
+        linkedInputExclusionsTotal.labels("output_path").inc();
       }
     } else {
       // REAPI < 2.1: for output_files only the parent directory + ancestors must remain
@@ -214,12 +227,14 @@ public final class LinkedInputExclusions {
           String parent = resolved.substring(0, lastSlash);
           exclusions.add(parent);
           addAncestors(parent, exclusions);
+          linkedInputExclusionsTotal.labels("output_file").inc();
         }
       }
       for (String outputDir : command.getOutputDirectoriesList()) {
         String resolved = resolveAgainstWorkingDirectory(workingDirectory, outputDir);
         addPathAndAncestors(resolved, exclusions);
         recursiveExclusions.add(resolved);
+        linkedInputExclusionsTotal.labels("output_directory").inc();
       }
     }
 
@@ -229,6 +244,7 @@ public final class LinkedInputExclusions {
     for (String excludePath : excludePaths) {
       String normalized = normalizePath(stripTrailingSlash(excludePath));
       addAncestors(normalized, exclusions);
+      linkedInputExclusionsTotal.labels("tool_input").inc();
     }
 
     // Exclude directories are directory paths. Their ancestors must also remain real so traversal
@@ -236,6 +252,7 @@ public final class LinkedInputExclusions {
     for (String excludeDirectory : excludeDirectories) {
       String normalized = normalizePath(stripTrailingSlash(excludeDirectory));
       addPathAndAncestors(normalized, exclusions);
+      linkedInputExclusionsTotal.labels("exclude_directory").inc();
     }
 
     return new ExclusionSet(

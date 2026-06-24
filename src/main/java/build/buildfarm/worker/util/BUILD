@@ -19,5 +19,6 @@ java_library(
         "@buildfarm_maven//:io_grpc_grpc_netty",
         "@buildfarm_maven//:io_grpc_grpc_protobuf",
         "@buildfarm_maven//:io_grpc_grpc_stub",
+        "@buildfarm_maven//:io_prometheus_simpleclient",
     ],
 )

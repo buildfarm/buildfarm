@@ -91,6 +91,15 @@ public class DirectoryEntryCFC extends CASFileCache {
           .name("cas_hardlink_fallback_total")
           .help("CAS-directory hardlinks that fell back to byte-copy.")
           .register();
+  // Success counterpart to hardlinkFallbackTotal -- the Phase-3 thesis (hardlink >> copy) is only
+  // provable with both: fallback ratio = fallback / (fallback + success). Incremented once per
+  // successful CAS-directory file hardlink (both the first-try and re-fetch link paths route
+  // through recordCasDirectoryHardlink).
+  private static final Counter casDirectoryHardlinksTotal =
+      Counter.build()
+          .name("cas_directory_hardlinks_total")
+          .help("CAS-directory file hardlinks that succeeded (pairs with cas_hardlink_fallback_total).")
+          .register();
   // Incremented once per re-fetch attempt (not once per distinct race) — the name and help both say
   // "attempts" so a single race that needs N tries adds N here, matching the loop in
   // reFetchAndLink.
@@ -663,6 +672,7 @@ public class DirectoryEntryCFC extends CASFileCache {
 
   private void recordCasDirectoryHardlink(HardlinkSource source) {
     casInodeIndex.increment(source.sourceEntry(), source.fileKey());
+    casDirectoryHardlinksTotal.inc();
   }
 
   private void copyHardlinkFallback(Path src, Path dst) throws IOException {
