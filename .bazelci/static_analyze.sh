@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025 The Buildfarm Authors. All rights reserved.
+# Copyright 2021-2026 The Buildfarm Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,9 +44,18 @@ print_error () {
 download_tool () {
     if [ ! -d "$TOOL_FOLDER" ] ; then
 
+        # Quiet down wget/unzip when not attached to a terminal (e.g. CI, agents).
+        if [ -t 1 ]; then
+            WGET_FLAGS="--show-progress"
+            UNZIP_FLAGS=""
+        else
+            WGET_FLAGS="-nv"
+            UNZIP_FLAGS="-q"
+        fi
+
         #download and extract tool
-        wget -O $LOCAL_DOWNLOAD_NAME $PMD_TOOL_URL
-        unzip $LOCAL_DOWNLOAD_NAME
+        wget -q $WGET_FLAGS -O $LOCAL_DOWNLOAD_NAME $PMD_TOOL_URL
+        unzip $UNZIP_FLAGS $LOCAL_DOWNLOAD_NAME
 
         #delete the zip and give tool common name.
         rm $LOCAL_DOWNLOAD_NAME
@@ -56,7 +65,13 @@ download_tool () {
 
 # The tool should return non-zero if there are violations
 run_static_analysis_checks () {
-    pmd/bin/pmd check -R $STATIC_ANALYSIS_RULESET --format text --threads 4 --relativize-paths-with src --report-file $STATIC_ANALYSIS_REPORT_FILE --dir src
+    # Disable the live progress bar when not attached to a terminal (e.g. CI, agents).
+    if [ -t 1 ]; then
+        PMD_PROGRESS_FLAG="--progress"
+    else
+        PMD_PROGRESS_FLAG="--no-progress"
+    fi
+    pmd/bin/pmd check $PMD_PROGRESS_FLAG -R $STATIC_ANALYSIS_RULESET --format text --threads 4 --relativize-paths-with src --report-file $STATIC_ANALYSIS_REPORT_FILE --dir src
 }
 
 analyze_static_analysis_results () {
