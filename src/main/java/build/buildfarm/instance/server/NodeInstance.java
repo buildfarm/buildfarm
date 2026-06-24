@@ -52,6 +52,7 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionCapabilities;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
@@ -107,6 +108,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Parser;
 import com.google.rpc.Code;
@@ -159,6 +161,17 @@ public abstract class NodeInstance extends InstanceBase {
   protected final OperationsMap completedOperations;
   protected final Map<Digest, ByteString> activeBlobWrites;
   protected final boolean ensureOutputsPresent;
+
+  // The default grpc max message size (4 MiB). A getTree page is truncated to stay below this so
+  // that the resulting GetTreeResponse does not exceed the grpc per-message byte limit. A buffer is
+  // reserved within the page builder below to leave room for the response envelope (nextPageToken).
+  private static final int DEFAULT_GET_TREE_MAX_MESSAGE_SIZE_BYTES = 4 * 1024 * 1024;
+
+  // Reserve a small portion of the message budget for the GetTreeResponse fields surrounding the
+  // repeated directories (notably nextPageToken) and grpc framing slack.
+  private static final int GET_TREE_RESPONSE_OVERHEAD_BYTES = 1024;
+
+  private int getTreeMaxMessageSizeBytes = DEFAULT_GET_TREE_MAX_MESSAGE_SIZE_BYTES;
 
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
 
@@ -622,6 +635,11 @@ public abstract class NodeInstance extends InstanceBase {
   protected abstract TokenizableIterator<DirectoryEntry> createTreeIterator(
       String reason, build.buildfarm.v1test.Digest rootDigest, String pageToken);
 
+  @VisibleForTesting
+  void setGetTreeMaxMessageSizeBytes(int getTreeMaxMessageSizeBytes) {
+    this.getTreeMaxMessageSizeBytes = getTreeMaxMessageSizeBytes;
+  }
+
   @Override
   public String getTree(
       build.buildfarm.v1test.Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
@@ -636,17 +654,45 @@ public abstract class NodeInstance extends InstanceBase {
 
     TokenizableIterator<DirectoryEntry> iter = createTreeIterator("getTree", rootDigest, pageToken);
 
+    // The page budget for the serialized directories within the GetTreeResponse. We always emit at
+    // least one directory per page to guarantee forward progress, even if that directory alone
+    // exceeds the budget (a pathological single oversized directory cannot be split here).
+    int pageBudgetBytes = getTreeMaxMessageSizeBytes - GET_TREE_RESPONSE_OVERHEAD_BYTES;
+    int pageBytes = 0;
+    boolean directoryAdded = false;
+
+    // The page token resuming at the current entry. Captured before advancing the iterator so that,
+    // if the entry does not fit, we can return a token that re-yields it as the first entry of the
+    // next page - losing and duplicating nothing.
+    String resumeToken = iter.toNextPageToken();
+
     while (iter.hasNext() && pageSize != 0) {
       DirectoryEntry entry = iter.next();
       Directory directory = entry.getDirectory();
       // If part of the tree is missing from the CAS, the server will return the
       // portion present and omit the rest.
       if (directory != null) {
+        // The contribution of this directory to the serialized GetTreeResponse - a repeated
+        // Directory field: the message bytes plus its tag and length-delimiter.
+        int directorySize = directory.getSerializedSize();
+        int entryBytes =
+            CodedOutputStream.computeTagSize(GetTreeResponse.DIRECTORIES_FIELD_NUMBER)
+                + CodedOutputStream.computeUInt32SizeNoTag(directorySize)
+                + directorySize;
+        // Stop before overflowing the page, but never produce an empty page: the first directory is
+        // always emitted so the walk makes progress. The resume token points at this entry, so it
+        // will lead the next page.
+        if (directoryAdded && pageBytes + entryBytes > pageBudgetBytes) {
+          return resumeToken;
+        }
         tree.putDirectories(entry.getDigest().getHash(), directory);
+        pageBytes += entryBytes;
+        directoryAdded = true;
         if (pageSize > 0) {
           pageSize--;
         }
       }
+      resumeToken = iter.toNextPageToken();
     }
     return iter.toNextPageToken();
   }
