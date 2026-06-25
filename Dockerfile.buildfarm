@@ -1,0 +1,78 @@
+FROM debian:12.7 AS base-build
+
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+RUN \
+    --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt_lib,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+ && apt-get install -y \
+        curl \
+        g++ \
+        openjdk-17-jre
+
+ENV BAZELISK_VERSION=1.22.1
+RUN curl -L -o /usr/local/bin/bazelisk \
+    https://github.com/bazelbuild/bazelisk/releases/download/v${BAZELISK_VERSION}/bazelisk-linux-amd64 \
+ && chmod +x /usr/local/bin/bazelisk
+
+WORKDIR /buildfarm
+
+# Download bazel first to better utilize the cache.
+COPY .bazelversion ./
+RUN \
+    --mount=type=cache,id=bazelisk_cache,target=/root/.cache/bazelisk,sharing=locked \
+    bazelisk version
+
+FROM base-build AS server-build
+
+COPY . .
+RUN \
+    --mount=type=cache,id=bazelisk_cache,target=/root/.cache/bazelisk,sharing=locked \
+    --mount=type=cache,id=bazel_cache,target=/root/.cache/bazel,sharing=locked \
+    bazelisk build //src/main/java/build/buildfarm:buildfarm-server \
+ && cp /buildfarm/bazel-out/k8-fastbuild/bin/src/main/java/build/buildfarm/buildfarm-server /usr/local/bin/buildfarm-server \
+ && cp -Lr /buildfarm/bazel-out/k8-fastbuild/bin/src/main/java/build/buildfarm/buildfarm-server.runfiles /usr/local/bin/buildfarm-server.runfiles
+
+FROM base-build AS worker-build
+
+COPY . .
+RUN \
+    --mount=type=cache,id=bazelisk_cache,target=/root/.cache/bazelisk,sharing=locked \
+    --mount=type=cache,id=bazel_cache,target=/root/.cache/bazel,sharing=locked \
+    bazelisk build //src/main/java/build/buildfarm:buildfarm-shard-worker \
+ && cp /buildfarm/bazel-out/k8-fastbuild/bin/src/main/java/build/buildfarm/buildfarm-shard-worker /usr/local/bin/buildfarm-shard-worker \
+ && cp -Lr /buildfarm/bazel-out/k8-fastbuild/bin/src/main/java/build/buildfarm/buildfarm-shard-worker.runfiles /usr/local/bin/buildfarm-shard-worker.runfiles
+
+RUN \
+    --mount=type=cache,id=bazelisk_cache,target=/root/.cache/bazelisk,sharing=locked \
+    --mount=type=cache,id=bazel_cache,target=/root/.cache/bazel,sharing=locked \
+    find /buildfarm/bazel-out/ > list.txt \
+ && readlink /buildfarm/bazel-out/k8-fastbuild/bin/src/main/java/build/buildfarm/buildfarm-shard-worker.runfiles/rules_java~~toolchains~remotejdk21_linux/bin/java > link.txt
+
+FROM debian:12.7 AS base
+
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+RUN \
+    --mount=type=cache,id=apt_cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt_lib,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+ && apt-get install -y \
+        openjdk-17-jre
+
+FROM base AS server
+
+COPY --from=server-build \
+    /usr/local/bin/buildfarm-server \
+    /usr/local/bin/buildfarm-server
+COPY --from=server-build \
+    /usr/local/bin/buildfarm-server.runfiles \
+    /usr/local/bin/buildfarm-server.runfiles
+
+FROM base AS worker
+
+COPY --from=worker-build \
+    /usr/local/bin/buildfarm-shard-worker \
+    /usr/local/bin/buildfarm-shard-worker
+COPY --from=worker-build \
+    /usr/local/bin/buildfarm-shard-worker.runfiles \
+    /usr/local/bin/buildfarm-shard-worker.runfiles
