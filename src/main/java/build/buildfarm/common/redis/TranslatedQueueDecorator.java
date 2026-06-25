@@ -16,7 +16,7 @@ package build.buildfarm.common.redis;
 
 import build.buildfarm.common.Queue;
 import com.google.protobuf.Message;
-import redis.clients.jedis.Jedis;
+import redis.clients.jedis.UnifiedJedis;
 
 public class TranslatedQueueDecorator<T extends Message> implements QueueDecorator<T> {
   private final QueueDecorator<String> decorator;
@@ -29,7 +29,7 @@ public class TranslatedQueueDecorator<T extends Message> implements QueueDecorat
   }
 
   @Override
-  public Queue<T> decorate(Jedis jedis, String name) {
+  public Queue<T> decorate(UnifiedJedis jedis, String name) {
     return new TranslatedQueue<>(decorator.decorate(jedis, name), translator);
   }
 }
