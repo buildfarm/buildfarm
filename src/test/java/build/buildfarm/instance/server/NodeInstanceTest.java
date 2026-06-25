@@ -264,8 +264,7 @@ public class NodeInstanceTest {
     @Override
     protected TokenizableIterator<DirectoryEntry> createTreeIterator(
         String reason, Digest rootDigest, String pageToken) {
-      return new TreeIterator(
-          directoryBlobDigest -> directoriesIndex.get(directoryBlobDigest), rootDigest, pageToken);
+      return new TreeIterator(directoriesIndex::get, rootDigest, pageToken);
     }
   }
 
