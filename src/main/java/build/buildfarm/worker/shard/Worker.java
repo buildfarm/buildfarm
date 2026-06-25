@@ -613,6 +613,20 @@ public final class Worker extends LoggingMain {
                 return isPaused;
               }
 
+              void publishQueues() {
+                for (build.buildfarm.common.config.Queue queue :
+                    configs.getBackplane().getQueues()) {
+                  try {
+                    backplane.publishWorkerQueue(queue);
+                  } catch (IOException e) {
+                    log.log(
+                        Level.WARNING,
+                        String.format("Failed to publish queue '%s' to backplane", queue.getName()),
+                        e);
+                  }
+                }
+              }
+
               void registerIfExpired() {
                 long now = System.currentTimeMillis();
                 if (now >= workerRegistrationExpiresAt
@@ -620,6 +634,8 @@ public final class Worker extends LoggingMain {
                     && !isWorkerPausedFromNewWork()) {
                   // worker must be registered to match
                   addWorker(nextRegistration(now));
+                  // publish queue configurations to Redis for server auto-discovery
+                  publishQueues();
                   // update every 10 seconds
                   workerRegistrationExpiresAt = nextInterval(now);
                 }

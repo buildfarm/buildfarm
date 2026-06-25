@@ -54,6 +54,9 @@ public class Backplane {
   private int maxPreQueueDepth = 1000000;
   private boolean priorityQueue = false;
   private Queue[] queues = {};
+  private String workerQueuePrefix = "WorkerQueue";
+  private int workerQueueExpireSeconds =
+      604800; // Worker queue keys expire after 1 week if not refreshed
   private String redisCredentialFile;
   private String redisUsername;
   @ToString.Exclude // Do not log the password on start-up.
