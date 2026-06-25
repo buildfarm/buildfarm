@@ -14,6 +14,7 @@
 
 package build.buildfarm.common;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -23,10 +24,13 @@ import com.google.protobuf.util.Durations;
 import io.grpc.Deadline;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+@NullMarked
 public class Poller {
   private final Duration period;
-  private ActivePoller activePoller = null;
+  private @Nullable ActivePoller activePoller = null;
 
   private class ActivePoller implements Runnable {
     private final BooleanSupplier poll;
@@ -88,11 +92,24 @@ public class Poller {
     }
   }
 
+  /**
+   * Creates a new poller with the given period.
+   *
+   * @param period the polling interval. Must be at least 1µs
+   */
   public Poller(Duration period) {
-    checkState(Durations.toMicros(period) >= 1);
+    checkArgument(Durations.toMicros(period) >= 1, "period is too short! It must be at least 1µs");
     this.period = period;
   }
 
+  /**
+   * Resumes polling with the given parameters.
+   *
+   * @param poll the polling function
+   * @param onExpiry the action to perform upon expiration of the deadline
+   * @param expiryDeadline the deadline by which polling should expire
+   * @param executor the executor to run the poller in
+   */
   public void resume(
       BooleanSupplier poll, Runnable onExpiry, Deadline expiryDeadline, Executor executor) {
     checkState(activePoller == null);
@@ -100,6 +117,7 @@ public class Poller {
     executor.execute(activePoller);
   }
 
+  /** Pauses the poller if it is currently running. */
   public void pause() {
     if (activePoller != null) {
       activePoller.stop();

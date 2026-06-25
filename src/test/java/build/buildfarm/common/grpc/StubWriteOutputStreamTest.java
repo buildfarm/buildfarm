@@ -160,7 +160,6 @@ public class StubWriteOutputStreamTest {
     assertThat(requests.get(3).getFinishWrite()).isTrue();
   }
 
-  @SuppressWarnings("PMD.EmptyControlStatement")
   @Test
   public void getOutputCallback() throws Exception {
     String resourceName = "reset-resource";

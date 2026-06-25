@@ -46,6 +46,7 @@ public class Worker {
   private int executeStageWidthOffset = 0;
   private int inputFetchStageWidth = 0;
   private int inputFetchDeadline = 60;
+  private int reportResultDeadline = 60;
   private int reportResultStageWidth = 1;
   private boolean linkExecFileSystem = true;
   private boolean linkInputDirectories = true;

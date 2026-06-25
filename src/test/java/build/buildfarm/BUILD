@@ -1,4 +1,4 @@
-load("@rules_java//java:java_library.bzl", "java_library")
+load("//bazel/rules:java.bzl", "java_library")
 
 filegroup(
     name = "configs",
@@ -19,5 +19,6 @@ java_library(
     deps = [
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:junit_junit",
+        "@buildfarm_maven//:org_jspecify_jspecify",
     ],
 )

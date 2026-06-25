@@ -14,11 +14,15 @@
 
 package build.buildfarm.common;
 
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
 /**
  * @class CasIndexSettings
  * @brief Settings used to determine how to index CAS entries and remove worker entries.
  * @details These are used for reindexing when a worker is leaving the cluster.
  */
+@NullMarked
 public class CasIndexSettings {
   /**
    * @field scanAmount
@@ -32,5 +36,5 @@ public class CasIndexSettings {
    * @brief How to query all of the CAS entries in redis.
    * @details The cas key is a global buildfarm config.
    */
-  public String casQuery;
+  public @Nullable String casQuery;
 }

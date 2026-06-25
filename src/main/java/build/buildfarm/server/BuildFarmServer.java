@@ -44,7 +44,7 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.netty.NettyServerBuilder;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionService;
-import io.grpc.services.ChannelzService;
+import io.grpc.services.AdminInterface;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
 import java.io.File;
@@ -167,7 +167,7 @@ public class BuildFarmServer extends LoggingMain {
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor);
     if (configs.getServer().isGrpcChannelz()) {
-      serverBuilder.addService(ChannelzService.newInstance(/* maxPageSize= */ 100));
+      serverBuilder.addServices(AdminInterface.getStandardServices());
     }
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getServer().getGrpcMetrics());
 

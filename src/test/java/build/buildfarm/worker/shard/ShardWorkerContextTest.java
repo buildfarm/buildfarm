@@ -110,6 +110,7 @@ public class ShardWorkerContextTest {
         /* executeStageWidth= */ 0,
         /* reportResultStageWidth= */ 1,
         /* inputFetchDeadline= */ 60,
+        /* reportResultDeadline= */ 60,
         backplane,
         execFileSystem,
         inputStreamFactory,

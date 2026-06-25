@@ -102,7 +102,7 @@ import io.grpc.Status.Code;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
-import io.grpc.services.ChannelzService;
+import io.grpc.services.AdminInterface;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import java.io.File;
@@ -255,7 +255,7 @@ public final class Worker extends LoggingMain {
     serverBuilder.addService(new WorkerControl(this));
     serverBuilder.addService(ProtoReflectionServiceV1.newInstance());
     if (configs.getWorker().isGrpcChannelz()) {
-      serverBuilder.addService(ChannelzService.newInstance(/* maxPageSize= */ 100));
+      serverBuilder.addServices(AdminInterface.getStandardServices());
     }
     serverBuilder.addService(workerProfileService);
 
@@ -772,6 +772,7 @@ public final class Worker extends LoggingMain {
             executeStageWidth,
             reportResultStageWidth,
             configs.getWorker().getInputFetchDeadline(),
+            configs.getWorker().getReportResultDeadline(),
             backplane,
             execFileSystem,
             new EmptyInputStreamFactory(

@@ -19,11 +19,13 @@ import com.google.common.reflect.ClassPath.ClassInfo;
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import org.jspecify.annotations.NullMarked;
 
 /**
  * A helper class to find all classes on the current classpath. This is used to automatically create
  * JUnit 3 and 4 test suites.
  */
+@NullMarked
 public final class Classpath {
   /** Base exception for any classpath related errors. */
   public static final class ClassPathException extends Exception {
@@ -48,7 +50,7 @@ public final class Classpath {
         }
       }
     } catch (IOException e) {
-      throw new ClassPathException(e.getMessage());
+      throw new ClassPathException(e.getMessage() != null ? e.getMessage() : e.toString());
     }
     return result;
   }
