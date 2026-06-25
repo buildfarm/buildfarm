@@ -53,7 +53,7 @@ public class ChunkerTest {
 
   @Test
   public void singleChunkFitsWhenSmallerThanChunkSize() throws IOException {
-    byte[] data = new byte[] {1, 2, 3, 4, 5};
+    byte[] data = {1, 2, 3, 4, 5};
     Chunker chunker = Chunker.builder().setInput(data).setChunkSize(16).build();
 
     Chunk chunk = chunker.next();
@@ -66,7 +66,7 @@ public class ChunkerTest {
 
   @Test
   public void splitsInputIntoChunkSizedPieces() throws IOException {
-    byte[] data = new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    byte[] data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
     Chunker chunker = Chunker.builder().setInput(data).setChunkSize(4).build();
 
     List<Chunk> chunks = drain(chunker);
@@ -82,7 +82,7 @@ public class ChunkerTest {
 
   @Test
   public void exactMultipleOfChunkSizeProducesNoEmptyTrailingChunk() throws IOException {
-    byte[] data = new byte[] {1, 2, 3, 4, 5, 6, 7, 8};
+    byte[] data = {1, 2, 3, 4, 5, 6, 7, 8};
     Chunker chunker = Chunker.builder().setInput(data).setChunkSize(4).build();
 
     List<Chunk> chunks = drain(chunker);
@@ -123,7 +123,7 @@ public class ChunkerTest {
 
   @Test
   public void setInputFromInputStreamUsesProvidedSize() throws IOException {
-    byte[] data = new byte[] {9, 8, 7};
+    byte[] data = {9, 8, 7};
     InputStream in = new ByteArrayInputStream(data);
     Chunker chunker = Chunker.builder().setInput(data.length, in).setChunkSize(16).build();
 
@@ -134,7 +134,7 @@ public class ChunkerTest {
 
   @Test
   public void resetReturnsToUninitializedState() throws IOException {
-    byte[] data = new byte[] {1, 2, 3, 4, 5, 6};
+    byte[] data = {1, 2, 3, 4, 5, 6};
     Chunker chunker = Chunker.builder().setInput(data).setChunkSize(2).build();
 
     chunker.next(); // consume first chunk, offset advances to 2
@@ -150,7 +150,7 @@ public class ChunkerTest {
 
   @Test
   public void seekBackwardResetsAndSkipsToOffset() throws IOException {
-    byte[] data = new byte[] {0, 1, 2, 3, 4, 5, 6, 7};
+    byte[] data = {0, 1, 2, 3, 4, 5, 6, 7};
     Chunker chunker = Chunker.builder().setInput(data).setChunkSize(2).build();
 
     // advance through two chunks (offset -> 4)
