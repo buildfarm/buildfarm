@@ -18,7 +18,6 @@ import static build.buildfarm.common.base.System.isWindows;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.protobuf.ByteString;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
@@ -87,13 +86,13 @@ public class UtilsTest {
   public void unTarTisEmpty() throws IOException {
     // ARRANGE
     TarArchiveInputStream tis = Mockito.mock(TarArchiveInputStream.class);
-    File dst = Mockito.mock(File.class);
+    Path dst = root.resolve("untar-empty");
 
     // ACT
     Utils.unTar(tis, dst);
 
     // ASSERT
-    Mockito.verify(dst, Mockito.times(0)).mkdirs();
+    assertThat(Files.exists(dst)).isFalse();
   }
 
   @Test
@@ -101,7 +100,7 @@ public class UtilsTest {
     // ARRANGE
     TarArchiveInputStream tis = Mockito.mock(TarArchiveInputStream.class);
     TarArchiveEntry entry = Mockito.mock(TarArchiveEntry.class);
-    File dst = Mockito.mock(File.class);
+    Path dst = root.resolve("untar-dir");
 
     Mockito.when(tis.getNextTarEntry()).thenReturn(entry).thenReturn(null);
     Mockito.when(entry.isDirectory()).thenReturn(true);
@@ -110,7 +109,7 @@ public class UtilsTest {
     Utils.unTar(tis, dst);
 
     // ASSERT
-    Mockito.verify(dst, Mockito.times(1)).mkdirs();
+    assertThat(Files.isDirectory(dst)).isTrue();
   }
 
   @Test
@@ -118,7 +117,7 @@ public class UtilsTest {
     // ARRANGE
     TarArchiveInputStream tis = Mockito.mock(TarArchiveInputStream.class);
     TarArchiveEntry entry = Mockito.mock(TarArchiveEntry.class);
-    File dst = Mockito.mock(File.class);
+    Path dst = root.resolve("untar-dir-repeated");
 
     Mockito.when(tis.getNextTarEntry())
         .thenReturn(entry)
@@ -131,6 +130,6 @@ public class UtilsTest {
     Utils.unTar(tis, dst);
 
     // ASSERT
-    Mockito.verify(dst, Mockito.times(3)).mkdirs();
+    assertThat(Files.isDirectory(dst)).isTrue();
   }
 }

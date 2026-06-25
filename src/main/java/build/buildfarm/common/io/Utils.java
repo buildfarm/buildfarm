@@ -22,8 +22,8 @@ import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
@@ -498,17 +498,17 @@ public final class Utils {
    *     execution is performed in the docker container, it will return ta stream object so that
    *     files can be extracted.
    */
-  public static void unTar(TarArchiveInputStream tis, File destinationPath) throws IOException {
+  public static void unTar(TarArchiveInputStream tis, Path destinationPath) throws IOException {
     TarArchiveEntry tarEntry;
     while ((tarEntry = tis.getNextTarEntry()) != null) {
       // Directories don't need copied over. We ensure the destination path exists.
       if (tarEntry.isDirectory()) {
-        destinationPath.mkdirs();
+        Files.createDirectories(destinationPath);
       }
 
       // Copy tar files to the destination path
       else {
-        try (FileOutputStream fos = new FileOutputStream(destinationPath)) {
+        try (OutputStream fos = Files.newOutputStream(destinationPath)) {
           IOUtils.copy(tis, fos);
         }
       }

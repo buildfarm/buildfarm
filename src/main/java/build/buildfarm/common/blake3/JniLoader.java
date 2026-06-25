@@ -19,7 +19,6 @@ import static build.buildfarm.common.base.System.isWindows;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.common.io.ByteStreams;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -77,7 +76,7 @@ public final class JniLoader {
         if (resource == null) {
           throw new UnsatisfiedLinkError("Resource " + resourceName + " not in JAR");
         }
-        try (OutputStream diskFile = new FileOutputStream(tempFile.toString())) {
+        try (OutputStream diskFile = Files.newOutputStream(tempFile)) {
           ByteStreams.copy(resource, diskFile);
         }
       }
