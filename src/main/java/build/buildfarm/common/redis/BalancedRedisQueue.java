@@ -500,6 +500,24 @@ public class BalancedRedisQueue<E> {
   }
 
   /**
+   * @brief Reclaim stale messages across all internal queues.
+   * @details Iterates all internal queues and reclaims stale PEL entries via XAUTOCLAIM. Only has
+   *     an effect when the underlying queues are stream-based.
+   * @param unified Jedis client.
+   * @param minIdleMillis Minimum idle time in milliseconds before a message is reclaimed.
+   * @return The total number of messages reclaimed across all internal queues.
+   */
+  public int reclaimStaleMessages(UnifiedJedis unified, long minIdleMillis) {
+    int total = 0;
+    for (String queue : fullIterationQueueOrder()) {
+      try (Jedis jedis = getJedisFromKey(unified, queue)) {
+        total += queueDecorator.decorate(jedis, queue).reclaimStaleMessages(minIdleMillis);
+      }
+    }
+    return total;
+  }
+
+  /**
    * @brief Check that the internal queues have evenly distributed the values.
    * @details We are checking that the size of all the internal queues are the same. This means, the
    *     balanced queue will be evenly distributed on every n elements pushed, where n is the number
