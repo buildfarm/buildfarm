@@ -1,4 +1,4 @@
-load("@rules_oci//oci:defs.bzl", "oci_image")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
@@ -177,6 +177,12 @@ oci_image(
     visibility = ["//container:__subpackages__"],
 )
 
+oci_load(
+    name = "buildfarm-server.load",
+    image = ":_buildfarm-server.image",
+    repo_tags = ["buildfarm-server:local"],
+)
+
 oci_image(
     name = "_buildfarm-worker.image",
     base = "@ubuntu_noble",
@@ -201,6 +207,12 @@ oci_image(
         ":layer_buildfarm_worker",
     ],
     visibility = ["//container:__subpackages__"],
+)
+
+oci_load(
+    name = "buildfarm-worker.load",
+    image = ":_buildfarm-worker.image",
+    repo_tags = ["buildfarm-worker:local"],
 )
 
 multiarch_oci_image(

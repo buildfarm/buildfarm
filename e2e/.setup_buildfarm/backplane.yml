@@ -1,0 +1,7 @@
+redisUri: redis://redis:6379
+queues:
+- name: cpu
+  allowUnmatched: true
+  properties:
+  - name: '*'
+    value: '*'

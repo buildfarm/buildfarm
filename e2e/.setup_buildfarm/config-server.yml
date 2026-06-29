@@ -1,0 +1,4 @@
+backplane: !include "backplane.yml"
+server:
+  instanceType: SHARD
+  name: shard

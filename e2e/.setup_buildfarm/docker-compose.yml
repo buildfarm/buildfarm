@@ -1,0 +1,43 @@
+services:
+  redis:
+    container_name: redis
+    image: redis:7.2.4
+    volumes:
+      - redis_data:/data
+    ports:
+      - 6379:6379
+
+  buildfarm-server:
+    container_name: buildfarm-server
+    image: bazelbuild/buildfarm-server:2.17.0
+    # image: buildfarm-server:local
+    depends_on:
+      redis:
+        condition: service_started
+    volumes:
+      - ./:/buildfarm/
+    environment:
+      CONFIG_PATH: /buildfarm/config-server.yml
+    ports:
+      - 8980:8980
+
+  buildfarm-worker:
+    container_name: buildfarm-worker
+    image: bazelbuild/buildfarm-worker:2.17.0
+    # image: buildfarm-worker:local
+    depends_on:
+      buildfarm-server:
+        condition: service_started
+    volumes:
+      - ./:/buildfarm/
+      - buildfarm-worker:/tmp/worker
+    environment:
+      CONFIG_PATH: /buildfarm/config-worker.yml
+    ports:
+      - 8981:8981
+
+volumes:
+  redis_data:
+    name: redis_data
+  buildfarm-worker:
+    name: buildfarm-worker
