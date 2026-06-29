@@ -1,0 +1,7 @@
+backplane: !include "backplane.yml"
+worker:
+  publicName: buildfarm-worker:8981
+  dequeueMatchSettings:
+    allowUnmatched: true
+  # linkedInputDirectories:
+  # - (?!external/)[^/]+

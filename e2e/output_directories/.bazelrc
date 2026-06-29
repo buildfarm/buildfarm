@@ -1,0 +1,7 @@
+build --remote_download_outputs=toplevel
+build --remote_cache=grpc://localhost:8980
+build --remote_executor=grpc://localhost:8980
+build --remote_timeout=120s
+build --remote_retries=5
+build --remote_cache_compression=true
+build --grpc_keepalive_time=30s
