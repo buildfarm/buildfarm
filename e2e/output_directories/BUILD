@@ -1,5 +1,6 @@
 load("@bazel_lib//lib:run_binary.bzl", "run_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 sh_binary(
     name = "create_dir_with_files",
@@ -24,4 +25,16 @@ run_binary(
     ],
     out_dirs = ["fruits"],
     tool = ":create_dir_with_files",
+)
+
+sh_test(
+    name = "test_colors",
+    srcs = ["test_colors.sh"],
+    data = [":colors"],
+)
+
+sh_test(
+    name = "test_fruits",
+    srcs = ["test_fruits.sh"],
+    data = [":fruits"],
 )
