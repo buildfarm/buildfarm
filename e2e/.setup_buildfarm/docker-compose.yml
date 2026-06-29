@@ -9,7 +9,8 @@ services:
 
   buildfarm-server:
     container_name: buildfarm-server
-    image: bazelbuild/buildfarm-server:2.17.0
+    # image: bazelbuild/buildfarm-server:2.17.0
+    image: buildfarm-server:local
     depends_on:
       redis:
         condition: service_started
@@ -22,7 +23,8 @@ services:
 
   buildfarm-worker:
     container_name: buildfarm-worker
-    image: bazelbuild/buildfarm-worker:2.17.0
+    # image: bazelbuild/buildfarm-worker:2.17.0
+    image: buildfarm-worker:local
     depends_on:
       buildfarm-server:
         condition: service_started
