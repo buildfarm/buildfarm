@@ -5,5 +5,3 @@ build --remote_timeout=120s
 build --remote_retries=5
 build --remote_cache_compression=true
 build --grpc_keepalive_time=30s
-
-build --test_output=errors
