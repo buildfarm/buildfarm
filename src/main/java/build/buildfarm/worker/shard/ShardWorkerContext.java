@@ -44,6 +44,7 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ProtoUtils;
+import build.buildfarm.common.Resource;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.common.Write;
@@ -163,6 +164,26 @@ class ShardWorkerContext implements WorkerContext {
   private boolean pauseExecute = false;
   private boolean pauseReportResult = false;
 
+  private static class UserPrincipalResource implements Resource {
+    @Override
+    public void release(int amount) {}
+
+    @Override
+    public int availablePermits() {
+      return 0;
+    }
+
+    @Override
+    public boolean tryAcquire(int amount) {
+      return false;
+    }
+
+    @Override
+    public Claim.Stage stage() {
+      return Claim.Stage.REPORT_RESULT_STAGE;
+    }
+  }
+
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, Iterable<String> workerNames, int executeStageWidth) {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
@@ -264,6 +285,9 @@ class ShardWorkerContext implements WorkerContext {
     this.writer = writer;
 
     checkState(resourceSet.resources.put(CPULease.RESOURCE_NAME, market) == null);
+    checkState(
+        resourceSet.resources.put(UserPrincipalLease.RESOURCE_NAME, new UserPrincipalResource())
+            == null);
     market.sell(executeStageWidth * SHARES_PER_SLOT);
 
     provideOwnedClaim = this.resourceSet.poolResources.containsKey(EXEC_OWNER_RESOURCE_NAME);
