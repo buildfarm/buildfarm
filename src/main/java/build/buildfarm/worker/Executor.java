@@ -657,11 +657,9 @@ public class Executor {
       long nsDeltaUsed,
       long nsDeltaThrottled) {
     // our budget - the available shares we could buy based on limits
-    int pctUnused = 100 - (int) (nsDeltaUsed * 100 / (currentShares * nsPeriod));
+    int pctUnused = 100 - (int) (nsDeltaUsed * 100 / (effectiveShares * nsPeriod));
     int shareDifference = (int) (((effectiveShares * nsPeriod) - nsDeltaUsed) / nsPeriod);
     long pctThrottle = nsDeltaThrottled * 100 / nsPeriod;
-    // System.out.println(String.format("pctUnused: %d, shareDifference %d, pctThrottle %d",
-    // pctUnused, shareDifference, pctThrottle));
     shareDifference = Math.min(shareDifference, currentShares - shareFloor);
     if (pctUnused >= pctMinUnused
         && shareDifference > minSharesSold
@@ -685,8 +683,15 @@ public class Executor {
       long nsSampleElapsed, long nrPeriods, long usCpuUsed, long usCpuThrottled) {}
 
   private int engageMarket(
-      int shares, IOResource resource, CPULease cpuLease, CPUUsageState now, CPUUsageState last)
+      int currentShares,
+      int effectiveShares,
+      IOResource resource,
+      CPULease cpuLease,
+      CPUUsageState now,
+      CPUUsageState last)
       throws IOException {
+    // currentShares == we own, and are now effective for the next sample
+    // effectiveShares == were in effect for the sample duration
     long nsPeriod = now.nsSampleElapsed() - last.nsSampleElapsed();
     long nsDeltaUsed =
         (now.usCpuUsed() - last.usCpuUsed())
@@ -697,21 +702,22 @@ public class Executor {
     // we can't miss samples in this process
     // use the previous share count to ensure we don't think we've bought when we just
     // bumped
-    int adjustment = getAdjustment(shares, shares, nsPeriod, nsDeltaUsed, nsDeltaThrottled);
+    int adjustment =
+        getAdjustment(currentShares, effectiveShares, nsPeriod, nsDeltaUsed, nsDeltaThrottled);
     if (adjustment > 0 && order.balance() == 0) {
       // might recommend a different value, but we're already buying...
       order = workerContext.market().buy(adjustment, cpuLease::accumulate);
-      return shares;
+      return currentShares;
     }
     order.cancel();
     if (adjustment < 0) {
-      shares += adjustment;
-      resource.setCpu(shares * 100);
+      currentShares += adjustment;
+      resource.setCpu(currentShares * 100);
       int sale = -adjustment;
       workerContext.market().sell(sale);
       cpuLease.deplete(sale);
     }
-    return shares;
+    return currentShares;
   }
 
   private void recordUsage(long periodShares, long lastNrPeriods, Map<String, Long> sample) {
@@ -776,10 +782,15 @@ public class Executor {
         order = workerContext.market().buy(shareLimit - shares, cpuLease::accumulate);
       }
 
+      // we _had_ these shares effective for the last sample
       int effectiveShares = shares;
+      // we currently own these shares
       int currentShares = cpuLease.amount();
       if (effectiveShares != currentShares) {
-        // a buy occurred in the last sample
+        // a buy occurred in the last sample, changing our owned shares, and now the cpu needs to be
+        // given to the process
+
+        // shares now reflects the new cpu given to the process
         shares = currentShares;
         resource.setCpu(shares * 100);
       }
@@ -791,7 +802,7 @@ public class Executor {
         long usCpuThrottled = sample.get(SAMPLE_CPU_THROTTLED_USEC);
         CPUUsageState usage = new CPUUsageState(nsElapsed, nrPeriods, usCpuUsed, usCpuThrottled);
 
-        shares = engageMarket(effectiveShares, resource, cpuLease, usage, lastUsage);
+        shares = engageMarket(currentShares, effectiveShares, resource, cpuLease, usage, lastUsage);
 
         long deltaNrPeriods = usage.nrPeriods() - lastUsage.nrPeriods();
         if (deltaNrPeriods > 0) {
