@@ -31,6 +31,8 @@ import redis.clients.jedis.UnifiedJedis;
  *     set(worker1,worker2)}.
  */
 public class JedisCasWorkerMap implements CasWorkerMap {
+  private static final int PIPELINE_CHUNK_MAX = 10000;
+
   private final UnifiedJedis jedis;
 
   /**
@@ -109,10 +111,16 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   @Override
   public void addAll(Iterable<Digest> blobDigests, String workerName) {
     try (AbstractPipeline p = jedis.pipelined()) {
+      int chunkCount = 0;
       for (Digest blobDigest : blobDigests) {
         String key = redisCasKey(blobDigest);
         p.sadd(key, workerName);
         p.expire(key, keyExpiration_s);
+        chunkCount++;
+        if (chunkCount >= PIPELINE_CHUNK_MAX) {
+          p.sync();
+          chunkCount = 0;
+        }
       }
     }
   }
@@ -141,9 +149,15 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   @Override
   public void removeAll(Iterable<Digest> blobDigests, String workerName) {
     try (AbstractPipeline p = jedis.pipelined()) {
+      int chunkCount = 0;
       for (Digest blobDigest : blobDigests) {
         String key = redisCasKey(blobDigest);
         p.srem(key, workerName);
+        chunkCount++;
+        if (chunkCount >= PIPELINE_CHUNK_MAX) {
+          p.sync();
+          chunkCount = 0;
+        }
       }
     }
   }
