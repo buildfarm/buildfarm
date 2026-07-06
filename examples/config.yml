@@ -131,6 +131,7 @@ worker:
     #- type: GRPC
     #  target: "grpc://host:port"
   executeStageWidth: 1
+  processorCountSource: MAX_OF_SOURCES
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
   reportResultStageWidth: 1
