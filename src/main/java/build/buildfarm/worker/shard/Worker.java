@@ -70,6 +70,7 @@ import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.PipelineChange;
 import build.buildfarm.v1test.ShardWorker;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.CFCExecFileSystem;
 import build.buildfarm.worker.CFCLinkExecFileSystem;
 import build.buildfarm.worker.ExecFileSystem;
@@ -101,6 +102,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Timestamp;
@@ -127,6 +129,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
@@ -862,7 +865,8 @@ public final class Worker extends LoggingMain {
             .setAttribute("name", name);
       }
 
-      void recordSpan(
+      @Nullable
+      SpanBuilder recordSpan(
           Consumer<SpanBuilder> decorator,
           String name,
           Timestamp start,
@@ -874,6 +878,31 @@ public final class Worker extends LoggingMain {
               .setStartTimestamp(Timestamps.toNanos(start), NANOSECONDS)
               .startSpan()
               .end(Timestamps.toNanos(end), NANOSECONDS);
+          return builder;
+        }
+        return null;
+      }
+
+      private static void decorateExecution(SpanBuilder spanBuilder, Consumer<SpanBuilder> decorator, ExecutedActionMetadata metadata) {
+        decorator.accept(spanBuilder);
+        WorkerExecutedMetadata workerExecutedMetadata = null;
+        // awkward that we have to deserialize these through the Any, but hopefully fast enough given the immediate construction
+        for (Any auxiliaryMetadata : metadata.getAuxiliaryMetadataList()) {
+          if (auxiliaryMetadata.is(WorkerExecutedMetadata.class)) {
+            try {
+              // take the first WorkerExecutedMetadata
+              workerExecutedMetadata = auxiliaryMetadata.unpack(WorkerExecutedMetadata.class);
+              break;
+            } catch (InvalidProtocolBufferException e) {
+              // unlikely
+            }
+          }
+        }
+
+        if (workerExecutedMetadata != null) {
+          for (Map.Entry<String, Long> entry : workerExecutedMetadata.getUsage().entrySet()) {
+            spanBuilder.setAttribute("usage." + entry.getKey(), entry.getValue());
+          }
         }
       }
 
@@ -884,7 +913,11 @@ public final class Worker extends LoggingMain {
         // otel
         recordSpan(decorator, "action queued", metadata.getQueuedTimestamp(), metadata.getWorkerStartTimestamp());
         recordSpan(decorator, "action input fetch", metadata.getInputFetchStartTimestamp(), metadata.getInputFetchCompletedTimestamp());
-        recordSpan(decorator, "action execution", metadata.getExecutionStartTimestamp(), metadata.getExecutionCompletedTimestamp());
+        recordSpan(
+            spanBuilder -> decorateExecution(spanBuilder, decorator, metadata),
+            "action execution",
+            metadata.getExecutionStartTimestamp(),
+            metadata.getExecutionCompletedTimestamp());
         recordSpan(decorator, "action report result", metadata.getOutputUploadStartTimestamp(), metadata.getOutputUploadCompletedTimestamp());
       }
     };
