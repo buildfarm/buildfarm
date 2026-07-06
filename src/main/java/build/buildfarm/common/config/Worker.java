@@ -16,6 +16,7 @@ package build.buildfarm.common.config;
 
 import static build.buildfarm.common.base.System.isWindows;
 
+import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
 import java.nio.file.Files;
@@ -44,6 +45,8 @@ public class Worker {
   private List<Cas> storages = Arrays.asList(new Cas());
   private int executeStageWidth = 0;
   private int executeStageWidthOffset = 0;
+  private SystemProcessors.PROCESSOR_DERIVE processorCountSource =
+      SystemProcessors.PROCESSOR_DERIVE.MAX_OF_SOURCES;
   private int inputFetchStageWidth = 0;
   private int inputFetchDeadline = 60;
   private int reportResultStageWidth = 1;

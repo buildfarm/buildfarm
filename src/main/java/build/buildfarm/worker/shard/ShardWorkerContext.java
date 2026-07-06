@@ -918,7 +918,7 @@ class ShardWorkerContext implements WorkerContext {
 
   void createOperationExecutionLimits() {
     try {
-      if (executeStageWidth < SystemProcessors.get()) {
+      if (executeStageWidth < SystemProcessors.get(configs.getWorker().getProcessorCountSource())) {
         /* only divide up our cfs quota if we need to limit below the available processors for executions */
         executionsGroup.getCpu().setMaxCpu(executeStageWidth);
       }

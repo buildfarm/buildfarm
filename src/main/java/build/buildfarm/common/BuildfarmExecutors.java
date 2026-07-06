@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 
+import build.buildfarm.common.config.BuildfarmConfigs;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.ExecutorService;
@@ -32,14 +33,16 @@ import java.util.concurrent.Executors;
  */
 public class BuildfarmExecutors {
   public static ExecutorService getScanCachePool() {
-    int nThreads = SystemProcessors.get();
+    int nThreads =
+        SystemProcessors.get(BuildfarmConfigs.getInstance().getWorker().getProcessorCountSource());
     String threadNameFormat = "scan-cache-pool-%d";
     return Executors.newFixedThreadPool(
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
   public static ExecutorService getComputeCachePool() {
-    int nThreads = SystemProcessors.get();
+    int nThreads =
+        SystemProcessors.get(BuildfarmConfigs.getInstance().getWorker().getProcessorCountSource());
     String threadNameFormat = "compute-cache-pool-%d";
     return Executors.newFixedThreadPool(
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());

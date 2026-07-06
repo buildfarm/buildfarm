@@ -37,34 +37,22 @@ public class SystemProcessors {
   /**
    * @field PROCESSOR_DERIVE
    * @brief Strategies for getting total processor counts.
-   * @details Can be chosen in user configuration.
+   * @details Chosen in user configuration. {@code JAVA_RUNTIME} honors a container cgroup CPU
+   *     limit; {@code OSHI} always reports the host's logical processors and ignores container
+   *     limits; {@code MAX_OF_SOURCES} takes the larger of the two, guarding against
+   *     Runtime.availableProcessors() under-reporting in some containerized runtimes at the cost of
+   *     ignoring the cgroup limit.
    */
   public enum PROCESSOR_DERIVE {
     JAVA_RUNTIME,
-    OSHI
-  }
-
-  /**
-   * @brief Memoized supplier for processor count.
-   * @details Uses Guava's memoize to cache the processor count since it won't change during
-   *     runtime.
-   */
-  private static final Supplier<Integer> processorCount =
-      Suppliers.memoize(
-          () -> Math.max(get(PROCESSOR_DERIVE.JAVA_RUNTIME), get(PROCESSOR_DERIVE.OSHI)));
-
-  /**
-   * @brief Get the number of logical processors on the system.
-   * @details Buildfarm will choose the best implementation.
-   * @return Number of logical processors on the system.
-   */
-  public static int get() {
-    return processorCount.get();
+    OSHI,
+    MAX_OF_SOURCES
   }
 
   /**
    * @brief Get the number of logical processors on the system.
-   * @details Implementation decided by configuration.
+   * @details Implementation decided by the supplied strategy.
+   * @param strategy Strategy for deriving the processor count.
    * @return Number of logical processors on the system.
    */
   public static int get(PROCESSOR_DERIVE strategy) {
@@ -73,6 +61,8 @@ public class SystemProcessors {
         return getViaJavaRuntime();
       case OSHI:
         return getViaOSHI();
+      case MAX_OF_SOURCES:
+        return Math.max(getViaJavaRuntime(), getViaOSHI());
       default:
         return getViaJavaRuntime();
     }
@@ -84,8 +74,11 @@ public class SystemProcessors {
    * @return Number of logical processors on the system.
    */
   private static int getViaJavaRuntime() {
-    return Runtime.getRuntime().availableProcessors();
+    return javaRuntimeCount.get();
   }
+
+  private static final Supplier<Integer> javaRuntimeCount =
+      Suppliers.memoize(() -> Runtime.getRuntime().availableProcessors());
 
   /**
    * @brief Get the number of logical processors on the system through OSHI.
@@ -93,9 +86,17 @@ public class SystemProcessors {
    * @return Number of logical processors on the system.
    */
   private static int getViaOSHI() {
-    SystemInfo systemInfo = new SystemInfo();
-    HardwareAbstractionLayer hardwareAbstractionLayer = systemInfo.getHardware();
-    CentralProcessor centralProcessor = hardwareAbstractionLayer.getProcessor();
-    return centralProcessor.getLogicalProcessorCount();
+    return oshiCount.get();
   }
+
+  // Memoized because the count is fixed for the process lifetime and the OSHI lookup performs
+  // native (JNA) calls.
+  private static final Supplier<Integer> oshiCount =
+      Suppliers.memoize(
+          () -> {
+            SystemInfo systemInfo = new SystemInfo();
+            HardwareAbstractionLayer hardwareAbstractionLayer = systemInfo.getHardware();
+            CentralProcessor centralProcessor = hardwareAbstractionLayer.getProcessor();
+            return centralProcessor.getLogicalProcessorCount();
+          });
 }
