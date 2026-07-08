@@ -27,25 +27,11 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SystemProcessorsTest {
   // Function under test: get
-  // Reason for testing: functions do not throw and return nonzero results.
+  // Reason for testing: function does not throw and returns a nonzero result.
   // Failure explanation: The implementation can not correctly derive.
   @Test
-  public void getCheckImplValuesAreNotZero() {
+  public void getReturnsNonZero() {
     // ASSERT
-    assertThat(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.JAVA_RUNTIME))
-        .isGreaterThan(0);
-    assertThat(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.OSHI)).isGreaterThan(0);
-  }
-
-  // Function under test: get
-  // Reason for testing: functions chooses highest value.
-  // Failure explanation: The implementation does not choose highest value.
-  @Test
-  public void getCheckBestValueIsChosen() {
-    // ASSERT
-    assertThat(SystemProcessors.get())
-        .isAtLeast(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.JAVA_RUNTIME));
-    assertThat(SystemProcessors.get())
-        .isAtLeast(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.OSHI));
+    assertThat(SystemProcessors.get()).isGreaterThan(0);
   }
 }

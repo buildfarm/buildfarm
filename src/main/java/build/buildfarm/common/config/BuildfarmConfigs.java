@@ -239,7 +239,7 @@ public final class BuildfarmConfigs {
     }
 
     if (configs.getWorker().getExecuteStageWidth() == 0) {
-      int processorCount = SystemProcessors.get(configs.getWorker().getProcessorCountSource());
+      int processorCount = SystemProcessors.get();
       int widthOffset = configs.getWorker().getExecuteStageWidthOffset();
       configs.getWorker().setExecuteStageWidth(Math.max(1, processorCount - widthOffset));
       log.info(
