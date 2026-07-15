@@ -121,6 +121,7 @@ maven.install(
         "commons-io:commons-io:2.21.0",
         "info.picocli:picocli:4.7.7",
         "io.opentelemetry:opentelemetry-api:1.61.0",
+        "io.opentelemetry:opentelemetry-context:1.61.0",
         "io.opentelemetry:opentelemetry-sdk:1.61.0",
         "io.opentelemetry:opentelemetry-sdk-trace:1.61.0",
         "io.opentelemetry:opentelemetry-sdk-common:1.61.0",

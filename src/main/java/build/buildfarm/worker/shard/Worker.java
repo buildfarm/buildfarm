@@ -146,7 +146,9 @@ import org.jspecify.annotations.Nullable;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanBuilder;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
@@ -829,10 +831,8 @@ public final class Worker extends LoggingMain {
           }
           if (response.hasResult()) {
             ActionResult result = response.getResult();
-            // result:
-            // getExitCode
-            // maybe is test timeout?
-            // int exitCode = result.getExitCode();
+            int statusCode = response.getStatus().getCode();
+            int exitCode = result.getExitCode();
             if (result.hasExecutionMetadata()) {
               // metadata:
               // with IF, EX, RR durations
@@ -845,6 +845,8 @@ public final class Worker extends LoggingMain {
                       requestMetadata.getActionMnemonic(),
                       requestMetadata.getTargetId(),
                       execution.getName()),
+                  statusCode,
+                  exitCode,
                   executionMetadata);
             }
           }
@@ -857,6 +859,7 @@ public final class Worker extends LoggingMain {
           String actionMnemonic,
           String targetId,
           String name) {
+        // further parse correlatedInvocationsId to get out host/user qualifier?
         return spanBuilder -> spanBuilder
             .setAttribute("correlated invocations id", correlatedInvocationsId)
             .setAttribute("tool invocation id", toolInvocationId)
@@ -865,26 +868,26 @@ public final class Worker extends LoggingMain {
             .setAttribute("name", name);
       }
 
-      @Nullable
-      SpanBuilder recordSpan(
+      void recordSpan(
           Consumer<SpanBuilder> decorator,
+          Consumer<Context> withContext,
           String name,
           Timestamp start,
           Timestamp end) {
         if (tracer != null) {
           SpanBuilder builder = tracer.spanBuilder(name);
           decorator.accept(builder);
-          builder
+          Span span = builder
               .setStartTimestamp(Timestamps.toNanos(start), NANOSECONDS)
-              .startSpan()
-              .end(Timestamps.toNanos(end), NANOSECONDS);
-          return builder;
+              .startSpan();
+          if (withContext != null) {
+            withContext.accept(Context.current().with(span));
+          }
+          span.end(Timestamps.toNanos(end), NANOSECONDS);
         }
-        return null;
       }
 
-      private static void decorateExecution(SpanBuilder spanBuilder, Consumer<SpanBuilder> decorator, ExecutedActionMetadata metadata) {
-        decorator.accept(spanBuilder);
+      private static void decorateExecution(SpanBuilder spanBuilder, ExecutedActionMetadata metadata) {
         WorkerExecutedMetadata workerExecutedMetadata = null;
         // awkward that we have to deserialize these through the Any, but hopefully fast enough given the immediate construction
         for (Any auxiliaryMetadata : metadata.getAuxiliaryMetadataList()) {
@@ -906,19 +909,53 @@ public final class Worker extends LoggingMain {
         }
       }
 
+      private static void decorateResult(SpanBuilder spanBuilder, int statusCode, int exitCode) {
+        spanBuilder.setAttribute("exit_code", exitCode);
+        spanBuilder.setAttribute("status_code", com.google.rpc.Code.forNumber(statusCode).toString());
+      }
+
       void recordMetric(
           Consumer<SpanBuilder> decorator,
+          int statusCode,
+          int exitCode,
           ExecutedActionMetadata metadata) {
-        // further parse correlatedInvocationsId to get out host/user qualifier?
-        // otel
-        recordSpan(decorator, "action queued", metadata.getQueuedTimestamp(), metadata.getWorkerStartTimestamp());
-        recordSpan(decorator, "action input fetch", metadata.getInputFetchStartTimestamp(), metadata.getInputFetchCompletedTimestamp());
         recordSpan(
-            spanBuilder -> decorateExecution(spanBuilder, decorator, metadata),
+            decorator,
+            parent -> recordAction(parent, statusCode, exitCode, metadata),
+            "action",
+            metadata.getQueuedTimestamp(),
+            metadata.getOutputUploadCompletedTimestamp());
+      }
+
+      Consumer<SpanBuilder> parented(Context parent, Consumer<SpanBuilder> delegate) {
+        return spanBuilder -> {
+          spanBuilder.setParent(parent);
+          if (delegate != null) {
+            delegate.accept(spanBuilder);
+          }
+        };
+      }
+
+      void recordAction(
+          Context parent,
+          int statusCode,
+          int exitCode,
+          ExecutedActionMetadata metadata) {
+        // otel
+        recordSpan(parented(parent, null), null, "action queued", metadata.getQueuedTimestamp(), metadata.getWorkerStartTimestamp());
+        recordSpan(parented(parent, null), null, "action input fetch", metadata.getInputFetchStartTimestamp(), metadata.getInputFetchCompletedTimestamp());
+        recordSpan(
+            parented(parent, spanBuilder -> decorateExecution(spanBuilder, metadata)),
+            null,
             "action execution",
             metadata.getExecutionStartTimestamp(),
             metadata.getExecutionCompletedTimestamp());
-        recordSpan(decorator, "action report result", metadata.getOutputUploadStartTimestamp(), metadata.getOutputUploadCompletedTimestamp());
+        recordSpan(
+            parented(parent, spanBuilder -> decorateResult(spanBuilder, statusCode, exitCode)),
+            null,
+            "action report result",
+            metadata.getOutputUploadStartTimestamp(),
+            metadata.getOutputUploadCompletedTimestamp());
       }
     };
 
