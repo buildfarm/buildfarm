@@ -14,88 +14,19 @@
 
 package build.buildfarm.common;
 
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
-import oshi.SystemInfo;
-import oshi.hardware.CentralProcessor;
-import oshi.hardware.HardwareAbstractionLayer;
-
 /**
  * @class SystemProcessors
- * @brief Abstraction for getting information about the system processors.
- * @details We've found that using java's Runtime.getRuntime().availableProcessors() utility does
- *     not always accurately reflect the amount of processors available. In some cases it returns 1
- *     due to containerization or virtualization. For example, if you are using k8s with containerd
- *     you might see this method give back 1 based on your particular deployment. There are other
- *     implementations such as OSHI that use JNA to acquire the native operating system and hardware
- *     information which is often more suitable for buildfarm. In order to provide consistency in
- *     deriving configuration values, and allocating thread pools, it's best to source the processor
- *     count from the same place. This abstracts implementation on how we derive processor count
- *     based on config and environment.
+ * @brief Abstraction for getting the number of logical processors available to the process.
+ * @details Uses Runtime.getRuntime().availableProcessors(), which on modern JVMs is container-aware
+ *     and honors the cgroup CPU limit, so buildfarm sizes work to the processors it may actually
+ *     use rather than the host's total.
  */
 public class SystemProcessors {
   /**
-   * @field PROCESSOR_DERIVE
-   * @brief Strategies for getting total processor counts.
-   * @details Can be chosen in user configuration.
-   */
-  public enum PROCESSOR_DERIVE {
-    JAVA_RUNTIME,
-    OSHI
-  }
-
-  /**
-   * @brief Memoized supplier for processor count.
-   * @details Uses Guava's memoize to cache the processor count since it won't change during
-   *     runtime.
-   */
-  private static final Supplier<Integer> processorCount =
-      Suppliers.memoize(
-          () -> Math.max(get(PROCESSOR_DERIVE.JAVA_RUNTIME), get(PROCESSOR_DERIVE.OSHI)));
-
-  /**
-   * @brief Get the number of logical processors on the system.
-   * @details Buildfarm will choose the best implementation.
-   * @return Number of logical processors on the system.
+   * @brief Get the number of logical processors available to the process.
+   * @return Number of logical processors available to the process.
    */
   public static int get() {
-    return processorCount.get();
-  }
-
-  /**
-   * @brief Get the number of logical processors on the system.
-   * @details Implementation decided by configuration.
-   * @return Number of logical processors on the system.
-   */
-  public static int get(PROCESSOR_DERIVE strategy) {
-    switch (strategy) {
-      case JAVA_RUNTIME:
-        return getViaJavaRuntime();
-      case OSHI:
-        return getViaOSHI();
-      default:
-        return getViaJavaRuntime();
-    }
-  }
-
-  /**
-   * @brief Get the number of logical processors on the system through java runtime.
-   * @details specific implementation.
-   * @return Number of logical processors on the system.
-   */
-  private static int getViaJavaRuntime() {
     return Runtime.getRuntime().availableProcessors();
-  }
-
-  /**
-   * @brief Get the number of logical processors on the system through OSHI.
-   * @details specific implementation.
-   * @return Number of logical processors on the system.
-   */
-  private static int getViaOSHI() {
-    SystemInfo systemInfo = new SystemInfo();
-    HardwareAbstractionLayer hardwareAbstractionLayer = systemInfo.getHardware();
-    CentralProcessor centralProcessor = hardwareAbstractionLayer.getProcessor();
-    return centralProcessor.getLogicalProcessorCount();
   }
 }
