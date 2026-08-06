@@ -23,6 +23,7 @@ import java.util.AbstractMap.SimpleEntry;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
@@ -101,6 +102,12 @@ public class RedisHashMap<T> {
    */
   public boolean exists(UnifiedJedis jedis, String key) {
     return jedis.hexists(name, key);
+  }
+
+  /** Returns the value associated with {@code key}, or {@code null} if it is absent. */
+  public @Nullable T get(UnifiedJedis jedis, String key) {
+    String value = jedis.hget(name, key);
+    return value == null ? null : translator.parse(value).value();
   }
 
   /**
