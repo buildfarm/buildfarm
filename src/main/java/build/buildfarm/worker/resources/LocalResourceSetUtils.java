@@ -46,6 +46,18 @@ import org.jspecify.annotations.Nullable;
 public class LocalResourceSetUtils {
   private static final LocalResourceSetMetrics metrics = new LocalResourceSetMetrics();
 
+  /**
+   * The prefix bazel uses to request extra resources, both in {@code tags} and in {@code
+   * exec_properties}. See {@code ExecutionRequirements.RESOURCES} in bazel.
+   */
+  private static final String RESOURCES_PREFIX = "resources:";
+
+  /**
+   * A misspelling of {@link #RESOURCES_PREFIX} that buildfarm has accepted since local resources
+   * were introduced. Still honored so that existing configurations and actions keep working.
+   */
+  private static final String LEGACY_RESOURCE_PREFIX = "resource:";
+
   private record SemaphoreLease(String name, int amount, Claim.Stage stage)
       implements Claim.Lease {}
 
@@ -260,7 +272,7 @@ public class LocalResourceSetUtils {
 
   private static int getResourceRequestAmount(Platform.Property property) {
     // We support resource values that are not numbers and interpret them as a request for 1
-    // resource.  For example "gpu:RTX-4090" is equivalent to resource:gpu:1".
+    // resource.  For example "gpu:RTX-4090" is equivalent to resources:gpu:1".
     try {
       return Integer.parseInt(property.getValue());
     } catch (NumberFormatException e) {
@@ -269,16 +281,25 @@ public class LocalResourceSetUtils {
   }
 
   public static String getResourceName(String propertyName) {
-    // We match to keys whether they are prefixed "resource:" or not.
-    // "resource:gpu:1" requests the gpu resource in the same way that "gpu:1" does.
-    // The prefix originates from bazel's syntax for the --extra_resources flag.
-    return StringUtils.removeStart(propertyName, "resource:");
+    // We match to keys whether they are prefixed or not.
+    // "resources:gpu:1" requests the gpu resource in the same way that "gpu:1" does.
+    // The prefix originates from bazel's syntax for extra resources, which spells it "resources:".
+    // The singular "resource:" is a buildfarm misspelling that is still accepted.
+    if (propertyName.startsWith(RESOURCES_PREFIX)) {
+      return propertyName.substring(RESOURCES_PREFIX.length());
+    }
+    return StringUtils.removeStart(propertyName, LEGACY_RESOURCE_PREFIX);
   }
 
   public static boolean satisfies(LocalResourceSet resourceSet, Platform.Property property) {
     String name = property.getName();
-    return name.startsWith("resource:")
+    return hasResourcePrefix(name)
         && (resourceSet.resources.containsKey(getResourceName(name))
             || resourceSet.poolResources.containsKey(getResourceName(name)));
+  }
+
+  private static boolean hasResourcePrefix(String propertyName) {
+    return propertyName.startsWith(RESOURCES_PREFIX)
+        || propertyName.startsWith(LEGACY_RESOURCE_PREFIX);
   }
 }

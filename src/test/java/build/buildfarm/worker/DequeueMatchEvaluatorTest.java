@@ -368,6 +368,69 @@ public class DequeueMatchEvaluatorTest {
     assertThat(resourceSet.resources.get("BAZ").availablePermits()).isEqualTo(200);
   }
 
+  // Function under test: acquireClaim
+  // Reason for testing: bazel spells the resource prefix "resources:", and such a request should
+  // claim the same resource as the legacy "resource:" spelling.
+  // Failure explanation: the bazel-compatible prefix is not recognized as a resource request.
+  @Test
+  public void shouldKeepOperationClaimsResourceWithPluralPrefix() throws Exception {
+    // ARRANGE
+    // unmatched properties are rejected, so the property is only kept if it is understood to be a
+    // resource request.
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
+    SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    resourceSet.resources.put("FOO", new SemaphoreResource(new Semaphore(1), EXECUTE_ACTION_STAGE));
+
+    Platform platform =
+        Platform.newBuilder()
+            .addProperties(Platform.Property.newBuilder().setName("resources:FOO").setValue("1"))
+            .build();
+
+    // PRE-ASSERT
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(1);
+
+    // ACT
+    Claim claim = acquireClaim(workerProvisions, resourceSet, platform);
+
+    // ASSERT
+    // the worker accepts because the resource is available.
+    assertThat(claim).isNotNull();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
+
+    // ACT
+    claim = acquireClaim(workerProvisions, resourceSet, platform);
+
+    // ASSERT
+    // the worker rejects because there are no resources left.
+    assertThat(claim).isNull();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
+  }
+
+  // Function under test: acquireClaim
+  // Reason for testing: the legacy "resource:" spelling must keep working alongside "resources:".
+  // Failure explanation: the legacy prefix is no longer recognized as a resource request.
+  @Test
+  public void shouldKeepOperationClaimsResourceWithLegacyPrefix() throws Exception {
+    // ARRANGE
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
+    SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    resourceSet.resources.put("FOO", new SemaphoreResource(new Semaphore(1), EXECUTE_ACTION_STAGE));
+
+    Platform platform =
+        Platform.newBuilder()
+            .addProperties(Platform.Property.newBuilder().setName("resource:FOO").setValue("1"))
+            .build();
+
+    // ACT
+    Claim claim = acquireClaim(workerProvisions, resourceSet, platform);
+
+    // ASSERT
+    assertThat(claim).isNotNull();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
+  }
+
   @Test
   public void shouldMatchCoresAsMinAndMax() throws Exception {
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
