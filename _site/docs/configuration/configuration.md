@@ -395,8 +395,8 @@ worker:
 
 ### Resources
 
-A list of limited resources that are available to the worker to be depleted by actions which execute containing a "resource:<name>": "N" property.
-The dequeueMatchSettings may also further limit executions to contain "resource:<name>" in properties, with either a specific limited resource count as the only accepted value for the action property. The use case here is one where executions are not allowed to request any value other than the one specified. There are no operators currently for asserting an execution requests 'less than' a particular number of resources.
+A list of limited resources that are available to the worker to be depleted by actions which execute containing a "resources:<name>": "N" property. This is the prefix bazel uses for extra resources in `tags` and `exec_properties`. The singular "resource:<name>" spelling is also accepted for backwards compatibility.
+The dequeueMatchSettings may also further limit executions to contain "resources:<name>" in properties, with either a specific limited resource count as the only accepted value for the action property. The use case here is one where executions are not allowed to request any value other than the one specified. There are no operators currently for asserting an execution requests 'less than' a particular number of resources.
 
 The default resource type is SEMAPHORE.
 The expected use case is that a resource is _internally_ allocated and managed by an execution, and the exhaustion prevents executions from starting which would block or fault if they could not consume the resource. Common examples include licensed software with tokens, and this mechanism can work for singleton resources like one gpu on a worker.
@@ -417,7 +417,7 @@ Example:
 worker:
   dequeueMatchSettings:
     properties:
-      - name: "resource:special-compiler-license"
+      - name: "resources:special-compiler-license"
         value: "1" # only actions which request one compiler license at a time will be accepted
   resources:
     name: "special-compiler-license"

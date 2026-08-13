@@ -56,4 +56,44 @@ public class LocalResourceSetUtilsTest {
     claim.release();
     assertThat(foo.availablePermits()).isEqualTo(1);
   }
+
+  // Function under test: getResourceName
+  // Reason for testing: bazel spells the prefix "resources:", but the singular "resource:" has
+  // always been accepted by buildfarm and must keep working.
+  // Failure explanation: a resource request is not resolved to the configured resource name.
+  @Test
+  public void getResourceNameStripsEitherPrefix() throws Exception {
+    assertThat(LocalResourceSetUtils.getResourceName("resources:FOO")).isEqualTo("FOO");
+    assertThat(LocalResourceSetUtils.getResourceName("resource:FOO")).isEqualTo("FOO");
+    // unprefixed names are used as-is
+    assertThat(LocalResourceSetUtils.getResourceName("FOO")).isEqualTo("FOO");
+    // only the leading prefix is stripped
+    assertThat(LocalResourceSetUtils.getResourceName("resources:resources:FOO"))
+        .isEqualTo("resources:FOO");
+  }
+
+  // Function under test: claimResources
+  // Reason for testing: a "resources:" request should claim the same resource as "resource:".
+  // Failure explanation: the bazel-compatible prefix does not claim the configured resource.
+  @Test
+  public void claimsResourceWithPluralPrefix() throws Exception {
+    // ARRANGE
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    Semaphore foo = new Semaphore(1);
+    resourceSet.resources.put("FOO", new SemaphoreResource(foo, EXECUTE_ACTION_STAGE));
+
+    Platform platform =
+        Platform.newBuilder()
+            .addProperties(Platform.Property.newBuilder().setName("resources:FOO").setValue("1"))
+            .build();
+
+    // ACT
+    Claim claim = LocalResourceSetUtils.claimResources(platform, resourceSet);
+
+    // ASSERT
+    assertThat(claim).isNotNull();
+    assertThat(foo.availablePermits()).isEqualTo(0);
+    claim.release();
+    assertThat(foo.availablePermits()).isEqualTo(1);
+  }
 }
