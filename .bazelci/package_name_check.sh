@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025 The Buildfarm Authors. All rights reserved.
+# Copyright 2021-2026 The Buildfarm Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,15 +65,15 @@ done
 
 # If there are no package issues, we complete successfully.
 if [ ${#incorrect_files[@]} -eq 0 ]; then
-    echo "All files have expected package format.";
-    exit 0;
-fi;
+    echo "All files have expected package format."
+    exit 0
+fi
 
 
 # If there are package issues, we report them and fail overall.
-print_error "There are files whose package statement does not match their file path:";
+print_error "There are files whose package statement does not match their file path:"
 for value in "${incorrect_files[@]}"
 do
      print_error $value
 done
-exit -1;
+exit -1
