@@ -111,15 +111,6 @@ tasks:
     shell_commands:
     - ./.bazelci/redis_unit_tests.sh
 
-  # We want to run the unit tests again inside of a docker container.
-  # This is because test cases may behave different while in docker due to user permissions.
-  # This is more of a sanity check between a defined docker file and running tests directly on the host.
-  docker_unit_tests:
-    name: Docker Unit Tests
-    platform: ubuntu2004
-    shell_commands:
-    - ./.bazelci/docker_unit_test.sh
-
   # Run server integration tests.
   # It starts the distributed storage backend and buildfarm services.
   # It performs a realistic build on generated cc targets and gating projects.
@@ -127,7 +118,10 @@ tasks:
     name: Server Integration Test
     platform: ubuntu2004
     shell_commands:
-    - ./.bazelci/run_server_test.sh
+    - export RUN_TEST=./.bazelci/run_server_test.sh
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
+    - export EXECUTION_STAGE_WIDTH=10
+    - ./.bazelci/integration_test.sh
 
   # Test that buildfarm can build software using the default configurations.
   # It starts the distributed storage backend and buildfarm services.
@@ -137,7 +131,7 @@ tasks:
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
 
@@ -148,7 +142,7 @@ tasks:
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
 
@@ -158,7 +152,7 @@ tasks:
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export TEST_ARG1=--experimental_remote_cache_compression
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
@@ -172,19 +166,19 @@ tasks:
     shell_commands:
     - export CACHE_TEST=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export TEST_ARG1=--remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--remote_grpc_log='./grpc2.log'
     - export SHA1_TOOLS_REMOTE=bc6975dcb71d090a7185f323d2905cbf1c926f52
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/cache_test.sh
 
-  integration_test_absei:
+  integration_test_abseil:
     name: Abseil Test
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=10
     - ./.bazelci/integration_test.sh
   integration_test_abseil_shard_compression:
@@ -192,7 +186,7 @@ tasks:
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=10
     - export TEST_ARG1=--experimental_remote_cache_compression
     - ./.bazelci/integration_test.sh

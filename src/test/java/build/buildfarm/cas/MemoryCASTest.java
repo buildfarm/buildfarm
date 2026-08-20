@@ -305,7 +305,6 @@ public class MemoryCASTest {
     Blob blob = blobOf("delegated");
     when(delegate.get(blob.getDigest())).thenReturn(blob);
     MemoryCAS storage = new MemoryCAS(1024, d -> {}, delegate);
-
     assertThat(storage.get(blob.getDigest())).isEqualTo(blob);
     verify(delegate, times(1)).get(blob.getDigest());
   }

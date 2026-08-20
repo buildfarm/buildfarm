@@ -59,7 +59,7 @@ download_tool () {
 
         #delete the zip and give tool common name.
         rm $LOCAL_DOWNLOAD_NAME
-        mv pmd-* $TOOL_FOLDER;
+        mv pmd-* $TOOL_FOLDER
     fi
 }
 
@@ -115,13 +115,13 @@ main () {
     if [ "${RUN_STATIC_ANALYSIS_CHECKS:-false}" = true ]; then
         run_static_analysis_checks
         analyze_static_analysis_results
-    fi;
+    fi
 
     # Possibly run code duplication check
     if [ "${RUN_CODE_DUPLICATION_CHECK:-false}" = true ]; then
         run_code_duplication_check
         analyze_code_duplication_results
-    fi;
+    fi
 
 }
 

@@ -13,12 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+pip3 install python-dateutil
+
 set -e
 set -o pipefail
 
-# This script is to be called within a built container reflecting the changes of a PR
-# We start the server and the worker, and test that they can complete builds for a bazel client.
-cd buildfarm;
+# Clean up function to stop services on exit
+buildfarm_cleanup() {
+    set +e
+    echo "Stopping buildfarm services..."
+    if [ -n "$SERVER_PID" ]; then
+        kill "$SERVER_PID" 2>/dev/null
+        wait "$SERVER_PID" 2>/dev/null
+    else
+        echo "No server pid..."
+    fi
+    if [ -n "$WORKER_PID" ]; then
+        kill "$WORKER_PID" 2>/dev/null
+        wait "$WORKER_PID" 2>/dev/null
+    else
+        echo "No server pid..."
+    fi
+}
 
 #Various targets to be tested
 BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
@@ -43,7 +59,7 @@ ensure_server_is_up(){
     MAX_COUNT=5
 
     # Wait for the server to start
-    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]];
+    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]]
     do
         echo "Waiting for Server to start..."
         sleep ${SLEEP_TIME}
@@ -59,7 +75,7 @@ ensure_server_is_up(){
        if [ ! -n "$(ps -p $SERVER_PID -o pid=)" ]; then
           echo "Server crashed."
           break
-       fi;
+       fi
     done
 }
 
@@ -75,7 +91,7 @@ ensure_worker_is_up(){
     MAX_COUNT=5
 
     # Wait for the server to start
-    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]];
+    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]]
     do
         echo "Waiting for Worker to start..."
         sleep ${SLEEP_TIME}
@@ -91,7 +107,7 @@ ensure_worker_is_up(){
        if [ ! -n "$(ps -p $WORKER_PID -o pid=)" ]; then
           echo "Worker crashed."
           break
-       fi;
+       fi
     done
 }
 
@@ -101,13 +117,13 @@ check_for_crashes(){
         if [ ! -n "$(ps -p $SERVER_PID -o pid=)" ]; then
 	    echo "Server crashed."
             cat server.log
-            exit -1;
-	fi;
+            exit -1
+	fi
         if [ ! -n "$(ps -p $WORKER_PID -o pid=)" ]; then
 	    echo "Worker crashed."
             cat worker.log
-            exit -1;
-	fi;
+            exit -1
+	fi
     done
 }
 
@@ -135,10 +151,10 @@ init_grpc_parser(){
         echo "Fetch tools_remote from git"
 
         git clone https://github.com/bazelbuild/tools_remote.git
-        cd tools_remote;
+        pushd tools_remote
         git reset --hard $SHA1_TOOLS_REMOTE
         ../bazel build //:remote_client
-        cd /buildfarm;
+        popd
     fi
 }
 parse_grpc_logs(){
@@ -149,6 +165,9 @@ parse_grpc_logs(){
         calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
     fi
 }
+
+# Trap EXIT, SIGINT, and SIGTERM
+trap buildfarm_cleanup EXIT INT TERM
 
 calculate_cache_statistics(){
     echo "Calculating cache statistics..."

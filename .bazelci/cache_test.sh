@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2025 The Buildfarm Authors. All rights reserved.
+# Copyright 2022-2026 The Buildfarm Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,32 +13,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is a CI integation test for a typical eployment of buildfarm.
+# This is a CI integation test for a typical deployment of buildfarm.
 # It ensures that the buildfarm services can startup and function as expected given PR changes.
 # All of the needed buildfarm services are initialized (redis, server, worker).
 # We ensure that the system can build a set of bazel targets.
 
-# Run redis container
-docker run --rm -d --name buildfarm-redis --network host redis:7.2.4 --bind localhost
+set -x
 
-# Build a container for buildfarm services
-cp `which bazel` bazel
-docker build -t buildfarm .
+# Define Redis details
+REDIS_VERSION="7.2.4"
+REDIS_DIR="redis-${REDIS_VERSION}"
 
-#Start the servies and do a test build
-docker run \
-    --rm \
-    -v /tmp:/tmp \
-    --network host  \
-    --env CACHE_TEST=$CACHE_TEST \
-    --env BUILDFARM_CONFIG=$BUILDFARM_CONFIG \
-    --env RUN_TEST=$RUN_TEST \
-    --env TEST_ARG1=$TEST_ARG1 \
-    --env TEST_ARG2=$TEST_ARG2 \
-    --env SHA1_TOOLS_REMOTE=$SHA1_TOOLS_REMOTE \
-    buildfarm buildfarm/.bazelci/test_buildfarm_container.sh
-status=$?
+# Download and compile Redis if not already present
+if [ ! -d "$REDIS_DIR" ]; then
+    echo "Downloading and compiling Redis ${REDIS_VERSION}..."
+    curl -sSL "https://github.com/redis/redis/archive/refs/tags/${REDIS_VERSION}.tar.gz" | tar -xz
+    make -C "$REDIS_DIR" -j$(nproc)
+fi
 
-docker stop buildfarm-redis
+# Clean up function to stop services on exit
+cleanup() {
+    echo "Stopping services..."
+    # Gracefully stop Redis, then force kill if needed
+    if [ -n "$REDIS_PID" ]; then
+        ./"${REDIS_DIR}/src/redis-cli" shutdown 2>/dev/null || kill "$REDIS_PID" 2>/dev/null
+    fi
+    wait "$REDIS_PID" "$PID2" 2>/dev/null
+    echo "All services stopped."
+}
 
-exit $status
+# Trap EXIT, SIGINT, and SIGTERM
+trap cleanup EXIT INT TERM
+
+# Start Redis 7.2.4 in the background
+./"${REDIS_DIR}/src/redis-server" --port 6379 &
+REDIS_PID=$!
+
+if [ -z "$BAZEL" ]
+then
+    BAZEL=bazel
+fi
+cp `which $BAZEL` bazel
+
+CACHE_TEST=$CACHE_TEST \
+BUILDFARM_CONFIG=$BUILDFARM_CONFIG \
+RUN_TEST=$RUN_TEST \
+TEST_ARG1=$TEST_ARG1 \
+TEST_ARG2=$TEST_ARG2 \
+SHA1_TOOLS_REMOTE=$SHA1_TOOLS_REMOTE \
+    .bazelci/test_buildfarm_container.sh

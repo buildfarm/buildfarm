@@ -219,11 +219,9 @@ public class BalancedRedisQueueTest {
     queue.take(jedis, service);
     queue.take(jedis, service);
     queue.take(jedis, service);
-    service.shutdown();
-    Boolean success = queue.removeFromDequeue(jedis, new BalancedQueueEntry("test", "bar"));
-
+    service.close();
+    Boolean success = queue.removeFromDequeue(jedis, new BalancedQueueEntry("{}test", "bar"));
     // ASSERT
-    assertThat(service.awaitTermination(0, SECONDS)).isTrue();
     assertThat(success).isTrue();
   }
 

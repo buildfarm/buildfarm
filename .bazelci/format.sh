@@ -112,12 +112,12 @@ run_hawkeye() {
 
 if [ "${FORMAT_JAVA:-false}" = true ]; then
     run_java_formatter "$@"
-fi;
+fi
 
 if [ "${FORMAT_BUILD:-false}" = true ]; then
     run_buildifier "$@"
-fi;
+fi
 
 if [ "${FORMAT_HAWKEYE:-false}" = true ]; then
     run_hawkeye "$@"
-fi;
+fi
