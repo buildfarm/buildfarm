@@ -23,9 +23,9 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.v1test.Digest;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
-import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -40,9 +40,7 @@ public class WorkerTest {
    */
   @Test
   public void zstdInputStreamFactoryClosesTheBaseStreamOnAnExhaustedPool() throws Exception {
-    try (FixedBufferPool pool = new FixedBufferPool(/* capacity= */ 1)) {
-      // Fail a borrow that finds no free buffer, rather than wait for one.
-      pool.setMaxWait(Duration.ZERO);
+    try (FixedBufferPool pool = new FixedBufferPool(/* capacity= */ 1, Duration.ZERO)) {
       AtomicBoolean closed = new AtomicBoolean(false);
       InputStream base =
           new ByteArrayInputStream(new byte[0]) {
@@ -57,7 +55,7 @@ public class WorkerTest {
       pool.borrowObject(); // the only buffer
 
       assertThrows(
-          NoSuchElementException.class,
+          IOException.class,
           () ->
               factory.newInput(
                   Compressor.Value.IDENTITY, Digest.getDefaultInstance(), /* offset= */ 0));

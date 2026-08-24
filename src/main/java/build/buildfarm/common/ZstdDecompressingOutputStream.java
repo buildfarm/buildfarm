@@ -27,9 +27,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.NoSuchElementException;
 import org.apache.commons.pool2.BasePooledObjectFactory;
-import org.apache.commons.pool2.ObjectPool;
 import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
@@ -57,21 +59,32 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
   }
 
   public static final class FixedBufferPool extends GenericObjectPool<ByteBuffer> {
-    private static GenericObjectPoolConfig<ByteBuffer> createPoolConfig(int capacity) {
+    private static GenericObjectPoolConfig<ByteBuffer> createPoolConfig(
+        int capacity, Duration maxWait) {
       GenericObjectPoolConfig<ByteBuffer> poolConfig = new GenericObjectPoolConfig<>();
       poolConfig.setMaxTotal(capacity);
+      poolConfig.setMaxWait(maxWait);
       return poolConfig;
     }
 
     public FixedBufferPool(int capacity) {
-      super(new ZstdDInBufferFactory(), createPoolConfig(capacity));
+      this(capacity, BaseObjectPoolConfig.DEFAULT_MAX_WAIT);
+    }
+
+    /**
+     * @param maxWait how long a borrow waits for a free buffer. A negative duration waits without a
+     *     bound, which can stall every zstd transfer on this process. A zero duration fails a
+     *     borrow that cannot take a free buffer at once.
+     */
+    public FixedBufferPool(int capacity, Duration maxWait) {
+      super(new ZstdDInBufferFactory(), createPoolConfig(capacity, maxWait));
     }
   }
 
   public static class ZstdFixedBufferPool implements BufferPool {
-    private final ObjectPool<ByteBuffer> pool;
+    private final FixedBufferPool pool;
 
-    public ZstdFixedBufferPool(ObjectPool<ByteBuffer> pool) {
+    public ZstdFixedBufferPool(FixedBufferPool pool) {
       this.pool = pool;
     }
 
@@ -81,6 +94,17 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
       checkState(bufferSize > 0 && bufferSize <= ZstdDInBufferFactory.getBufferSize());
       try {
         return pool.borrowObject();
+      } catch (NoSuchElementException e) {
+        // Do not throw. zstd-jni turns a null from a BufferPool into a ZstdIOException, so the
+        // callers that already handle IOException see this as a failed transfer instead of an
+        // unchecked exception out of a constructor. commons-pool2 raises NoSuchElementException
+        // for a borrow timeout and for an exhausted pool alike, and both mean the same thing here.
+        return null;
+      } catch (InterruptedException e) {
+        // Restore the flag. throwIfUnchecked would otherwise wrap this and lose it, and zstd-jni
+        // reports it with the same message it uses for a timeout.
+        Thread.currentThread().interrupt();
+        return null;
       } catch (Exception e) {
         throwIfUnchecked(e);
         throw new RuntimeException(e);
