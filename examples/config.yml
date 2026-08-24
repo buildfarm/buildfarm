@@ -157,6 +157,7 @@ worker:
     selectForTmpFs: false
   createSymlinkOutputs: false
   zstdBufferPoolSize: 2048
+  zstdBufferPoolBorrowTimeoutMillis: -1
   compressedBlobTransfer: false
   executionPolicies:
   - name: test

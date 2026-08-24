@@ -21,6 +21,7 @@ java_test(
         "@buildfarm_maven//:io_grpc_grpc_core",
         "@buildfarm_maven//:io_grpc_grpc_stub",
         "@buildfarm_maven//:io_grpc_grpc_testing",
+        "@buildfarm_maven//:org_apache_commons_commons_pool2",
         "@buildfarm_maven//:org_mockito_mockito_core",
         "@buildfarm_maven//:redis_clients_jedis",
         "@googleapis//google/bytestream:bytestream_java_proto",

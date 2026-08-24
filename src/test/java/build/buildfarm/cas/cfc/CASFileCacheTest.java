@@ -83,7 +83,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CyclicBarrier;
@@ -152,11 +151,10 @@ class CASFileCacheTest {
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
-    // A single buffer, and a borrow that fails rather than one that waits, so that one open
-    // zstd write exhausts the pool and the next borrow fails at once. Every other test here
-    // writes IDENTITY and never touches it.
-    zstdBufferPool = new FixedBufferPool(/* capacity= */ 1);
-    zstdBufferPool.setMaxWait(Duration.ZERO);
+    // A single buffer, and a borrow timeout of zero, so that one open zstd write exhausts the
+    // pool and the next borrow fails at once. Every other test here writes IDENTITY and never
+    // touches it.
+    zstdBufferPool = new FixedBufferPool(/* capacity= */ 1, Duration.ZERO);
     fileCache =
         new LegacyDirectoryCFC(
             root,
@@ -563,7 +561,7 @@ class CASFileCacheTest {
     Write retried = getWrite(Compressor.Value.ZSTD, retriedDigest);
 
     OutputStream heldOut = held.getOutput(1, SECONDS, () -> {});
-    assertThrows(NoSuchElementException.class, () -> retried.getOutput(1, SECONDS, () -> {}));
+    assertThrows(IOException.class, () -> retried.getOutput(1, SECONDS, () -> {}));
     zstd(heldContent).writeTo(heldOut);
     heldOut.close();
 
