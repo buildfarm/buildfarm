@@ -52,10 +52,12 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.EvenMoreFiles;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.v1test.Digest;
+import com.github.luben.zstd.Zstd;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -78,8 +80,10 @@ import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CyclicBarrier;
@@ -108,6 +112,7 @@ class CASFileCacheTest {
   private final Path root;
   private final boolean storeFileDirsIndexInMemory;
   private Map<Digest, ByteString> blobs;
+  private FixedBufferPool zstdBufferPool;
   private ExecutorService putService;
 
   @Mock private Consumer<Digest> onPut;
@@ -147,6 +152,11 @@ class CASFileCacheTest {
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
+    // A single buffer, and a borrow that fails rather than one that waits, so that one open
+    // zstd write exhausts the pool and the next borrow fails at once. Every other test here
+    // writes IDENTITY and never touches it.
+    zstdBufferPool = new FixedBufferPool(/* capacity= */ 1);
+    zstdBufferPool.setMaxWait(Duration.ZERO);
     fileCache =
         new LegacyDirectoryCFC(
             root,
@@ -159,7 +169,7 @@ class CASFileCacheTest {
             /* accessRecorder= */ directExecutor(),
             storage,
             /* directoriesIndexDbName= */ ":memory:",
-            /* zstdBufferPool= */ null,
+            zstdBufferPool,
             onPut,
             onExpire,
             delegate,
@@ -188,6 +198,7 @@ class CASFileCacheTest {
     if (!shutdownAndAwaitTermination(expireService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down expire service");
     }
+    zstdBufferPool.close();
     Directories.remove(root, fileStore);
   }
 
@@ -527,8 +538,52 @@ class CASFileCacheTest {
   }
 
   Write getWrite(Digest digest) throws IOException {
+    return getWrite(Compressor.Value.IDENTITY, digest);
+  }
+
+  Write getWrite(Compressor.Value compressor, Digest digest) throws IOException {
     return fileCache.getWrite(
-        Compressor.Value.IDENTITY, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+        compressor, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+  }
+
+  private static ByteString zstd(ByteString content) {
+    return ByteString.copyFrom(Zstd.compress(content.toByteArray()));
+  }
+
+  // A zstd write holds a pool buffer for the life of its output stream. With one buffer in the
+  // pool, the second getOutput fails inside the ZstdDecompressingOutputStream constructor, which
+  // runs after CASFileCache has already published the write's closedFuture. Nothing else closes
+  // that stream, so unless getOutput cleans up, the retry below waits on closedFuture forever.
+  @Test
+  public void zstdWriteRecoversFromAnExhaustedBufferPool() throws Exception {
+    ByteString heldContent = ByteString.copyFromUtf8("held blob");
+    ByteString retriedContent = ByteString.copyFromUtf8("retried blob");
+    Digest retriedDigest = DIGEST_UTIL.compute(retriedContent);
+    Write held = getWrite(Compressor.Value.ZSTD, DIGEST_UTIL.compute(heldContent));
+    Write retried = getWrite(Compressor.Value.ZSTD, retriedDigest);
+
+    OutputStream heldOut = held.getOutput(1, SECONDS, () -> {});
+    assertThrows(NoSuchElementException.class, () -> retried.getOutput(1, SECONDS, () -> {}));
+    zstd(heldContent).writeTo(heldOut);
+    heldOut.close();
+
+    ExecutorService retryService = newSingleThreadExecutor();
+    try {
+      Future<?> retry =
+          retryService.submit(
+              () -> {
+                try (OutputStream out = retried.getOutput(1, SECONDS, () -> {})) {
+                  zstd(retriedContent).writeTo(out);
+                }
+                return null;
+              });
+      // A wedged closedFuture blocks this get, and shutdownNow below unblocks the wait.
+      retry.get(5, SECONDS);
+    } finally {
+      shutdownAndAwaitTermination(retryService, 1, SECONDS);
+    }
+
+    assertThat(storage.get(fileCache.getKey(retriedDigest, false))).isNotNull();
   }
 
   @Test

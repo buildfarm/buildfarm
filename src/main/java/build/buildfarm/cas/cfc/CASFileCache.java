@@ -937,6 +937,33 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  /** Wrap a committed write output stream for the compressor that the client is sending. */
+  private FeedbackOutputStream writeOutputForCompressor(
+      Compressor.Value compressor, UniqueWriteOutputStream uniqueOut) throws IOException {
+    try {
+      switch (compressor) {
+        case IDENTITY:
+          return uniqueOut;
+        case ZSTD:
+          return new ZstdDecompressingOutputStream(uniqueOut, zstdBufferPool);
+        default:
+          throw new UnsupportedOperationException("Unsupported compressor " + compressor);
+      }
+    } catch (IOException | RuntimeException e) {
+      // The caller has already published the write's closedFuture through commitOpenState. If we
+      // leave without closing uniqueOut, that future never completes and the next getOutput() for
+      // this write waits on it forever, before it can reach reset(). close() resolves the future
+      // and leaves the delegate open, so a partial write stays resumable. The zstd constructor
+      // reaches here when the buffer pool refuses a borrow, and so does an unsupported compressor.
+      try {
+        uniqueOut.close();
+      } catch (IOException closeError) {
+        e.addSuppressed(closeError);
+      }
+      throw e;
+    }
+  }
+
   Write newWrite(BlobWriteKey key, SettableFuture<Long> future) {
     Write write =
         new Write() {
@@ -1096,15 +1123,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               return uniqueOut;
             } else {
               commitOpenState(uniqueOut.delegate(), outClosedFuture);
-              switch (key.getCompressor()) {
-                case IDENTITY:
-                  return uniqueOut;
-                case ZSTD:
-                  return new ZstdDecompressingOutputStream(uniqueOut, zstdBufferPool);
-                default:
-                  throw new UnsupportedOperationException(
-                      "Unsupported compressor " + key.getCompressor());
-              }
+              return writeOutputForCompressor(key.getCompressor(), uniqueOut);
             }
           }
 
