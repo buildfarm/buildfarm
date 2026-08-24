@@ -374,6 +374,32 @@ public final class Worker extends LoggingMain {
     }
   }
 
+  /**
+   * Fetch every blob compressed and decompress locally, so that a worker to worker transfer moves
+   * fewer bytes than the blob itself.
+   */
+  static InputStreamFactory zstdDecompressingInputStreamFactory(
+      InputStreamFactory base, FixedBufferPool zstdBufferPool) {
+    return (compressor, digest, offset) -> {
+      InputStream zstdStream = base.newInput(Compressor.Value.ZSTD, digest, offset);
+      if (compressor != Compressor.Value.IDENTITY) {
+        return zstdStream;
+      }
+      try {
+        return new ZstdInputStreamNoFinalizer(zstdStream, new ZstdFixedBufferPool(zstdBufferPool));
+      } catch (IOException | RuntimeException e) {
+        // The decompressor takes its pool buffer in the constructor, which throws when the
+        // borrow fails. Nothing else holds zstdStream, so the remote read stays open.
+        try {
+          zstdStream.close();
+        } catch (IOException closeError) {
+          e.addSuppressed(closeError);
+        }
+        throw e;
+      }
+    };
+  }
+
   private CASFileCache createStorages(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
@@ -718,16 +744,8 @@ public final class Worker extends LoggingMain {
             workerStubs,
             (worker, t, context) -> {});
     if (configs.getWorker().isCompressedBlobTransfer()) {
-      InputStreamFactory base = remoteInputStreamFactory;
       remoteInputStreamFactory =
-          (compressor, digest, offset) -> {
-            InputStream zstdStream = base.newInput(Compressor.Value.ZSTD, digest, offset);
-            if (compressor == Compressor.Value.IDENTITY) {
-              return new ZstdInputStreamNoFinalizer(
-                  zstdStream, new ZstdFixedBufferPool(zstdBufferPool));
-            }
-            return zstdStream;
-          };
+          zstdDecompressingInputStreamFactory(remoteInputStreamFactory, zstdBufferPool);
     }
     CASFileCache storage =
         createStorages(
