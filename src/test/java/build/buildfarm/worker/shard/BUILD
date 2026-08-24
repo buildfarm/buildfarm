@@ -23,6 +23,8 @@ java_test(
         "@buildfarm_maven//:com_google_truth_truth",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_core",
+        "@buildfarm_maven//:org_apache_commons_commons_pool2",
         "@buildfarm_maven//:org_mockito_mockito_core",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
