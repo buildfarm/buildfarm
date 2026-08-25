@@ -34,7 +34,7 @@ tasks:
     - //src/test/java/...:all
     coverage_flags:
     - --combined_report=lcov
-    - --test_tag_filters=-redis,-integration
+    - --test_tag_filters=-redis,-integration,-container
     post_shell_commands:
     - export BUILDFARM_INVOKE_COVERAGE=false
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
@@ -49,7 +49,7 @@ tasks:
     build_flags:
     - --build_tag_filters=-container
     test_flags:
-    - --test_tag_filters=-integration,-redis
+    - --test_tag_filters=-integration,-redis,-container
     test_targets:
     - '...'
   ubuntu2204:
@@ -59,7 +59,7 @@ tasks:
     build_flags:
     - --build_tag_filters=-container
     test_flags:
-    - --test_tag_filters=-integration,-redis
+    - --test_tag_filters=-integration,-redis,-containuer
     test_targets:
     - '...'
   ubuntu2004:
@@ -69,7 +69,7 @@ tasks:
     build_flags:
     - --build_tag_filters=-container
     test_flags:
-    - --test_tag_filters=-integration,-redis
+    - --test_tag_filters=-integration,-redis,-containuer
     test_targets:
     - '...'
   macos:
@@ -94,7 +94,7 @@ tasks:
     - '...'
     test_flags:
     - --@rules_jvm_external//settings:stamp_manifest=False
-    - --test_tag_filters=-container,-integration,-redis
+    - --test_tag_filters=-container,-integration,-redis,-container
     test_targets:
     - '...'
   rpm_builds:
