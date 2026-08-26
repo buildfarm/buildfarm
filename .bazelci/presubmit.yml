@@ -59,7 +59,7 @@ tasks:
     build_flags:
     - --build_tag_filters=-container
     test_flags:
-    - --test_tag_filters=-integration,-redis,-containuer
+    - --test_tag_filters=-integration,-redis,-container
     test_targets:
     - '...'
   ubuntu2004:
@@ -69,7 +69,7 @@ tasks:
     build_flags:
     - --build_tag_filters=-container
     test_flags:
-    - --test_tag_filters=-integration,-redis,-containuer
+    - --test_tag_filters=-integration,-redis,-container
     test_targets:
     - '...'
   macos:
