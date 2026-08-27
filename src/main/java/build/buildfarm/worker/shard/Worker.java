@@ -23,15 +23,15 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
@@ -69,6 +69,7 @@ import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.PipelineChange;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.CFCExecFileSystem;
@@ -82,7 +83,6 @@ import build.buildfarm.worker.MatchStage;
 import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
-import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.SuperscalarPipelineStage;
 import build.buildfarm.worker.WorkerEventObserver;
@@ -105,8 +105,8 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.Timestamp;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -116,6 +116,15 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
 import io.grpc.services.ChannelzService;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanBuilder;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import java.io.File;
@@ -142,16 +151,6 @@ import java.util.logging.Level;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
 import org.jspecify.annotations.Nullable;
-
-import io.opentelemetry.api.OpenTelemetry;
-import io.opentelemetry.api.common.AttributeKey;
-import io.opentelemetry.api.trace.SpanBuilder;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.Tracer;
-import io.opentelemetry.context.Context;
-import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.opentelemetry.sdk.resources.Resource;
-import io.opentelemetry.sdk.trace.SdkTracerProvider;
 
 @Log
 public final class Worker extends LoggingMain {
@@ -759,208 +758,216 @@ public final class Worker extends LoggingMain {
     String oTelURL = configs.getWorker().getOpenTelemetryURL();
     Tracer tracer;
     if (!oTelURL.isEmpty()) {
-      Resource resource = Resource.getDefault().toBuilder()
-          .put(SERVICE_NAME, "Buildfarm")
-          .build();
+      Resource resource = Resource.getDefault().toBuilder().put(SERVICE_NAME, "Buildfarm").build();
       oTelSdkTracerProvider =
           SdkTracerProvider.builder()
               .setResource(resource)
-              .addSpanProcessor(SpanProcessorConfig.batchSpanProcessor(
-                  SpanExporterConfig.otlpHttpSpanExporter(oTelURL)))
+              .addSpanProcessor(
+                  SpanProcessorConfig.batchSpanProcessor(
+                      SpanExporterConfig.otlpHttpSpanExporter(oTelURL)))
               .build();
 
       OpenTelemetry oTel =
-          OpenTelemetrySdk.builder()
-              .setTracerProvider(oTelSdkTracerProvider)
-              .build();
+          OpenTelemetrySdk.builder().setTracerProvider(oTelSdkTracerProvider).build();
 
       tracer = oTel.getTracer("Buildfarm Worker");
     } else {
       tracer = null;
     }
 
-    WorkerEventObserver workerEventObserver = new WorkerEventObserver() {
-      @Override
-      public void onFetched(long numBytes) {
-        fetchedBytesTotal.inc(numBytes);
-      }
-
-      @Override
-      public void onCreatedLinkedDirectory() {
-        createdLinkedDirectoriesTotal.inc();
-      }
-
-      @Override
-      public void onCompletedExecution(Operation execution) {
-        captureExecutionMetric(execution);
-        completedExecutions.inc();
-      }
-
-      void captureExecutionMetric(Operation execution) {
-        // otel metrics bucketing for:
-        
-        ExecuteOperationMetadata metadata;
-        RequestMetadata requestMetadata;
-        try {
-          if (execution.getMetadata().is(QueuedOperationMetadata.class)) {
-            QueuedOperationMetadata queuedOperationMetadata =
-                execution.getMetadata().unpack(QueuedOperationMetadata.class);
-            metadata = queuedOperationMetadata.getExecuteOperationMetadata();
-            requestMetadata = queuedOperationMetadata.getRequestMetadata();
-          } else {
-            metadata = ExecuteOperationMetadata.getDefaultInstance();
-            requestMetadata = RequestMetadata.getDefaultInstance();
+    WorkerEventObserver workerEventObserver =
+        new WorkerEventObserver() {
+          @Override
+          public void onFetched(long numBytes) {
+            fetchedBytesTotal.inc(numBytes);
           }
-        } catch (InvalidProtocolBufferException e) {
-          metadata = ExecuteOperationMetadata.getDefaultInstance();
-          requestMetadata = RequestMetadata.getDefaultInstance();
-        }
 
-        // requestMetadata:
-        // getCorrelatedInvocationsId
-        // getToolInvocationId?
-        // getActionMnemonic
-        // getTargetId
-        if (execution.getResultCase() == Operation.ResultCase.RESPONSE) {
-          ExecuteResponse response;
-          try {
-            response = execution.getResponse().unpack(ExecuteResponse.class);
-          } catch (InvalidProtocolBufferException e) {
-            // unlikely, as this is the only message we put into this field
-            response = ExecuteResponse.getDefaultInstance();
+          @Override
+          public void onCreatedLinkedDirectory() {
+            createdLinkedDirectoriesTotal.inc();
           }
-          if (response.hasResult()) {
-            ActionResult result = response.getResult();
-            int statusCode = response.getStatus().getCode();
-            int exitCode = result.getExitCode();
-            if (result.hasExecutionMetadata()) {
-              // metadata:
-              // with IF, EX, RR durations
-              ExecutedActionMetadata executionMetadata = result.getExecutionMetadata();
 
-              recordMetric(
-                  spanBuilderDecorator(
-                      requestMetadata.getCorrelatedInvocationsId(),
-                      requestMetadata.getToolInvocationId(),
-                      requestMetadata.getActionMnemonic(),
-                      requestMetadata.getTargetId(),
-                      execution.getName()),
-                  statusCode,
-                  exitCode,
-                  executionMetadata);
-            }
+          @Override
+          public void onCompletedExecution(Operation execution) {
+            captureExecutionMetric(execution);
+            completedExecutions.inc();
           }
-        }
-      }
 
-      Consumer<SpanBuilder> spanBuilderDecorator(
-          String correlatedInvocationsId,
-          String toolInvocationId,
-          String actionMnemonic,
-          String targetId,
-          String name) {
-        // further parse correlatedInvocationsId to get out host/user qualifier?
-        return spanBuilder -> spanBuilder
-            .setAttribute("correlated invocations id", correlatedInvocationsId)
-            .setAttribute("tool invocation id", toolInvocationId)
-            .setAttribute("action mnemonic", actionMnemonic)
-            .setAttribute("target id", targetId)
-            .setAttribute("name", name);
-      }
+          void captureExecutionMetric(Operation execution) {
+            // otel metrics bucketing for:
 
-      void recordSpan(
-          Consumer<SpanBuilder> decorator,
-          Consumer<Context> withContext,
-          String name,
-          Timestamp start,
-          Timestamp end) {
-        if (tracer != null) {
-          SpanBuilder builder = tracer.spanBuilder(name);
-          decorator.accept(builder);
-          Span span = builder
-              .setStartTimestamp(Timestamps.toNanos(start), NANOSECONDS)
-              .startSpan();
-          if (withContext != null) {
-            withContext.accept(Context.current().with(span));
-          }
-          span.end(Timestamps.toNanos(end), NANOSECONDS);
-        }
-      }
-
-      private static void decorateExecution(SpanBuilder spanBuilder, ExecutedActionMetadata metadata) {
-        WorkerExecutedMetadata workerExecutedMetadata = null;
-        // awkward that we have to deserialize these through the Any, but hopefully fast enough given the immediate construction
-        for (Any auxiliaryMetadata : metadata.getAuxiliaryMetadataList()) {
-          if (auxiliaryMetadata.is(WorkerExecutedMetadata.class)) {
+            ExecuteOperationMetadata metadata;
+            RequestMetadata requestMetadata;
             try {
-              // take the first WorkerExecutedMetadata
-              workerExecutedMetadata = auxiliaryMetadata.unpack(WorkerExecutedMetadata.class);
-              break;
+              if (execution.getMetadata().is(QueuedOperationMetadata.class)) {
+                QueuedOperationMetadata queuedOperationMetadata =
+                    execution.getMetadata().unpack(QueuedOperationMetadata.class);
+                metadata = queuedOperationMetadata.getExecuteOperationMetadata();
+                requestMetadata = queuedOperationMetadata.getRequestMetadata();
+              } else {
+                metadata = ExecuteOperationMetadata.getDefaultInstance();
+                requestMetadata = RequestMetadata.getDefaultInstance();
+              }
             } catch (InvalidProtocolBufferException e) {
-              // unlikely
+              metadata = ExecuteOperationMetadata.getDefaultInstance();
+              requestMetadata = RequestMetadata.getDefaultInstance();
+            }
+
+            // requestMetadata:
+            // getCorrelatedInvocationsId
+            // getToolInvocationId?
+            // getActionMnemonic
+            // getTargetId
+            if (execution.getResultCase() == Operation.ResultCase.RESPONSE) {
+              ExecuteResponse response;
+              try {
+                response = execution.getResponse().unpack(ExecuteResponse.class);
+              } catch (InvalidProtocolBufferException e) {
+                // unlikely, as this is the only message we put into this field
+                response = ExecuteResponse.getDefaultInstance();
+              }
+              if (response.hasResult()) {
+                ActionResult result = response.getResult();
+                int statusCode = response.getStatus().getCode();
+                int exitCode = result.getExitCode();
+                if (result.hasExecutionMetadata()) {
+                  // metadata:
+                  // with IF, EX, RR durations
+                  ExecutedActionMetadata executionMetadata = result.getExecutionMetadata();
+
+                  recordMetric(
+                      spanBuilderDecorator(
+                          requestMetadata.getCorrelatedInvocationsId(),
+                          requestMetadata.getToolInvocationId(),
+                          requestMetadata.getActionMnemonic(),
+                          requestMetadata.getTargetId(),
+                          execution.getName()),
+                      statusCode,
+                      exitCode,
+                      executionMetadata);
+                }
+              }
             }
           }
-        }
 
-        if (workerExecutedMetadata != null) {
-          for (Map.Entry<String, Long> entry : workerExecutedMetadata.getUsage().entrySet()) {
-            spanBuilder.setAttribute("usage." + entry.getKey(), entry.getValue());
+          Consumer<SpanBuilder> spanBuilderDecorator(
+              String correlatedInvocationsId,
+              String toolInvocationId,
+              String actionMnemonic,
+              String targetId,
+              String name) {
+            // further parse correlatedInvocationsId to get out host/user qualifier?
+            return spanBuilder ->
+                spanBuilder
+                    .setAttribute("correlated invocations id", correlatedInvocationsId)
+                    .setAttribute("tool invocation id", toolInvocationId)
+                    .setAttribute("action mnemonic", actionMnemonic)
+                    .setAttribute("target id", targetId)
+                    .setAttribute("name", name);
           }
-        }
-      }
 
-      private static void decorateResult(SpanBuilder spanBuilder, int statusCode, int exitCode) {
-        spanBuilder.setAttribute("exit_code", exitCode);
-        spanBuilder.setAttribute("status_code", com.google.rpc.Code.forNumber(statusCode).toString());
-      }
+          void recordSpan(
+              Consumer<SpanBuilder> decorator,
+              Consumer<Context> withContext,
+              String name,
+              Timestamp start,
+              Timestamp end) {
+            if (tracer != null) {
+              SpanBuilder builder = tracer.spanBuilder(name);
+              decorator.accept(builder);
+              Span span =
+                  builder.setStartTimestamp(Timestamps.toNanos(start), NANOSECONDS).startSpan();
+              if (withContext != null) {
+                withContext.accept(Context.current().with(span));
+              }
+              span.end(Timestamps.toNanos(end), NANOSECONDS);
+            }
+          }
 
-      void recordMetric(
-          Consumer<SpanBuilder> decorator,
-          int statusCode,
-          int exitCode,
-          ExecutedActionMetadata metadata) {
-        recordSpan(
-            decorator,
-            parent -> recordAction(parent, statusCode, exitCode, metadata),
-            "action",
-            metadata.getQueuedTimestamp(),
-            metadata.getOutputUploadCompletedTimestamp());
-      }
+          private static void decorateExecution(
+              SpanBuilder spanBuilder, ExecutedActionMetadata metadata) {
+            WorkerExecutedMetadata workerExecutedMetadata = null;
+            // awkward that we have to deserialize these through the Any, but hopefully fast enough
+            // given the immediate construction
+            for (Any auxiliaryMetadata : metadata.getAuxiliaryMetadataList()) {
+              if (auxiliaryMetadata.is(WorkerExecutedMetadata.class)) {
+                try {
+                  // take the first WorkerExecutedMetadata
+                  workerExecutedMetadata = auxiliaryMetadata.unpack(WorkerExecutedMetadata.class);
+                  break;
+                } catch (InvalidProtocolBufferException e) {
+                  // unlikely
+                }
+              }
+            }
 
-      Consumer<SpanBuilder> parented(Context parent, Consumer<SpanBuilder> delegate) {
-        return spanBuilder -> {
-          spanBuilder.setParent(parent);
-          if (delegate != null) {
-            delegate.accept(spanBuilder);
+            if (workerExecutedMetadata != null) {
+              for (Map.Entry<String, Long> entry : workerExecutedMetadata.getUsage().entrySet()) {
+                spanBuilder.setAttribute("usage." + entry.getKey(), entry.getValue());
+              }
+            }
+          }
+
+          private static void decorateResult(
+              SpanBuilder spanBuilder, int statusCode, int exitCode) {
+            spanBuilder.setAttribute("exit_code", exitCode);
+            spanBuilder.setAttribute(
+                "status_code", com.google.rpc.Code.forNumber(statusCode).toString());
+          }
+
+          void recordMetric(
+              Consumer<SpanBuilder> decorator,
+              int statusCode,
+              int exitCode,
+              ExecutedActionMetadata metadata) {
+            recordSpan(
+                decorator,
+                parent -> recordAction(parent, statusCode, exitCode, metadata),
+                "action",
+                metadata.getQueuedTimestamp(),
+                metadata.getOutputUploadCompletedTimestamp());
+          }
+
+          Consumer<SpanBuilder> parented(Context parent, Consumer<SpanBuilder> delegate) {
+            return spanBuilder -> {
+              spanBuilder.setParent(parent);
+              if (delegate != null) {
+                delegate.accept(spanBuilder);
+              }
+            };
+          }
+
+          void recordAction(
+              Context parent, int statusCode, int exitCode, ExecutedActionMetadata metadata) {
+            // otel
+            recordSpan(
+                parented(parent, null),
+                null,
+                "action queued",
+                metadata.getQueuedTimestamp(),
+                metadata.getWorkerStartTimestamp());
+            recordSpan(
+                parented(parent, null),
+                null,
+                "action input fetch",
+                metadata.getInputFetchStartTimestamp(),
+                metadata.getInputFetchCompletedTimestamp());
+            recordSpan(
+                parented(parent, spanBuilder -> decorateExecution(spanBuilder, metadata)),
+                null,
+                "action execution",
+                metadata.getExecutionStartTimestamp(),
+                metadata.getExecutionCompletedTimestamp());
+            recordSpan(
+                parented(parent, spanBuilder -> decorateResult(spanBuilder, statusCode, exitCode)),
+                null,
+                "action report result",
+                metadata.getOutputUploadStartTimestamp(),
+                metadata.getOutputUploadCompletedTimestamp());
           }
         };
-      }
-
-      void recordAction(
-          Context parent,
-          int statusCode,
-          int exitCode,
-          ExecutedActionMetadata metadata) {
-        // otel
-        recordSpan(parented(parent, null), null, "action queued", metadata.getQueuedTimestamp(), metadata.getWorkerStartTimestamp());
-        recordSpan(parented(parent, null), null, "action input fetch", metadata.getInputFetchStartTimestamp(), metadata.getInputFetchCompletedTimestamp());
-        recordSpan(
-            parented(parent, spanBuilder -> decorateExecution(spanBuilder, metadata)),
-            null,
-            "action execution",
-            metadata.getExecutionStartTimestamp(),
-            metadata.getExecutionCompletedTimestamp());
-        recordSpan(
-            parented(parent, spanBuilder -> decorateResult(spanBuilder, statusCode, exitCode)),
-            null,
-            "action report result",
-            metadata.getOutputUploadStartTimestamp(),
-            metadata.getOutputUploadCompletedTimestamp());
-      }
-    };
 
     /** end tie up section */
-
     InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
             configs.getWorker().getPublicName(),
