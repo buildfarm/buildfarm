@@ -30,7 +30,6 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -796,20 +795,16 @@ public final class Worker extends LoggingMain {
           void captureExecutionMetric(Operation execution) {
             // otel metrics bucketing for:
 
-            ExecuteOperationMetadata metadata;
             RequestMetadata requestMetadata;
             try {
               if (execution.getMetadata().is(QueuedOperationMetadata.class)) {
                 QueuedOperationMetadata queuedOperationMetadata =
                     execution.getMetadata().unpack(QueuedOperationMetadata.class);
-                metadata = queuedOperationMetadata.getExecuteOperationMetadata();
                 requestMetadata = queuedOperationMetadata.getRequestMetadata();
               } else {
-                metadata = ExecuteOperationMetadata.getDefaultInstance();
                 requestMetadata = RequestMetadata.getDefaultInstance();
               }
             } catch (InvalidProtocolBufferException e) {
-              metadata = ExecuteOperationMetadata.getDefaultInstance();
               requestMetadata = RequestMetadata.getDefaultInstance();
             }
 
