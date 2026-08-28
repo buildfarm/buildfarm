@@ -377,24 +377,27 @@ class CASFileCacheTest {
     // Two blobs with different sizes, both smaller than one block.
     ByteString blob1 = ByteString.copyFromUtf8("small");
     Digest digest1 = DIGEST_UTIL.compute(blob1);
-    Path path1 = fileCache.getPath(fileCache.getKey(digest1, false));
+    Path path1 = fileCache.getPath(digest1, fileCache.getKey(digest1, false));
     Files.write(path1, blob1.toByteArray());
     EvenMoreFiles.setReadOnlyPerms(path1, false, fileStore);
 
     ByteString blob2 = ByteString.copyFromUtf8("another small blob");
     Digest digest2 = DIGEST_UTIL.compute(blob2);
-    Path path2 = fileCache.getPath(fileCache.getKey(digest2, false));
+    Path path2 = fileCache.getPath(digest2, fileCache.getKey(digest2, false));
     Files.write(path2, blob2.toByteArray());
     EvenMoreFiles.setReadOnlyPerms(path2, false, fileStore);
 
     fileCache.start(false).get();
 
     assertThat(storage.size()).isEqualTo(2);
-    // Each blob is < 4096 bytes, so each occupies one full block on disk.
-    // Total size should be 2 * 4096 = 8192, NOT the sum of logical sizes.
+    // Account using the filesystem block size discovered during start(). This varies by platform
+    // (for example, the Windows CI filesystem reports 512-byte blocks).
     assertThat(fileCache.size())
-        .isEqualTo(estimateSizeOnDisk(blob1.size()) + estimateSizeOnDisk(blob2.size()));
-    assertThat(fileCache.size()).isEqualTo(2 * TEST_BLOCK_SIZE);
+        .isEqualTo(
+            CASFileCache.estimateSizeOnDisk(
+                    blob1.size(), fileCache.blockSize, /* isHardlink= */ false)
+                + CASFileCache.estimateSizeOnDisk(
+                    blob2.size(), fileCache.blockSize, /* isHardlink= */ false));
   }
 
   @Test
@@ -1375,7 +1378,7 @@ class CASFileCacheTest {
     ByteString bigBlob = ByteString.copyFrom(bigData);
     Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
     blobs.put(bigDigest, bigBlob);
-    Path bigPath = fileCache.put(bigDigest, false).path();
+    fileCache.put(bigDigest, false);
 
     // First blob should be evicted, only big blob remains
     assertThat(Files.exists(path)).isFalse();
