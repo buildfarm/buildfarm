@@ -97,4 +97,9 @@ class TranslatedQueue<E extends Message> implements Queue<E> {
         newArrayList(transform(scanResults.getResult(), value -> translator.parse(value).value()));
     return new ScanResult<>(scanResults.getCursor(), results);
   }
+
+  @Override
+  public int reclaimStaleMessages(long minIdleMillis) {
+    return queue.reclaimStaleMessages(minIdleMillis);
+  }
 }
