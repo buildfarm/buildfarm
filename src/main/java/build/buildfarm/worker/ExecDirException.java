@@ -60,13 +60,26 @@ public class ExecDirException extends IOException {
 
     static void toViolation(
         Violation.Builder violation, Throwable cause, Path path, boolean isExecutable) {
-      if (cause instanceof NoSuchFileException || cause instanceof BlobNotFoundException) {
+      // A BlobNotFoundException may be wrapped, possibly at multiple layers, by the stream class
+      // reporting exceptions (e.g. an IOException from a rejected retry). Seek it in the cause
+      // chain rather than relying on the immediate type, so the violation is reported as MISSING
+      // rather than as an INVALID precondition failure.
+      if (cause instanceof NoSuchFileException || hasBlobNotFoundCause(cause)) {
         violation
             .setType(VIOLATION_TYPE_MISSING)
             .setDescription(getDescription(path, isExecutable));
       } else {
         violation.setType(VIOLATION_TYPE_INVALID).setDescription(cause.getMessage());
       }
+    }
+
+    private static boolean hasBlobNotFoundCause(Throwable cause) {
+      for (Throwable t = cause; t != null; t = t.getCause()) {
+        if (t instanceof BlobNotFoundException) {
+          return true;
+        }
+      }
+      return false;
     }
 
     public Violation getViolation() {
