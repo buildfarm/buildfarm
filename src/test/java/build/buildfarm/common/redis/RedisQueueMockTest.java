@@ -32,11 +32,11 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import redis.clients.jedis.Jedis;
+import redis.clients.jedis.UnifiedJedis;
 
 @RunWith(JUnit4.class)
 public class RedisQueueMockTest {
-  @Mock private Jedis redis;
+  @Mock private UnifiedJedis redis;
 
   @Before
   public void setUp() {

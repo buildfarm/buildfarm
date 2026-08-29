@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import lombok.Getter;
 import redis.clients.jedis.AbstractPipeline;
-import redis.clients.jedis.Jedis;
+import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 import redis.clients.jedis.resps.Tuple;
@@ -44,11 +44,11 @@ public class RedisPriorityQueue implements Queue<String> {
   private static final Clock defaultClock = Clock.systemUTC();
   private static final long defaultPollIntervalMillis = 100;
 
-  public static Queue<String> decorate(Jedis jedis, String name) {
+  public static Queue<String> decorate(UnifiedJedis jedis, String name) {
     return new RedisPriorityQueue(jedis, name);
   }
 
-  private final Jedis jedis;
+  private final UnifiedJedis jedis;
 
   /**
    * @field name
@@ -68,7 +68,7 @@ public class RedisPriorityQueue implements Queue<String> {
    * @details Construct a named redis queue with an established redis cluster.
    * @param name The global name of the queue.
    */
-  public RedisPriorityQueue(Jedis jedis, String name) {
+  public RedisPriorityQueue(UnifiedJedis jedis, String name) {
     this(jedis, name, defaultPollIntervalMillis);
   }
 
@@ -78,7 +78,7 @@ public class RedisPriorityQueue implements Queue<String> {
    *     testing of the order of the queued actions
    * @param name The global name of the queue.
    */
-  public RedisPriorityQueue(Jedis jedis, String name, Clock clock) {
+  public RedisPriorityQueue(UnifiedJedis jedis, String name, Clock clock) {
     this(jedis, name, clock, defaultPollIntervalMillis);
   }
 
@@ -89,7 +89,7 @@ public class RedisPriorityQueue implements Queue<String> {
    * @param name The global name of the queue.
    * @param pollIntervalMillis pollInterval to use when dqueuing from redis.
    */
-  public RedisPriorityQueue(Jedis jedis, String name, long pollIntervalMillis) {
+  public RedisPriorityQueue(UnifiedJedis jedis, String name, long pollIntervalMillis) {
     this(jedis, name, defaultClock, pollIntervalMillis);
   }
 
@@ -101,7 +101,7 @@ public class RedisPriorityQueue implements Queue<String> {
    * @param time Timestamp of the operation.
    * @param pollIntervalMillis pollInterval to use when dqueuing from redis.
    */
-  public RedisPriorityQueue(Jedis jedis, String name, Clock clock, long pollIntervalMillis) {
+  public RedisPriorityQueue(UnifiedJedis jedis, String name, Clock clock, long pollIntervalMillis) {
     this.jedis = jedis;
     this.name = name;
     this.clock = clock;

@@ -35,7 +35,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import redis.clients.jedis.Jedis;
+import redis.clients.jedis.UnifiedJedis;
 
 /**
  * @class RedisPriorityQueueMockTest
@@ -48,7 +48,7 @@ import redis.clients.jedis.Jedis;
  */
 @RunWith(JUnit4.class)
 public class RedisPriorityQueueMockTest {
-  @Mock private Jedis redis;
+  @Mock private UnifiedJedis redis;
   @Mock private Clock clock;
 
   @Before

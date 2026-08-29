@@ -73,7 +73,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void redisPriorityQueueConstructsWithoutError() throws Exception {
     // ACT
-    new RedisPriorityQueue(redis, "test");
+    new RedisPriorityQueue(pooled, "test");
   }
 
   // Function under test: offer
@@ -82,7 +82,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void offerWithoutError() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
 
     // ACT
     queue.offer("foo");
@@ -94,7 +94,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void offerDifferentWithoutError() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
 
     // ACT
     queue.offer("foo");
@@ -107,7 +107,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void pushPushSameWithoutError() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
 
     // ACT
     queue.offer("foo");
@@ -120,7 +120,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void pushPushMany() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
@@ -134,7 +134,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void pushPushIncreasesSize() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
 
     // ACT / ASSERT
     assertThat(queue.size()).isEqualTo(0);
@@ -166,7 +166,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void getDequeueNameNameIsStored() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "queue_name");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "queue_name");
 
     // ACT
     String name = queue.getDequeueName();
@@ -181,7 +181,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void sizeAdjustPushDequeue() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
     ExecutorService service = mock(ExecutorService.class);
     Duration timeout = Duration.ofSeconds(1);
 
@@ -220,7 +220,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void checkPriorityOnDequeue() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
     ExecutorService service = mock(ExecutorService.class);
     Duration timeout = Duration.ofSeconds(1);
     // ACT / ASSERT
@@ -257,7 +257,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void checkDequeueTimeout() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
     ExecutorService service = mock(ExecutorService.class);
 
     Stopwatch stopwatch = Stopwatch.createStarted();
@@ -275,7 +275,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void checkNegativesInPriority() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
     ExecutorService service = mock(ExecutorService.class);
     Duration timeout = Duration.ofSeconds(1);
     String val;
@@ -315,7 +315,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void visitCheckVisitOfEachElement() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
     queue.offer("element 1");
     queue.offer("element 2");
     queue.offer("element 3");
@@ -353,7 +353,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void visitVisitManyOverPageSize() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(pooled, "test");
     for (int i = 0; i < 2500; ++i) {
       queue.offer("foo" + i);
     }
