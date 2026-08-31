@@ -67,6 +67,7 @@ import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.UserPrincipalLease;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.WorkerEventObserver;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
@@ -90,7 +91,6 @@ import com.google.rpc.PreconditionFailure;
 import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.StatusException;
-import io.prometheus.client.Counter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -120,11 +120,6 @@ class ShardWorkerContext implements WorkerContext {
   private static final Platform.Property EXEC_OWNER_PROPERTY =
       Platform.Property.newBuilder().setName(EXEC_OWNER_RESOURCE_NAME).setValue("1").build();
   private static final String PROVISION_CORES_NAME = "cores";
-
-  private static final Counter completedOperations =
-      Counter.build().name("completed_operations").help("Completed operations.").register();
-  private static final Counter operationPollerCounter =
-      Counter.build().name("operation_poller").help("Number of operations polled.").register();
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
@@ -158,6 +153,7 @@ class ShardWorkerContext implements WorkerContext {
   private final boolean marketExecution;
   private final Set<String> ignoreMarketExecutionMnemonics;
   private final boolean provideOwnedClaim;
+  private final WorkerEventObserver workerEventObserver;
   private boolean inGracefulShutdown = false;
   private boolean pauseMatch = false;
   private boolean pauseInputFetch = false;
@@ -257,7 +253,8 @@ class ShardWorkerContext implements WorkerContext {
       boolean marketExecution,
       Set<String> ignoreMarketExecutionMnemonics,
       LocalResourceSet resourceSet,
-      CasWriter writer) {
+      CasWriter writer,
+      WorkerEventObserver workerEventObserver) {
     this.name = name;
     this.matchProvisions = getMatchProvisions(policies, matchWorkerNames, executeStageWidth);
     this.operationPollPeriod = operationPollPeriod;
@@ -283,6 +280,7 @@ class ShardWorkerContext implements WorkerContext {
     this.ignoreMarketExecutionMnemonics = ignoreMarketExecutionMnemonics;
     this.resourceSet = resourceSet;
     this.writer = writer;
+    this.workerEventObserver = workerEventObserver;
 
     checkState(resourceSet.resources.put(CPULease.RESOURCE_NAME, market) == null);
     checkState(
@@ -369,7 +367,6 @@ class ShardWorkerContext implements WorkerContext {
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
-            operationPollerCounter.inc();
             log.log(
                 Level.FINEST, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
@@ -839,11 +836,11 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation) throws IOException, InterruptedException {
-    boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
-    if (success && operation.getDone()) {
-      completedOperations.inc();
-      log.log(Level.FINER, "CompletedOperation: " + operation.getName());
+  public boolean putOperation(Operation execution) throws IOException, InterruptedException {
+    boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(execution));
+    if (success && execution.getDone()) {
+      workerEventObserver.onCompletedExecution(execution);
+      log.log(Level.FINER, "CompletedExecution: " + execution.getName());
     }
     return success;
   }

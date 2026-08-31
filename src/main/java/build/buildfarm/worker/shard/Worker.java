@@ -23,11 +23,16 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Compressor;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -63,7 +68,9 @@ import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.PipelineChange;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorker;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.CFCExecFileSystem;
 import build.buildfarm.worker.CFCLinkExecFileSystem;
 import build.buildfarm.worker.ExecFileSystem;
@@ -77,6 +84,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.SuperscalarPipelineStage;
+import build.buildfarm.worker.WorkerEventObserver;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
@@ -93,8 +101,12 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -103,6 +115,15 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
 import io.grpc.services.ChannelzService;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanBuilder;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import java.io.File;
@@ -116,6 +137,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
@@ -131,33 +153,48 @@ import org.jspecify.annotations.Nullable;
 
 @Log
 public final class Worker extends LoggingMain {
+  /* all docs on using this from io.opentelemetry.semconv result in failure */
+  private static final AttributeKey SERVICE_NAME = AttributeKey.stringKey("service.name");
+
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
-  private static final Counter healthCheckMetric =
+  private final Counter healthCheckMetric =
       Counter.build()
           .name("health_check")
           .labelNames("lifecycle")
           .help("Service health check.")
           .register();
-  private static final Counter workerPausedMetric =
+  private final Counter workerPausedMetric =
       Counter.build().name("worker_paused").help("Worker paused.").register();
-  private static final Gauge executionSlotUsage = // now Market stock - balance
+  private final Gauge executionSlotUsage = // now Market stock - balance
       Gauge.build().name("execution_slot_usage").help("Execution slot Usage.").register();
-  private static final Gauge executionSlotsTotal =
+  private final Gauge executionSlotsTotal =
       Gauge.build()
           .name("execution_slots_total")
           .help("Total execution slots configured on worker.")
           .register();
-  private static final Gauge inputFetchSlotsTotal =
+  private final Gauge inputFetchSlotsTotal =
       Gauge.build()
           .name("input_fetch_slots_total")
           .help("Total input fetch slots configured on worker.")
           .register();
-  private static final Gauge reportResultSlotsTotal =
+  private final Gauge reportResultSlotsTotal =
       Gauge.build()
           .name("report_result_slots_total")
           .help("Total report result slots configured on worker.")
           .register();
+  private final Counter fetchedBytesTotal =
+      Counter.build()
+          .name("fetched_bytes_total")
+          .help("Total number of bytes fetched for executions.")
+          .register();
+  private final Counter createdLinkedDirectoriesTotal =
+      Counter.build()
+          .name("created_linked_directories_total")
+          .help("Total number of novel linked input directories created.")
+          .register();
+  private final Counter completedExecutions =
+      Counter.build().name("completed_operations").help("Completed operations.").register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
 
@@ -180,6 +217,7 @@ public final class Worker extends LoggingMain {
   private AtomicBoolean released = new AtomicBoolean(true);
   private AtomicBoolean shutdownInitiated = new AtomicBoolean(false);
   private boolean startWritable = true;
+  private SdkTracerProvider oTelSdkTracerProvider;
 
   /**
    * The method will prepare the worker for graceful shutdown when the worker is ready. Note on
@@ -333,7 +371,8 @@ public final class Worker extends LoggingMain {
       ContentAddressableStorage storage,
       LocalResourceSet resourceSet,
       String ownerName,
-      List<String> ownerNames)
+      List<String> ownerNames,
+      WorkerEventObserver workerEventObserver)
       throws ConfigurationException {
     checkState(storage != null, "no exec fs cas specified");
     if (storage instanceof CASFileCache cfc) {
@@ -367,7 +406,7 @@ public final class Worker extends LoggingMain {
       }
 
       return createCFCExecFileSystem(
-          removeDirectoryService, accessRecorder, fetchService, cfc, owners);
+          removeDirectoryService, accessRecorder, fetchService, cfc, owners, workerEventObserver);
     } else {
       // FIXME not the only fuse backing capacity...
       return createFuseExecFileSystem(remoteInputStreamFactory, storage);
@@ -514,7 +553,8 @@ public final class Worker extends LoggingMain {
       ExecutorService accessRecorder,
       ExecutorService fetchService,
       CASFileCache fileCache,
-      ImmutableMap<String, UserPrincipal> owners) {
+      ImmutableMap<String, UserPrincipal> owners,
+      WorkerEventObserver workerEventObserver) {
     if (configs.getWorker().isLinkExecFileSystem()) {
       return new CFCLinkExecFileSystem(
           root,
@@ -525,7 +565,8 @@ public final class Worker extends LoggingMain {
           configs.isAllowSymlinkTargetAbsolute(),
           removeDirectoryService,
           accessRecorder,
-          fetchService);
+          fetchService,
+          workerEventObserver);
     } else {
       return new CFCExecFileSystem(
           root,
@@ -534,7 +575,8 @@ public final class Worker extends LoggingMain {
           configs.isAllowSymlinkTargetAbsolute(),
           removeDirectoryService,
           accessRecorder,
-          fetchService);
+          fetchService,
+          workerEventObserver);
     }
   }
 
@@ -730,12 +772,223 @@ public final class Worker extends LoggingMain {
     int reportResultStageWidth = configs.getWorker().getReportResultStageWidth();
     LocalResourceSet resourceSet = LocalResourceSetUtils.create(configs.getWorker().getResources());
     List<String> execOwners = configs.getWorker().getExecOwners();
+    // need to adapt this to executionMarket
     if (!execOwners.isEmpty()
         && execOwners.size() < inputFetchStageWidth + executeStageWidth + reportResultStageWidth) {
       throw new ConfigurationException(
           "execOwners is not large enough to fill requested stage widths");
     }
 
+    /** need to tie all of the below up together */
+    String oTelURL = configs.getWorker().getOpenTelemetryURL();
+    Tracer tracer;
+    if (!oTelURL.isEmpty()) {
+      Resource resource = Resource.getDefault().toBuilder().put(SERVICE_NAME, "Buildfarm").build();
+      oTelSdkTracerProvider =
+          SdkTracerProvider.builder()
+              .setResource(resource)
+              .addSpanProcessor(
+                  SpanProcessorConfig.batchSpanProcessor(
+                      SpanExporterConfig.otlpHttpSpanExporter(oTelURL)))
+              .build();
+
+      OpenTelemetry oTel =
+          OpenTelemetrySdk.builder().setTracerProvider(oTelSdkTracerProvider).build();
+
+      tracer = oTel.getTracer("Buildfarm Worker");
+    } else {
+      tracer = null;
+    }
+
+    WorkerEventObserver workerEventObserver =
+        new WorkerEventObserver() {
+          @Override
+          public void onFetched(long numBytes) {
+            fetchedBytesTotal.inc(numBytes);
+          }
+
+          @Override
+          public void onCreatedLinkedDirectory() {
+            createdLinkedDirectoriesTotal.inc();
+          }
+
+          @Override
+          public void onCompletedExecution(Operation execution) {
+            captureExecutionMetric(execution);
+            completedExecutions.inc();
+          }
+
+          void captureExecutionMetric(Operation execution) {
+            // otel metrics bucketing for:
+
+            RequestMetadata requestMetadata;
+            try {
+              if (execution.getMetadata().is(QueuedOperationMetadata.class)) {
+                QueuedOperationMetadata queuedOperationMetadata =
+                    execution.getMetadata().unpack(QueuedOperationMetadata.class);
+                requestMetadata = queuedOperationMetadata.getRequestMetadata();
+              } else {
+                requestMetadata = RequestMetadata.getDefaultInstance();
+              }
+            } catch (InvalidProtocolBufferException e) {
+              requestMetadata = RequestMetadata.getDefaultInstance();
+            }
+
+            // requestMetadata:
+            // getCorrelatedInvocationsId
+            // getToolInvocationId?
+            // getActionMnemonic
+            // getTargetId
+            if (execution.getResultCase() == Operation.ResultCase.RESPONSE) {
+              ExecuteResponse response;
+              try {
+                response = execution.getResponse().unpack(ExecuteResponse.class);
+              } catch (InvalidProtocolBufferException e) {
+                // unlikely, as this is the only message we put into this field
+                response = ExecuteResponse.getDefaultInstance();
+              }
+              if (response.hasResult()) {
+                ActionResult result = response.getResult();
+                int statusCode = response.getStatus().getCode();
+                int exitCode = result.getExitCode();
+                if (result.hasExecutionMetadata()) {
+                  // metadata:
+                  // with IF, EX, RR durations
+                  ExecutedActionMetadata executionMetadata = result.getExecutionMetadata();
+
+                  recordMetric(
+                      spanBuilderDecorator(
+                          requestMetadata.getCorrelatedInvocationsId(),
+                          requestMetadata.getToolInvocationId(),
+                          requestMetadata.getActionMnemonic(),
+                          requestMetadata.getTargetId(),
+                          execution.getName()),
+                      statusCode,
+                      exitCode,
+                      executionMetadata);
+                }
+              }
+            }
+          }
+
+          Consumer<SpanBuilder> spanBuilderDecorator(
+              String correlatedInvocationsId,
+              String toolInvocationId,
+              String actionMnemonic,
+              String targetId,
+              String name) {
+            // further parse correlatedInvocationsId to get out host/user qualifier?
+            return spanBuilder ->
+                spanBuilder
+                    .setAttribute("correlated invocations id", correlatedInvocationsId)
+                    .setAttribute("tool invocation id", toolInvocationId)
+                    .setAttribute("action mnemonic", actionMnemonic)
+                    .setAttribute("target id", targetId)
+                    .setAttribute("name", name);
+          }
+
+          void recordSpan(
+              Consumer<SpanBuilder> decorator,
+              Consumer<Context> withContext,
+              String name,
+              Timestamp start,
+              Timestamp end) {
+            if (tracer != null) {
+              SpanBuilder builder = tracer.spanBuilder(name);
+              decorator.accept(builder);
+              Span span =
+                  builder.setStartTimestamp(Timestamps.toNanos(start), NANOSECONDS).startSpan();
+              if (withContext != null) {
+                withContext.accept(Context.current().with(span));
+              }
+              span.end(Timestamps.toNanos(end), NANOSECONDS);
+            }
+          }
+
+          private static void decorateExecution(
+              SpanBuilder spanBuilder, ExecutedActionMetadata metadata) {
+            WorkerExecutedMetadata workerExecutedMetadata = null;
+            // awkward that we have to deserialize these through the Any, but hopefully fast enough
+            // given the immediate construction
+            for (Any auxiliaryMetadata : metadata.getAuxiliaryMetadataList()) {
+              if (auxiliaryMetadata.is(WorkerExecutedMetadata.class)) {
+                try {
+                  // take the first WorkerExecutedMetadata
+                  workerExecutedMetadata = auxiliaryMetadata.unpack(WorkerExecutedMetadata.class);
+                  break;
+                } catch (InvalidProtocolBufferException e) {
+                  // unlikely
+                }
+              }
+            }
+
+            if (workerExecutedMetadata != null) {
+              for (Map.Entry<String, Long> entry : workerExecutedMetadata.getUsage().entrySet()) {
+                spanBuilder.setAttribute("usage." + entry.getKey(), entry.getValue());
+              }
+            }
+          }
+
+          private static void decorateResult(
+              SpanBuilder spanBuilder, int statusCode, int exitCode) {
+            spanBuilder.setAttribute("exit_code", exitCode);
+            spanBuilder.setAttribute(
+                "status_code", com.google.rpc.Code.forNumber(statusCode).toString());
+          }
+
+          void recordMetric(
+              Consumer<SpanBuilder> decorator,
+              int statusCode,
+              int exitCode,
+              ExecutedActionMetadata metadata) {
+            recordSpan(
+                decorator,
+                parent -> recordAction(parent, statusCode, exitCode, metadata),
+                "action",
+                metadata.getQueuedTimestamp(),
+                metadata.getOutputUploadCompletedTimestamp());
+          }
+
+          Consumer<SpanBuilder> parented(Context parent, Consumer<SpanBuilder> delegate) {
+            return spanBuilder -> {
+              spanBuilder.setParent(parent);
+              if (delegate != null) {
+                delegate.accept(spanBuilder);
+              }
+            };
+          }
+
+          void recordAction(
+              Context parent, int statusCode, int exitCode, ExecutedActionMetadata metadata) {
+            // otel
+            recordSpan(
+                parented(parent, null),
+                null,
+                "action queued",
+                metadata.getQueuedTimestamp(),
+                metadata.getWorkerStartTimestamp());
+            recordSpan(
+                parented(parent, null),
+                null,
+                "action input fetch",
+                metadata.getInputFetchStartTimestamp(),
+                metadata.getInputFetchCompletedTimestamp());
+            recordSpan(
+                parented(parent, spanBuilder -> decorateExecution(spanBuilder, metadata)),
+                null,
+                "action execution",
+                metadata.getExecutionStartTimestamp(),
+                metadata.getExecutionCompletedTimestamp());
+            recordSpan(
+                parented(parent, spanBuilder -> decorateResult(spanBuilder, statusCode, exitCode)),
+                null,
+                "action report result",
+                metadata.getOutputUploadStartTimestamp(),
+                metadata.getOutputUploadCompletedTimestamp());
+          }
+        };
+
+    /** end tie up section */
     InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
             configs.getWorker().getPublicName(),
@@ -764,7 +1017,8 @@ public final class Worker extends LoggingMain {
             storage,
             resourceSet,
             configs.getWorker().getExecOwner(),
-            execOwners);
+            execOwners,
+            workerEventObserver);
 
     instance = new WorkerInstance(configs.getWorker().getPublicName(), backplane, storage);
 
@@ -810,7 +1064,8 @@ public final class Worker extends LoggingMain {
             configs.getWorker().isExecutionMarket(),
             configs.getWorker().getIgnoreMarketExecutionMnemonics(),
             resourceSet,
-            writer);
+            writer,
+            workerEventObserver);
 
     // initial balance for market is available slots
     final int marketStock = context.market().balance();
@@ -1025,6 +1280,9 @@ public final class Worker extends LoggingMain {
     if (workerStubs != null) {
       workerStubs.invalidateAll();
       workerStubs = null;
+    }
+    if (oTelSdkTracerProvider != null) {
+      oTelSdkTracerProvider.close();
     }
     if (interrupted) {
       Thread.currentThread().interrupt();
