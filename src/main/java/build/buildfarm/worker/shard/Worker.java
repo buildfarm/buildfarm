@@ -389,7 +389,7 @@ public final class Worker extends LoggingMain {
         return new ZstdInputStreamNoFinalizer(zstdStream, new ZstdFixedBufferPool(zstdBufferPool));
       } catch (IOException | RuntimeException e) {
         // The decompressor takes its pool buffer in the constructor, which throws when the
-        // borrow fails. Nothing else holds zstdStream, so the remote read stays open.
+        // borrow times out. Nothing else holds zstdStream, so the remote read stays open.
         try {
           zstdStream.close();
         } catch (IOException closeError) {
@@ -711,7 +711,11 @@ public final class Worker extends LoggingMain {
     ExecutorService accessRecorder = newSingleThreadExecutor();
     ExecutorService fetchService = BuildfarmExecutors.getFetchServicePool();
     FixedBufferPool zstdBufferPool =
-        new FixedBufferPool(configs.getWorker().getZstdBufferPoolSize());
+        new FixedBufferPool(
+            configs.getWorker().getZstdBufferPoolSize(),
+            // com.google.protobuf.Duration owns the simple name in this file.
+            java.time.Duration.ofMillis(
+                configs.getWorker().getZstdBufferPoolBorrowTimeoutMillis()));
     Gauge.build()
         .name("zstd_buffer_pool_used")
         .help("Current number of Zstd decompression buffers active")
