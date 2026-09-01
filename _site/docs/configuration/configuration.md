@@ -432,7 +432,8 @@ Unless specified, options are only relevant for FILESYSTEM type
 |------------------------------|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
 | type                         | _FILESYSTEM_, GRPC            | Type of CAS used                                                                                                                                   |
 | path                         | String, _cache_               | Local cache location relative to the 'root', or absolute                                                                                           |
-| maxSizeBytes                 | Integer, _0_                  | Limit for contents of files retained from CAS in the cache, value of 0 means to auto-configure to 90% of _root_/_path_ underlying filesystem space |
+| maxSizeBytes                 | Integer, _0_                  | Limit in bytes for contents of files retained from CAS in the cache. Mutually exclusive with maxSizePercent. A value of 0 means to use maxSizePercent instead. |
+| maxSizePercent               | Integer (0-100), _0_          | Limit in percent of the _root_/_path_ underlying filesystem space for contents of files retained from CAS in the cache. Mutually exclusive with maxSizeBytes. 0 means not set. If both maxSizePercent and maxSizeBytes are 0, then maxSizePercent is used at 90%. |
 | fileDirectoriesIndexInMemory | boolean, _false_              | Determines if the file directories bidirectional mapping should be stored in memory or in sqlite                                                  |
 | skipLoad                     | boolean, _false_              | Determines if transient data on the worker should be loaded into CAS on worker startup (affects startup time)                                |
 | target                       | String, _null_                | For GRPC CAS type, target for external CAS endpoint                                                                                                |
@@ -447,6 +448,16 @@ worker:
     - type: FILESYSTEM
       path: "cache"
       maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+```
+
+This definition will create a filesystem-based CAS file cache that uses 75% of the filesystem for CAS storage.
+
+```yaml
+worker:
+  storages:
+    - type: FILESYSTEM
+      path: "cache"
+      maxSizePercent: 75
 ```
 
 This definition elides FILESYSTEM configuration with '...', will read-through an external GRPC CAS supporting the REAPI CAS Services into its storage, and will attempt to write expiring entries into the GRPC CAS (i.e. pushing new entries into the head of a worker LRU list will drop the entries from the tail into the GRPC CAS).
