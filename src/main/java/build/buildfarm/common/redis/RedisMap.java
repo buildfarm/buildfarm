@@ -239,6 +239,17 @@ public class RedisMap<T> {
   }
 
   /**
+   * @brief Pipeline-compatible exists check.
+   * @details Returns a Response that can be resolved after pipeline sync.
+   * @param pipeline Redis pipeline.
+   * @param key The name of the key.
+   * @return A Response wrapping the exists result.
+   */
+  public Response<Boolean> exists(AbstractPipeline pipeline, String key) {
+    return pipeline.exists(createKeyName(key));
+  }
+
+  /**
    * @brief Get the size of the map.
    * @details May be inefficient to due scanning into memory and deduplicating.
    * @param jedis Jedis cluster client.
