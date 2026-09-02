@@ -22,6 +22,7 @@ import com.google.protobuf.util.Durations;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -245,13 +246,26 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
       Files.createDirectories(outputDirPath);
     }
 
-    for (String relOutput : context.outputFiles) {
+    // REAPI >= 2.1 clients (Bazel >= 7) populate Command.output_paths and leave
+    // output_files/output_directories empty. Fall back to output_paths so the
+    // worker's outputs are moved back to the operation root.
+    Iterable<String> outputs = context.outputFiles;
+    if (context.outputFiles.isEmpty() && context.outputDirectories.isEmpty()) {
+      outputs = context.outputPaths;
+    }
+
+    for (String relOutput : outputs) {
       Path execOutputPath = workerExecRoot.resolve(relOutput);
       Path opOutputPath = opRoot.resolve(relOutput);
       // Don't fail here if the action failed to produce a file.
       // The missing file will be handled just like it is for non-worker actions.
       if (Files.exists(execOutputPath)) {
-        FileAccessUtils.moveFile(execOutputPath, opOutputPath);
+        Files.createDirectories(opOutputPath.getParent());
+        if (Files.isDirectory(execOutputPath)) {
+          Files.move(execOutputPath, opOutputPath, StandardCopyOption.REPLACE_EXISTING);
+        } else {
+          FileAccessUtils.moveFile(execOutputPath, opOutputPath);
+        }
       }
     }
   }

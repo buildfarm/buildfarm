@@ -57,6 +57,8 @@ public class PersistentExecutor {
   // TODO Revisit hardcoded actions
   static final String JAVABUILDER_JAR =
       "external/remote_java_tools/java_tools/JavaBuilder_deploy.jar";
+  // bzlmod repos are named e.g. rules_java++toolchains+remote_java_tools
+  static final String JAVABUILDER_JAR_SUFFIX = "java_tools/JavaBuilder_deploy.jar";
 
   private static final String SCALAC_EXEC_NAME = "Scalac";
   private static final String JAVAC_EXEC_NAME = "JavaBuilder";
@@ -285,7 +287,7 @@ public class PersistentExecutor {
     boolean isScalac = argsList.size() > 1 && argsList.getFirst().endsWith("scalac/scalac");
     if (isScalac) {
       return SCALAC_EXEC_NAME;
-    } else if (argsList.contains(JAVABUILDER_JAR)) {
+    } else if (argsList.stream().anyMatch(a -> a.endsWith(JAVABUILDER_JAR_SUFFIX))) {
       return JAVAC_EXEC_NAME;
     }
     return "SomeOtherExec";
