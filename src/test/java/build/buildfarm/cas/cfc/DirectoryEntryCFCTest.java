@@ -24,6 +24,9 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Compressor;
@@ -133,8 +136,9 @@ class DirectoryEntryCFCTest {
               return content.substring((int) offset).newInput();
             });
     fileCache.initializeRootDirectory();
-    // Force a known block size so tests are hermetic and don't depend on the host filesystem.
-    fileCache.setBlockSizeForTesting(4096);
+    FileStore fileStore = spy(fileCache.fileStore);
+    doReturn(4096L).when(fileStore).getBlockSize();
+    fileCache.fileStore = fileStore;
   }
 
   @After
@@ -150,13 +154,14 @@ class DirectoryEntryCFCTest {
   }
 
   @Test
-  public void estimateDirectorySizeOnDisk_emptyDirectory_returnsOneBlock() {
+  public void estimateDirectoryFileStoreSize_emptyDirectory_returnsOneBlock() {
     Directory emptyDir = Directory.getDefaultInstance();
-    assertThat(CASFileCache.estimateDirectorySizeOnDisk(emptyDir, 4096)).isEqualTo(4096);
+    assertThat(CASFileCache.estimateDirectoryFileStoreSize(emptyDir, fileCache.fileStore))
+        .isEqualTo(4096);
   }
 
   @Test
-  public void estimateDirectorySizeOnDisk_fewEntries_returnsOneBlock() {
+  public void estimateDirectoryFileStoreSize_fewEntries_returnsOneBlock() {
     Directory dir =
         Directory.newBuilder()
             .addFiles(
@@ -170,162 +175,154 @@ class DirectoryEntryCFCTest {
                     .setDigest(DigestUtil.toDigest(DIGEST_UTIL.empty()))
                     .build())
             .build();
-    // 2 entries * 32 bytes = 64 bytes, fits in one 4096-byte block
-    assertThat(CASFileCache.estimateDirectorySizeOnDisk(dir, 4096)).isEqualTo(4096);
+    assertThat(CASFileCache.estimateDirectoryFileStoreSize(dir, fileCache.fileStore))
+        .isEqualTo(4096);
   }
 
   @Test
-  public void estimateDirectorySizeOnDisk_manyEntries_scalesWithEntryCount() {
+  public void estimateDirectoryFileStoreSize_manyEntries_scalesWithEntryCount() {
     Directory.Builder dir = Directory.newBuilder();
-    for (int i = 0; i < 200; i++) {
+    for (int i = 0; i < 300; i++) {
       dir.addFiles(
           FileNode.newBuilder()
               .setName("file" + i)
               .setDigest(DigestUtil.toDigest(DIGEST_UTIL.empty()))
               .build());
     }
-    // 200 entries * 32 bytes = 6400 bytes, needs 2 blocks of 4096
-    assertThat(CASFileCache.estimateDirectorySizeOnDisk(dir.build(), 4096)).isEqualTo(8192);
+    assertThat(CASFileCache.estimateDirectoryFileStoreSize(dir.build(), fileCache.fileStore))
+        .isEqualTo(8192);
   }
 
   @Test
-  public void estimateDirectorySizeOnDisk_countsAllEntryTypes() {
+  public void estimateDirectoryFileStoreSize_countsAllEntryTypes() {
     Directory.Builder dir = Directory.newBuilder();
-    for (int i = 0; i < 80; i++) {
+    for (int i = 0; i < 100; i++) {
       dir.addFiles(
           FileNode.newBuilder()
               .setName("file" + i)
               .setDigest(DigestUtil.toDigest(DIGEST_UTIL.empty()))
               .build());
     }
-    for (int i = 0; i < 60; i++) {
+    for (int i = 0; i < 100; i++) {
       dir.addDirectories(
           DirectoryNode.newBuilder()
               .setName("dir" + i)
               .setDigest(DigestUtil.toDigest(DIGEST_UTIL.empty()))
               .build());
     }
-    for (int i = 0; i < 60; i++) {
+    for (int i = 0; i < 100; i++) {
       dir.addSymlinks(SymlinkNode.newBuilder().setName("link" + i).setTarget("target").build());
     }
-    // 200 total entries * 32 bytes = 6400 bytes, needs 2 blocks
-    assertThat(CASFileCache.estimateDirectorySizeOnDisk(dir.build(), 4096)).isEqualTo(8192);
-  }
-
-  // -- estimateSizeOnDisk tests --
-
-  @Test
-  public void estimateSizeOnDisk_zeroSize_returnsZero() {
-    assertThat(CASFileCache.estimateSizeOnDisk(0, 4096, /* isHardlink= */ false)).isEqualTo(0);
-  }
-
-  @Test
-  public void estimateSizeOnDisk_oneByte_returnsOneBlock() {
-    assertThat(CASFileCache.estimateSizeOnDisk(1, 4096, /* isHardlink= */ false)).isEqualTo(4096);
-  }
-
-  @Test
-  public void estimateSizeOnDisk_justUnderOneBlock_returnsOneBlock() {
-    assertThat(CASFileCache.estimateSizeOnDisk(4095, 4096, /* isHardlink= */ false))
-        .isEqualTo(4096);
-  }
-
-  @Test
-  public void estimateSizeOnDisk_exactlyOneBlock_returnsOneBlock() {
-    // Idempotent: an already-aligned value should not round up to the next block.
-    assertThat(CASFileCache.estimateSizeOnDisk(4096, 4096, /* isHardlink= */ false))
-        .isEqualTo(4096);
-  }
-
-  @Test
-  public void estimateSizeOnDisk_oneByteOverBlock_returnsTwoBlocks() {
-    assertThat(CASFileCache.estimateSizeOnDisk(4097, 4096, /* isHardlink= */ false))
+    assertThat(CASFileCache.estimateDirectoryFileStoreSize(dir.build(), fileCache.fileStore))
         .isEqualTo(8192);
   }
 
   @Test
-  public void estimateSizeOnDisk_negativeSize_throws() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> CASFileCache.estimateSizeOnDisk(-1, 4096, /* isHardlink= */ false));
+  public void estimateDirectoryFileStoreSize_usesEncodedNameLength() throws IOException {
+    FileStore fileStore = mock(FileStore.class);
+    when(fileStore.getBlockSize()).thenReturn(32L);
+    Directory shortName =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("a")
+                    .setDigest(DigestUtil.toDigest(DIGEST_UTIL.empty())))
+            .build();
+    Directory longName =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("a-name-that-needs-more-than-one-block")
+                    .setDigest(DigestUtil.toDigest(DIGEST_UTIL.empty())))
+            .build();
+
+    assertThat(CASFileCache.estimateDirectoryFileStoreSize(shortName, fileStore)).isEqualTo(32);
+    assertThat(CASFileCache.estimateDirectoryFileStoreSize(longName, fileStore)).isEqualTo(64);
+  }
+
+  private static FileStore fileStoreWithBlockSize(long blockSize) throws IOException {
+    FileStore fileStore = mock(FileStore.class);
+    when(fileStore.getBlockSize()).thenReturn(blockSize);
+    return fileStore;
+  }
+
+  private static long estimateFileStoreSize(long logicalSize, long blockSize) throws IOException {
+    return CASFileCache.estimateFileStoreSize(logicalSize, fileStoreWithBlockSize(blockSize));
+  }
+
+  // -- estimateFileStoreSize tests --
+
+  @Test
+  public void estimateFileStoreSize_zeroSize_returnsZero() throws IOException {
+    assertThat(estimateFileStoreSize(0, 4096)).isEqualTo(0);
   }
 
   @Test
-  public void estimateSizeOnDisk_differentBlockSizes() {
-    assertThat(CASFileCache.estimateSizeOnDisk(100, 512, /* isHardlink= */ false)).isEqualTo(512);
-    assertThat(CASFileCache.estimateSizeOnDisk(100, 1, /* isHardlink= */ false)).isEqualTo(100);
+  public void estimateFileStoreSize_oneByte_returnsOneBlock() throws IOException {
+    assertThat(estimateFileStoreSize(1, 4096)).isEqualTo(4096);
   }
 
   @Test
-  public void estimateSizeOnDisk_invalidBlockSize_throws() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> CASFileCache.estimateSizeOnDisk(100, 0, /* isHardlink= */ false));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> CASFileCache.estimateSizeOnDisk(100, -1, /* isHardlink= */ false));
+  public void estimateFileStoreSize_justUnderOneBlock_returnsOneBlock() throws IOException {
+    assertThat(estimateFileStoreSize(4095, 4096)).isEqualTo(4096);
   }
 
   @Test
-  public void estimateSizeOnDisk_isIdempotent() {
-    // Applying estimateSizeOnDisk twice should give the same result as applying it once.
+  public void estimateFileStoreSize_exactlyOneBlock_returnsOneBlock() throws IOException {
+    // Idempotent: an already-aligned value should not round up to the next block.
+    assertThat(estimateFileStoreSize(4096, 4096)).isEqualTo(4096);
+  }
+
+  @Test
+  public void estimateFileStoreSize_oneByteOverBlock_returnsTwoBlocks() throws IOException {
+    assertThat(estimateFileStoreSize(4097, 4096)).isEqualTo(8192);
+  }
+
+  @Test
+  public void estimateFileStoreSize_negativeSize_throws() throws IOException {
+    assertThrows(IllegalArgumentException.class, () -> estimateFileStoreSize(-1, 4096));
+  }
+
+  @Test
+  public void estimateFileStoreSize_differentBlockSizes() throws IOException {
+    assertThat(estimateFileStoreSize(100, 512)).isEqualTo(512);
+    assertThat(estimateFileStoreSize(100, 1)).isEqualTo(100);
+  }
+
+  @Test
+  public void estimateFileStoreSize_invalidBlockSize_throws() throws IOException {
+    assertThrows(IllegalArgumentException.class, () -> estimateFileStoreSize(100, 0));
+    assertThrows(IllegalArgumentException.class, () -> estimateFileStoreSize(100, -1));
+  }
+
+  @Test
+  public void estimateFileStoreSize_isIdempotent() throws IOException {
+    // Applying estimateFileStoreSize twice should give the same result as applying it once.
     // This matters because directory Entry.size values are pre-aligned, and discharge()
-    // applies estimateSizeOnDisk again.
+    // applies estimateFileStoreSize again.
     long[] sizes = {0, 1, 100, 4095, 4096, 4097, 8192, 10000};
     long[] blockSizes = {512, 1024, 4096, 8192};
     for (long blockSize : blockSizes) {
+      FileStore fileStore = fileStoreWithBlockSize(blockSize);
       for (long size : sizes) {
-        long once = CASFileCache.estimateSizeOnDisk(size, blockSize, /* isHardlink= */ false);
-        long twice = CASFileCache.estimateSizeOnDisk(once, blockSize, /* isHardlink= */ false);
+        long once = CASFileCache.estimateFileStoreSize(size, fileStore);
+        long twice = CASFileCache.estimateFileStoreSize(once, fileStore);
         assertThat(twice).isEqualTo(once);
       }
     }
   }
 
   @Test
-  public void estimateSizeOnDisk_isHardlinkTrue_returnsZero() {
-    // Hardlinks reuse an existing inode's blocks, so the physical cost is ~0 regardless of
-    // logical size or block size.
-    long[] sizes = {0, 1, 100, 4095, 4096, 4097, 1L << 20};
-    long[] blockSizes = {1, 512, 1024, 4096, 8192};
-    for (long blockSize : blockSizes) {
-      for (long size : sizes) {
-        assertThat(CASFileCache.estimateSizeOnDisk(size, blockSize, /* isHardlink= */ true))
-            .isEqualTo(0);
-      }
-    }
+  public void estimateFileStoreSize_usesDefaultWhenBlockSizeIsUnavailable() throws IOException {
+    FileStore fileStore = mock(FileStore.class);
+    when(fileStore.getBlockSize()).thenThrow(new UnsupportedOperationException());
+
+    assertThat(CASFileCache.estimateFileStoreSize(1, fileStore)).isEqualTo(4096);
   }
 
   @Test
-  public void estimateSizeOnDisk_isHardlinkTrue_zeroSize_returnsZero() {
-    // Zero-size boundary with the hardlink branch still returns 0.
-    assertThat(CASFileCache.estimateSizeOnDisk(0, 4096, /* isHardlink= */ true)).isEqualTo(0);
-  }
-
-  @Test
-  public void estimateSizeOnDisk_isHardlinkTrue_largeSize_returnsZero() {
-    // Integer.MAX_VALUE-scale sizes with the hardlink branch still return 0 and do not overflow.
-    assertThat(CASFileCache.estimateSizeOnDisk(Integer.MAX_VALUE, 4096, /* isHardlink= */ true))
-        .isEqualTo(0);
-    assertThat(
-            CASFileCache.estimateSizeOnDisk(
-                (long) Integer.MAX_VALUE + 1, 4096, /* isHardlink= */ true))
-        .isEqualTo(0);
-  }
-
-  @Test
-  public void estimateSizeOnDisk_isHardlinkTrue_isIdempotent() {
-    // Applying estimateSizeOnDisk twice with isHardlink=true still yields 0, mirroring the
-    // existing estimateSizeOnDisk_isIdempotent test.
-    long[] sizes = {0, 1, 100, 4095, 4096, 4097, 8192, 10000};
-    long[] blockSizes = {512, 1024, 4096, 8192};
-    for (long blockSize : blockSizes) {
-      for (long size : sizes) {
-        long once = CASFileCache.estimateSizeOnDisk(size, blockSize, /* isHardlink= */ true);
-        long twice = CASFileCache.estimateSizeOnDisk(once, blockSize, /* isHardlink= */ true);
-        assertThat(twice).isEqualTo(once);
-      }
-    }
+  public void estimateFileStoreSize_roundingOverflowThrows() throws IOException {
+    assertThrows(ArithmeticException.class, () -> estimateFileStoreSize(Long.MAX_VALUE, 4096));
   }
 
   @Test
