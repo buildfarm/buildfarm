@@ -150,6 +150,7 @@ public class CFCLinkExecFileSystemTest {
     when(cfc.putDirectory(subDigest, directoriesIndex, fetchService))
         .thenReturn(
             immediateFuture(new PathResult(root.resolve("cfc-entry-sub"), /* isMissed= */ false)));
+    WorkerEventObserver workerEventObserver = mock(WorkerEventObserver.class);
     CFCLinkExecFileSystem efs =
         new CFCLinkExecFileSystem(
             root,
@@ -160,7 +161,8 @@ public class CFCLinkExecFileSystemTest {
             /* allowSymlinkTargetAbsolute= */ false,
             /* removeDirectoryService= */ null,
             /* accessRecorder= */ null,
-            fetchService);
+            fetchService,
+            workerEventObserver);
     Path execDir =
         efs.createExecDir(
             "outputPathDirOp",
@@ -180,6 +182,7 @@ public class CFCLinkExecFileSystemTest {
     // mock completionism
     verify(cfc, times(1)).put(fileDigest, true, fetchService);
     verifyNoMoreInteractions(cfc);
+    verifyNoMoreInteractions(workerEventObserver);
   }
 
   // DirectoryIterator constructor calls advance("") and then
@@ -265,9 +268,7 @@ public class CFCLinkExecFileSystemTest {
     when(cfc.putDirectory(aDigest, directoriesIndex, fetchService))
         .thenReturn(
             immediateFuture(new PathResult(root.resolve("cfc-entry-a"), /* isMissed= */ false)));
-    when(cfc.putDirectory(bDigest, directoriesIndex, fetchService))
-        .thenReturn(
-            immediateFuture(new PathResult(root.resolve("cfc-entry-b"), /* isMissed= */ false)));
+    WorkerEventObserver workerEventObserver = mock(WorkerEventObserver.class);
     CFCLinkExecFileSystem efs =
         new CFCLinkExecFileSystem(
             root,
@@ -281,7 +282,8 @@ public class CFCLinkExecFileSystemTest {
             /* allowSymlinkTargetAbsolute= */ false,
             /* removeDirectoryService= */ null,
             /* accessRecorder= */ null,
-            fetchService);
+            fetchService,
+            workerEventObserver);
     efs.createExecDir(
         "iteratorSkipOp",
         directoriesIndex,
@@ -293,6 +295,7 @@ public class CFCLinkExecFileSystemTest {
     // "a" matched the linked-directories pattern; it should have been linked via
     // putDirectory. If the constructor double-advance bug skipped "a", this fails.
     verify(cfc, times(1)).putDirectory(aDigest, directoriesIndex, fetchService);
+    verifyNoMoreInteractions(workerEventObserver);
   }
 
   @Test

@@ -85,7 +85,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       boolean allowSymlinkTargetAbsolute,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
-      ExecutorService fetchService) {
+      ExecutorService fetchService,
+      WorkerEventObserver workerEventObserver) {
     super(
         root,
         fileCache,
@@ -93,7 +94,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         allowSymlinkTargetAbsolute,
         removeDirectoryService,
         accessRecorder,
-        fetchService);
+        fetchService,
+        workerEventObserver);
     this.linkInputDirectories = linkInputDirectories;
     this.linkedInputDirectories = Iterables.transform(linkedInputDirectories, Pattern::compile);
   }
@@ -349,6 +351,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
                 pathResult -> {
                   inputDirectories.add(reapiDigest);
                   if (pathResult.isMissed()) {
+                    workerEventObserver.onCreatedLinkedDirectory();
                     fetchedBytes(sumDirectorySize(reapiDigest));
                   }
                   return null;

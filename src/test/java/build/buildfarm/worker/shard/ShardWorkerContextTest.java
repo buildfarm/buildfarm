@@ -45,6 +45,7 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.WorkerEventObserver;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import com.google.common.collect.ImmutableList;
@@ -56,6 +57,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -77,6 +79,8 @@ public class ShardWorkerContextTest {
 
   @Mock private CasWriter writer;
 
+  @Mock private WorkerEventObserver workerEventObserver;
+
   @Before
   public void setUp() throws Exception {
     configs.getServer().setInstanceType(SHARD);
@@ -90,6 +94,11 @@ public class ShardWorkerContextTest {
     configs.getBackplane().setQueues(queues);
 
     MockitoAnnotations.initMocks(this);
+  }
+
+  @After
+  public void tearDown() {
+    verifyNoMoreInteractions(workerEventObserver);
   }
 
   WorkerContext createTestContext() {
@@ -127,7 +136,8 @@ public class ShardWorkerContextTest {
         /* marketExecution= */ false,
         /* ignoreMarketExecutionMnemonics= */ ImmutableSet.of(),
         resourceSet,
-        writer);
+        writer,
+        workerEventObserver);
   }
 
   @SuppressWarnings("unchecked")
