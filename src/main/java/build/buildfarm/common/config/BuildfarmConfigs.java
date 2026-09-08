@@ -4,6 +4,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.ExecutionWrapperProperties;
 import build.buildfarm.common.SystemProcessors;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
@@ -36,6 +37,8 @@ public final class BuildfarmConfigs {
   private static Constructor constructor;
 
   private static final long DEFAULT_CAS_SIZE = 2147483648L; // 2 * 1024 * 1024 * 1024
+
+  @VisibleForTesting static final int DEFAULT_MAX_SIZE_PERCENT = 90;
 
   private static final class ImportConstruct extends AbstractConstruct {
     String configsBasePath;
@@ -207,7 +210,7 @@ public final class BuildfarmConfigs {
     adjustRedisUri(configs);
   }
 
-  private static void adjustWorkerConfigs(BuildfarmConfigs configs) {
+  private static void adjustWorkerConfigs(BuildfarmConfigs configs) throws ConfigurationException {
     configs
         .getWorker()
         .setPublicName(
@@ -215,8 +218,8 @@ public final class BuildfarmConfigs {
     adjustRedisUri(configs);
     adjustCompressedBlobTransfer(configs);
 
-    // Automatically set disk space to 90% of available space on the worker volume.
-    // User configured value in .yaml will always take presedence.
+    // Automatically set disk space to maxSizePercent of the worker volume.
+    // User configured value in .yaml will always take precedence.
     for (Cas storage : configs.getWorker().getStorages()) {
       deriveCasStorage(storage);
     }
@@ -310,14 +313,38 @@ public final class BuildfarmConfigs {
     }
   }
 
-  private static void deriveCasStorage(Cas storage) {
+  @VisibleForTesting
+  static void validateCasStorageSizeConfig(Cas storage) throws ConfigurationException {
+    long maxSizeBytes = storage.getMaxSizeBytes();
+    int maxSizePercent = storage.getMaxSizePercent();
+    if (maxSizeBytes < 0) {
+      throw new ConfigurationException("maxSizeBytes must be non-negative, got: " + maxSizeBytes);
+    }
+    if (maxSizeBytes != 0 && maxSizePercent != 0) {
+      throw new ConfigurationException(
+          "maxSizeBytes and maxSizePercent cannot both be non-zero; please use one or the other");
+    }
+    if (maxSizePercent < 0 || maxSizePercent > 100) {
+      throw new ConfigurationException(
+          "maxSizePercent must be between 0 and 100, got: " + maxSizePercent);
+    }
+  }
+
+  @VisibleForTesting
+  static void deriveCasStorage(Cas storage) throws ConfigurationException {
+    validateCasStorageSizeConfig(storage);
     if (storage.getMaxSizeBytes() == 0) {
+      int maxSizePercent = storage.getMaxSizePercent();
+      if (maxSizePercent <= 0) {
+        maxSizePercent = DEFAULT_MAX_SIZE_PERCENT;
+      }
       try {
         storage.setMaxSizeBytes(
             (long)
                 (BuildfarmConfigs.getInstance().getWorker().getValidRoot().toFile().getTotalSpace()
-                    * 0.9));
+                    * (maxSizePercent / 100.0)));
       } catch (Exception e) {
+        log.warning("Failed to determine filesystem size, falling back to default CAS size: " + e);
         storage.setMaxSizeBytes(DEFAULT_CAS_SIZE);
       }
       log.info(String.format("CAS size changed to %d", storage.getMaxSizeBytes()));
