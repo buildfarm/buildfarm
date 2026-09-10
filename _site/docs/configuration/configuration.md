@@ -129,6 +129,8 @@ server:
 | recentServedExecutionsCacheMaxEntries | Long, _64 * 1024_             | The max number of entries that the executions cache will hold.       |
 | actionCacheMaxEntries                 | Long, _1000000_               | The max number of entries that the action cache will hold.           |
 
+These are in-memory Caffeine caches of deserialized Directory, Command, and Action messages. The limits are entry counts, not a heap cap, so a large Directory still costs memory per slot. Start at the defaults (`64 * 1024`, 65536). Size them for the hot metadata set: large enough to avoid thrash, small enough that unused entries expire. If a heap dump shows `directoryCache` or `commandCache` dominating, or JVM heap briefly hits 100%, lower the values. Millions of entries (for example `6553600`) are far above the default and commonly cause heap pressure. Compare a representative full-execution build on a fresh server at the current size versus a reduced size; if wall time is unchanged, the extra entries are not helping.
+
 Example:
 
 ```yaml
