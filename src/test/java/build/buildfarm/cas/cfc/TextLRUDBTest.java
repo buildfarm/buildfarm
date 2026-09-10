@@ -18,6 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import build.buildfarm.cas.cfc.LRUDB.SizeEntry;
+import build.buildfarm.common.io.FileSystemMover;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Jimfs;
 import java.io.BufferedReader;
@@ -43,10 +44,10 @@ public class TextLRUDBTest {
   private Path rootDir;
 
   @Before
-  public void setUp() {
-    textLRUDB = new TextLRUDB();
+  public void setUp() throws IOException {
     fileSystem = Jimfs.newFileSystem();
     rootDir = Iterables.getFirst(fileSystem.getRootDirectories(), null);
+    textLRUDB = new TextLRUDB(FileSystemMover.probe(rootDir));
   }
 
   @After
