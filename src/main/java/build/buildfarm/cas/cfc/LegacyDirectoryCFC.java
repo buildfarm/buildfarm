@@ -240,6 +240,8 @@ public class LegacyDirectoryCFC extends CASFileCache {
     ExecutorService pool = BuildfarmExecutors.getComputeCachePool();
 
     ImmutableList.Builder<Path> invalidDirectories = new ImmutableList.Builder<>();
+    CacheLoadProgress progress =
+        new CacheLoadProgress("Populating directories", cacheScanResults.computeDirs().size());
 
     for (Path path : cacheScanResults.computeDirs()) {
       DigestUtil digestUtil = parseDirectoryDigestUtil(path.getFileName().toString());
@@ -268,11 +270,13 @@ public class LegacyDirectoryCFC extends CASFileCache {
               }
             } catch (Exception e) {
               log.log(Level.SEVERE, "error processing directory " + path.toString(), e);
+            } finally {
+              progress.complete();
             }
           });
     }
 
-    joinThreads(pool, "Populating Directories...");
+    joinThreads(pool, progress);
 
     return invalidDirectories.build();
   }
