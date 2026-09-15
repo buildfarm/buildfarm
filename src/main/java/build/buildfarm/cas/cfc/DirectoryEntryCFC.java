@@ -145,12 +145,21 @@ public class DirectoryEntryCFC extends CASFileCache {
     ExecutorService pool = BuildfarmExecutors.getComputeCachePool();
 
     ImmutableList.Builder<Path> invalidDirectories = new ImmutableList.Builder<>();
+    CacheLoadProgress progress =
+        new CacheLoadProgress("Populating directories", cacheScanResults.computeDirs().size());
 
     for (Path path : cacheScanResults.computeDirs()) {
-      pool.execute(() -> computeDirectory(path, invalidDirectories));
+      pool.execute(
+          () -> {
+            try {
+              computeDirectory(path, invalidDirectories);
+            } finally {
+              progress.complete();
+            }
+          });
     }
 
-    joinThreads(pool, "Populating Directories...");
+    joinThreads(pool, progress);
 
     return invalidDirectories.build();
   }
