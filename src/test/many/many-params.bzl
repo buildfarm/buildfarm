@@ -50,7 +50,7 @@ def {name}():
 
     return None
 
-many_params = repository_rule(
+_many_params = repository_rule(
     implementation = _many_params_impl,
     local = True,
     environ = [
@@ -58,4 +58,11 @@ many_params = repository_rule(
         "MANY_CC_LIBRARIES",
         "MANY_CC_LIBRARY_SOURCES",
     ],
+)
+
+def _many_params_extension_impl(_ctx):
+    _many_params(name = "many-params")
+
+many_params = module_extension(
+    implementation = _many_params_extension_impl,
 )
