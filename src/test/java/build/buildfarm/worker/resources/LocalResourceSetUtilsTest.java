@@ -122,7 +122,7 @@ public class LocalResourceSetUtilsTest {
                 resource("pool", 2, LimitedResource.Type.POOL)));
 
     assertThat(set.resources).containsKey("sem");
-    assertThat(set.resources.get("sem").semaphore().availablePermits()).isEqualTo(3);
+    assertThat(set.resources.get("sem").availablePermits()).isEqualTo(3);
     assertThat(set.poolResources).containsKey("pool");
     assertThat(set.poolResources.get("pool").pool()).hasSize(2);
   }
@@ -137,7 +137,7 @@ public class LocalResourceSetUtilsTest {
                 resource("drained", 1, LimitedResource.Type.POOL)));
 
     // deplete "used" and "drained" but leave "free" available
-    set.resources.get("used").semaphore().acquireUninterruptibly();
+    assertThat(set.resources.get("used").tryAcquire(1)).isTrue();
     set.poolResources.get("drained").pool().poll();
 
     assertThat(LocalResourceSetUtils.exhausted(set)).containsExactly("used", "drained");
@@ -168,7 +168,7 @@ public class LocalResourceSetUtilsTest {
 
     assertThat(claim).isNull();
     // the failed claim must not leak permits
-    assertThat(set.resources.get("cpu").semaphore().availablePermits()).isEqualTo(1);
+    assertThat(set.resources.get("cpu").availablePermits()).isEqualTo(1);
   }
 
   @Test
@@ -189,8 +189,8 @@ public class LocalResourceSetUtilsTest {
     Claim claim = LocalResourceSetUtils.claimResources(platform, set);
 
     assertThat(claim).isNull();
-    assertThat(set.resources.get("first").semaphore().availablePermits()).isEqualTo(1);
-    assertThat(set.resources.get("second").semaphore().availablePermits()).isEqualTo(1);
+    assertThat(set.resources.get("first").availablePermits()).isEqualTo(1);
+    assertThat(set.resources.get("second").availablePermits()).isEqualTo(1);
   }
 
   @Test
