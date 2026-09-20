@@ -32,4 +32,8 @@ public interface Queue<E> {
   void removeFromDequeue(AbstractPipeline pipeline, E e);
 
   ScanResult<E> scan(String cursor, int count, String match);
+
+  default int reclaimStaleMessages(long minIdleMillis) {
+    return 0;
+  }
 }

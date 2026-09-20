@@ -1407,4 +1407,15 @@ public class RedisShardBackplane implements Backplane {
       String actionId, String toolInvocationId, String actionMnemonic, String targetId) {
     // TODO count for each of these fields
   }
+
+  @Override
+  public int reclaimStalePelEntries(long minIdleMillis) throws IOException {
+    return client.call(
+        jedis -> {
+          int reclaimed = 0;
+          reclaimed += state.prequeue.reclaimStaleMessages(jedis, minIdleMillis);
+          reclaimed += state.executionQueue.reclaimStaleMessages(jedis, minIdleMillis);
+          return reclaimed;
+        });
+  }
 }

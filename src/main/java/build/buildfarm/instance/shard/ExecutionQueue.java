@@ -155,6 +155,22 @@ public class ExecutionQueue {
   }
 
   /**
+   * @brief Reclaim stale PEL entries across all provisioned queues.
+   * @details Iterates all provisioned queues and reclaims stale messages. Only has an effect when
+   *     the underlying queues are stream-based.
+   * @param jedis Jedis cluster client.
+   * @param minIdleMillis Minimum idle time in milliseconds before a message is reclaimed.
+   * @return The total number of messages reclaimed.
+   */
+  public int reclaimStaleMessages(UnifiedJedis jedis, long minIdleMillis) {
+    int total = 0;
+    for (ProvisionedRedisQueue provisionedQueue : queues) {
+      total += provisionedQueue.queue().reclaimStaleMessages(jedis, minIdleMillis);
+    }
+    return total;
+  }
+
+  /**
    * @brief Get size.
    * @details Checks the current length of the queue.
    * @param jedis Jedis cluster client.
