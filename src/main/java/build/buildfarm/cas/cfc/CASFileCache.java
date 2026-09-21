@@ -70,6 +70,7 @@ import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.io.FileStatus;
+import build.buildfarm.common.io.FileStoreMover;
 import build.buildfarm.v1test.BlobWriteKey;
 import build.buildfarm.v1test.Digest;
 import com.google.common.annotations.VisibleForTesting;
@@ -175,7 +176,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
-  private final LRUDB db = new TextLRUDB();
+  private LRUDB db;
+  private FileStoreMover fileStoreMover;
   private volatile Deadline saveLRUAfter = Deadline.after(10, MINUTES);
   private final Path lru;
 
@@ -1318,6 +1320,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Files.createDirectories(dir);
     }
     fileStore = Files.getFileStore(root);
+    if (fileStoreMover == null) {
+      fileStoreMover = FileStoreMover.probe(root);
+      db = new TextLRUDB(fileStoreMover);
+    }
   }
 
   @SuppressWarnings({"PMD.CompareObjectsWithEquals"})
@@ -2674,13 +2680,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         boolean inserted = false;
         try {
           // acquire the key lock
-          Files.createLink(CASFileCache.this.getPath(actual, key), writePath);
+          fileStoreMover.move(writePath, CASFileCache.this.getPath(actual, key));
           existingEntry = safeStorageInsertion(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
           log.log(Level.FINER, "file already exists for " + key + ", nonexistent entry will fail");
         } finally {
-          Files.delete(writePath);
+          Files.deleteIfExists(writePath);
           if (!inserted) {
             dischargeAndNotify(writeKey, blobSizeInBytes);
           }
