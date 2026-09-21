@@ -111,6 +111,15 @@ public class DistributedStateCreator {
 
   private static ExecutionQueue createExecutionQueue(
       UnifiedJedis jedis, StringTranslator<QueueEntry> translator) {
+    return createExecutionQueue(jedis, translator, configs.getBackplane().getQueues());
+  }
+
+  /**
+   * Create an execution queue from an explicit list of queue configurations. This overload is used
+   * for dynamic queue rebuilding when workers register new queues.
+   */
+  static ExecutionQueue createExecutionQueue(
+      UnifiedJedis jedis, StringTranslator<QueueEntry> translator, Queue[] queueConfigs) {
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
     // eligibility and placement of operations.
@@ -118,7 +127,7 @@ public class DistributedStateCreator {
     // requirements.  This will ensure that all operations are eligible for the final queue.
     ImmutableList.Builder<ProvisionedRedisQueue<QueueEntry>> provisionedQueues =
         new ImmutableList.Builder<>();
-    for (Queue queueConfig : configs.getBackplane().getQueues()) {
+    for (Queue queueConfig : queueConfigs) {
       ProvisionedRedisQueue<QueueEntry> provisionedQueue =
           new ProvisionedRedisQueue<QueueEntry>(
               getQueueName(queueConfig),
@@ -135,7 +144,7 @@ public class DistributedStateCreator {
     // all operations.
     // This will ensure the expected behavior for the paradigm in which all work is put on the same
     // queue.
-    if (configs.getBackplane().getQueues().length == 0) {
+    if (queueConfigs.length == 0) {
       SetMultimap defaultProvisions = LinkedHashMultimap.create();
       defaultProvisions.put(
           ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
