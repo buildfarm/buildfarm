@@ -22,6 +22,8 @@ import java.util.concurrent.BlockingQueue;
 
 public class ByteStringQueueInputStream extends InputStream {
   private final BlockingQueue<ByteString> queue;
+  private final Runnable onChunkTaken;
+  private final Runnable onClose;
   private InputStream input;
   private boolean closed;
   private boolean completed = false;
@@ -29,7 +31,19 @@ public class ByteStringQueueInputStream extends InputStream {
 
   @VisibleForTesting
   public ByteStringQueueInputStream(BlockingQueue<ByteString> queue) {
+    this(queue, () -> {}, () -> {});
+  }
+
+  /**
+   * @param onChunkTaken invoked after each element is taken from the queue, so that the producer
+   *     can be signalled to supply the next one
+   * @param onClose invoked once when the stream is closed, so that the producer can be cancelled
+   */
+  public ByteStringQueueInputStream(
+      BlockingQueue<ByteString> queue, Runnable onChunkTaken, Runnable onClose) {
     this.queue = queue;
+    this.onChunkTaken = onChunkTaken;
+    this.onClose = onClose;
     input = ByteString.EMPTY.newInput();
     closed = false;
   }
@@ -97,8 +111,11 @@ public class ByteStringQueueInputStream extends InputStream {
 
   @Override
   public void close() {
+    if (closed) {
+      return;
+    }
     closed = true;
-    // offer to indicate cancellation?
+    onClose.run();
   }
 
   public void setCompleted() {
@@ -126,6 +143,7 @@ public class ByteStringQueueInputStream extends InputStream {
       } catch (InterruptedException e) {
         throw new IOException(e);
       }
+      onChunkTaken.run();
     }
     input = data.newInput();
   }
