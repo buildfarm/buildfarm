@@ -105,6 +105,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
@@ -219,6 +220,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                   return future;
                 }
               });
+
+  private static final long DEFAULT_BLOCK_SIZE = 4096;
+  private static final long DIRECTORY_ENTRY_HEADER_SIZE = 8;
+  private static final long DIRECTORY_ENTRY_ALIGNMENT = 4;
 
   protected FileStore fileStore; // bound to root
   protected transient long sizeInBytes = 0;
@@ -1584,7 +1589,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     } else {
       // if cas is full or entry is oversized or empty, mark file for later deletion.
       long size = entry.size();
-      if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes || size == 0) {
+      if (sizeInBytes + estimateFileStoreSize(size, fileStore) > maxSizeInBytes
+          || size > maxEntrySizeInBytes
+          || size == 0) {
         synchronized (deleteFiles) {
           deleteFiles.add(path);
         }
@@ -1607,8 +1614,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             if (e.decrementReference(header)) {
               unreferencedEntryCount++;
             }
+            sizeInBytes += estimateFileStoreSize(size, fileStore);
           }
-          sizeInBytes += size;
         }
       }
     }
@@ -1712,9 +1719,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   protected synchronized void discharge(String key, long size) {
-    sizeInBytes -= size;
+    long fileStoreSize = estimateFileStoreSize(size, fileStore);
+    sizeInBytes -= fileStoreSize;
     removedEntryCount++;
-    removedEntrySize += size;
+    removedEntrySize += fileStoreSize;
   }
 
   @GuardedBy("this")
@@ -2065,7 +2073,65 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  protected void fetchDirectory(
+  /**
+   * Estimates the physical file-store size of a file by rounding up to the nearest filesystem block
+   * boundary.
+   *
+   * <p>For many files and filesystems this will be accurate. However, for some files on some
+   * filesystems this will overestimate the physical size by up to one block. To clarify, this
+   * likely overestimates for smaller files on filesystems that use inlining, block suballocation,
+   * variable block sizes, etc. It can also overestimate for compressed filesystems proportional to
+   * the compression ratio.
+   */
+  @VisibleForTesting
+  static long estimateFileStoreSize(long logicalSize, FileStore fileStore) {
+    long blockSize = getBlockSize(fileStore);
+    checkArgument(blockSize > 0, "blockSize (%s) must be positive", blockSize);
+    checkArgument(logicalSize >= 0, "logicalSize (%s) must be non-negative", logicalSize);
+    if (logicalSize == 0) {
+      return 0;
+    }
+    return Math.multiplyExact(Math.ceilDiv(logicalSize, blockSize), blockSize);
+  }
+
+  private static long getBlockSize(FileStore fileStore) {
+    try {
+      return fileStore.getBlockSize();
+    } catch (UnsupportedOperationException | IOException e) {
+      return DEFAULT_BLOCK_SIZE;
+    }
+  }
+
+  /**
+   * Estimates the file-store size of a directory's entry table based on its contents. On typical
+   * Linux filesystems, each directory entry contains a header and the filename aligned to a fixed
+   * boundary. Each directory occupies at least one filesystem block.
+   */
+  @VisibleForTesting
+  static long estimateDirectoryFileStoreSize(Directory directory, FileStore fileStore) {
+    long blockSize = getBlockSize(fileStore);
+    checkArgument(blockSize > 0, "blockSize (%s) must be positive", blockSize);
+    long estimatedBytes = 0;
+    for (FileNode file : directory.getFilesList()) {
+      estimatedBytes = Math.addExact(estimatedBytes, estimateDirectoryEntrySize(file.getName()));
+    }
+    for (SymlinkNode symlink : directory.getSymlinksList()) {
+      estimatedBytes = Math.addExact(estimatedBytes, estimateDirectoryEntrySize(symlink.getName()));
+    }
+    for (DirectoryNode child : directory.getDirectoriesList()) {
+      estimatedBytes = Math.addExact(estimatedBytes, estimateDirectoryEntrySize(child.getName()));
+    }
+    long blocks = Math.max(1, Math.ceilDiv(estimatedBytes, blockSize));
+    return Math.multiplyExact(blocks, blockSize);
+  }
+
+  private static long estimateDirectoryEntrySize(String name) {
+    long unalignedSize = DIRECTORY_ENTRY_HEADER_SIZE + name.getBytes(StandardCharsets.UTF_8).length;
+    return Math.multiplyExact(
+        Math.ceilDiv(unalignedSize, DIRECTORY_ENTRY_ALIGNMENT), DIRECTORY_ENTRY_ALIGNMENT);
+  }
+
+  protected long fetchDirectory(
       Path rootPath,
       Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
@@ -2073,6 +2139,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ImmutableList.Builder<ListenableFuture<Path>> putFutures,
       ExecutorService service)
       throws IOException, InterruptedException {
+    long directoryOverhead = 0;
     Stack<Map.Entry<Path, Directory>> stack = new Stack<>();
     stack.push(
         new AbstractMap.SimpleEntry<>(
@@ -2084,6 +2151,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       removeFilePath(path);
       Files.createDirectory(path);
+      directoryOverhead += estimateDirectoryFileStoreSize(directory, fileStore);
       putDirectoryFiles(
           digest.getDigestFunction(),
           directory.getFilesList(),
@@ -2103,6 +2171,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     DigestUtil.fromDigest(directoryNode.getDigest(), digest.getDigestFunction()))));
       }
     }
+    return directoryOverhead;
   }
 
   private void removeFilePath(Path path) throws IOException {
@@ -2456,7 +2525,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       if (referenceIfExists(key)) {
         return false;
       }
-      sizeInBytes += blobSizeInBytes;
+      sizeInBytes += estimateFileStoreSize(blobSizeInBytes, fileStore);
       requiresDischarge.set(true);
 
       ImmutableList.Builder<ListenableFuture<Digest>> builder = ImmutableList.builder();

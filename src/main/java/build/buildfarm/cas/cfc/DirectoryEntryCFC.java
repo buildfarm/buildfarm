@@ -108,9 +108,15 @@ public class DirectoryEntryCFC extends CASFileCache {
           path,
           new SimpleFileVisitor<>() {
             @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+              blobSizeInBytes.addAndGet(estimateFileStoreSize(attrs.size(), fileStore));
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
               if (attrs.isRegularFile()) {
-                blobSizeInBytes.addAndGet(attrs.size());
+                blobSizeInBytes.addAndGet(estimateFileStoreSize(attrs.size(), fileStore));
               }
               return FileVisitResult.CONTINUE;
             }
@@ -127,8 +133,8 @@ public class DirectoryEntryCFC extends CASFileCache {
           if (e.decrementReference(header)) {
             unreferencedEntryCount++;
           }
+          sizeInBytes += estimateFileStoreSize(e.size, fileStore);
         }
-        sizeInBytes += e.size;
       }
     } catch (Exception e) {
       log.log(Level.SEVERE, "error processing directory " + path.toString(), e);
@@ -275,16 +281,18 @@ public class DirectoryEntryCFC extends CASFileCache {
     ImmutableList.Builder<ListenableFuture<Path>> putFuturesBuilder = ImmutableList.builder();
     AtomicLong weight = new AtomicLong();
     try {
-      fetchDirectory(
-          path,
-          digest,
-          directoriesIndex,
-          (dst, src, size, isExecutable) -> {
-            copyLocalFileAndDereference(dst, src, isExecutable);
-            weight.addAndGet(size);
-          },
-          putFuturesBuilder,
-          service);
+      long dirOverhead =
+          fetchDirectory(
+              path,
+              digest,
+              directoriesIndex,
+              (dst, src, size, isExecutable) -> {
+                copyLocalFileAndDereference(dst, src, isExecutable);
+                weight.addAndGet(estimateFileStoreSize(size, fileStore));
+              },
+              putFuturesBuilder,
+              service);
+      weight.addAndGet(dirOverhead);
     } catch (Exception e) {
       return immediateFailedFuture(e);
     }
