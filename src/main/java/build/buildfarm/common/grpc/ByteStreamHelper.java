@@ -28,16 +28,19 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
-import io.grpc.stub.StreamObserver;
+import io.grpc.stub.ClientCallStreamObserver;
+import io.grpc.stub.ClientResponseObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.file.NoSuchFileException;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import org.jspecify.annotations.Nullable;
 
@@ -56,41 +59,67 @@ public final class ByteStreamHelper {
       throws IOException {
     ReadRequest request =
         ReadRequest.newBuilder().setResourceName(resourceName).setReadOffset(offset).build();
-    BlockingQueue<ByteString> queue = new ArrayBlockingQueue<>(1);
-    ByteStringQueueInputStream inputStream = new ByteStringQueueInputStream(queue);
+    // The queue is bounded by gRPC flow control rather than by capacity: the consumer
+    // requests one message per chunk it takes, so onNext never has to block and never
+    // pins a call executor thread if the consumer goes away.
+    BlockingQueue<ByteString> queue = new LinkedBlockingQueue<>();
+    Object lock = new Object();
+    AtomicBoolean cancelled = new AtomicBoolean(false);
+    AtomicReference<ClientCallStreamObserver<ReadRequest>> requestStream = new AtomicReference<>();
+    ByteStringQueueInputStream inputStream =
+        new ByteStringQueueInputStream(
+            queue,
+            () -> requestStream.get().request(1),
+            () -> {
+              ClientCallStreamObserver<ReadRequest> stream;
+              synchronized (lock) {
+                cancelled.set(true);
+                stream = requestStream.get();
+              }
+              stream.cancel("input stream closed", null);
+            });
     // this interface needs to operate similar to open, where it
     // throws an exception on creation. We will need to wait around
     // for the response to come back in order to supply the stream or
     // throw the exception it receives
     SettableFuture<InputStream> streamReadyFuture = SettableFuture.create();
-    StreamObserver<ReadResponse> responseObserver =
-        new StreamObserver<ReadResponse>() {
+    ClientResponseObserver<ReadRequest, ReadResponse> responseObserver =
+        new ClientResponseObserver<ReadRequest, ReadResponse>() {
           long requestOffset = offset;
           long currentOffset = offset;
           Backoff backoff = backoffSupplier.get();
 
           @Override
+          public void beforeStart(ClientCallStreamObserver<ReadRequest> stream) {
+            stream.disableAutoRequestWithInitial(1);
+            requestStream.set(stream);
+          }
+
+          @Override
           public void onNext(ReadResponse response) {
             streamReadyFuture.set(inputStream);
             ByteString data = response.getData();
-            try {
-              queue.put(data);
-              currentOffset += data.size();
-            } catch (InterruptedException e) {
-              // cancel context?
-              inputStream.setException(e);
-            }
+            queue.add(data);
+            currentOffset += data.size();
           }
 
           private void retryRequest() {
-            requestOffset = currentOffset;
-            bsStubSupplier
-                .get()
-                .read(request.toBuilder().setReadOffset(requestOffset).build(), this);
+            synchronized (lock) {
+              if (cancelled.get()) {
+                return;
+              }
+              requestOffset = currentOffset;
+              bsStubSupplier
+                  .get()
+                  .read(request.toBuilder().setReadOffset(requestOffset).build(), this);
+            }
           }
 
           @Override
           public void onError(Throwable t) {
+            if (cancelled.get()) {
+              return;
+            }
             Status status = Status.fromThrowable(t);
             long nextDelayMillis = backoff.nextDelayMillis();
             if (status.getCode() == Status.Code.DEADLINE_EXCEEDED
@@ -140,7 +169,7 @@ public final class ByteStreamHelper {
       try {
         inputStream.close();
       } catch (RuntimeException closeEx) {
-        e.addSuppressed(e);
+        e.addSuppressed(closeEx);
       }
       IOException ioEx = new ClosedByInterruptException();
       ioEx.addSuppressed(e);

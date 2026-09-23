@@ -24,6 +24,7 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -190,5 +191,33 @@ public class ByteStringQueueInputStreamTest {
       throw new RuntimeException("unexpected io exception", e);
     }
     in.available();
+  }
+
+  @Test
+  public void closeRunsOnCloseOnce() {
+    AtomicInteger closes = new AtomicInteger();
+    ByteStringQueueInputStream in =
+        new ByteStringQueueInputStream(
+            newLinkedBlockingQueue(of()), () -> {}, closes::incrementAndGet);
+
+    in.close();
+    in.close();
+
+    assertThat(closes.get()).isEqualTo(1);
+  }
+
+  @Test
+  public void readRunsOnChunkTakenPerChunk() throws IOException {
+    AtomicInteger taken = new AtomicInteger();
+    ByteStringQueueInputStream in =
+        new ByteStringQueueInputStream(
+            newLinkedBlockingQueue(of(copyFromUtf8("Hello, "), copyFromUtf8("World"))),
+            taken::incrementAndGet,
+            () -> {});
+    in.setCompleted();
+
+    assertThat(ByteString.readFrom(in)).isEqualTo(copyFromUtf8("Hello, World"));
+    // two data chunks plus the completion sentinel
+    assertThat(taken.get()).isEqualTo(3);
   }
 }
