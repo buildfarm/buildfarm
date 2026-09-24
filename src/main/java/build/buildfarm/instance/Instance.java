@@ -35,8 +35,10 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.PipelineChange;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerPipelineChangeResponse;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -164,7 +166,10 @@ public interface Instance {
 
   ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names);
 
-  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
+  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String name);
+
+  ListenableFuture<WorkerPipelineChangeResponse> pipelineChange(
+      String name, List<PipelineChange> changes);
 
   GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
