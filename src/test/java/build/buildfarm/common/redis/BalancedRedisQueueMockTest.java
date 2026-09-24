@@ -38,9 +38,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import redis.clients.jedis.Connection;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.UnifiedJedis;
 
 /**
  * @class BalancedRedisQueueMockTest
@@ -54,18 +53,16 @@ import redis.clients.jedis.JedisCluster;
 @RunWith(JUnit4.class)
 public class BalancedRedisQueueMockTest {
   @Mock private JedisCluster redis;
-  @Mock private Connection connection;
   @Mock private Queue<String> subQueue;
 
   @SuppressWarnings("unused") // parameters are ignored
-  private Queue<String> subQueueDecorate(Jedis jedis, String name) {
+  private Queue<String> subQueueDecorate(UnifiedJedis jedis, String name) {
     return subQueue;
   }
 
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
-    when(redis.getConnectionFromSlot(any(Integer.class))).thenReturn(connection);
   }
 
   // Function under test: removeFromDequeue

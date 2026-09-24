@@ -25,7 +25,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.function.Supplier;
 import redis.clients.jedis.AbstractPipeline;
-import redis.clients.jedis.Jedis;
+import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.resps.ScanResult;
 
 /**
@@ -40,7 +40,7 @@ import redis.clients.jedis.resps.ScanResult;
 public class RedisQueue implements Queue<String> {
   private static final int defaultListPageSize = 10000;
 
-  public static Queue decorate(Jedis jedis, String name) {
+  public static Queue decorate(UnifiedJedis jedis, String name) {
     return new RedisQueue(jedis, name, defaultListPageSize);
   }
 
@@ -48,7 +48,7 @@ public class RedisQueue implements Queue<String> {
     return timeout.getSeconds() + timeout.getNano() / 1e9;
   }
 
-  private final Jedis jedis;
+  private final UnifiedJedis jedis;
 
   /**
    * @field name
@@ -65,11 +65,11 @@ public class RedisQueue implements Queue<String> {
    * @details Construct a named redis queue with an established redis cluster.
    * @param name The global name of the queue.
    */
-  public RedisQueue(Jedis jedis, String name) {
+  public RedisQueue(UnifiedJedis jedis, String name) {
     this(jedis, name, defaultListPageSize);
   }
 
-  public RedisQueue(Jedis jedis, String name, int listPageSize) {
+  public RedisQueue(UnifiedJedis jedis, String name, int listPageSize) {
     this.jedis = jedis;
     this.name = name;
     this.listPageSize = listPageSize;

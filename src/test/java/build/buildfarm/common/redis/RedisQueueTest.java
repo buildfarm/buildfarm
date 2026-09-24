@@ -67,12 +67,12 @@ public class RedisQueueTest {
 
   @Test
   public void decorateSucceeds() {
-    RedisQueue.decorate(redis, "test");
+    RedisQueue.decorate(pooled, "test");
   }
 
   @Test
   public void offerShouldContain() {
-    RedisQueue queue = new RedisQueue(redis, "test");
+    RedisQueue queue = new RedisQueue(pooled, "test");
 
     queue.offer("foo");
 
@@ -81,7 +81,7 @@ public class RedisQueueTest {
 
   @Test
   public void removeFromDequeueShouldExclude() {
-    RedisQueue queue = new RedisQueue(redis, "test");
+    RedisQueue queue = new RedisQueue(pooled, "test");
     redis.lpush(queue.getDequeueName(), "foo", "bar", "foo");
 
     queue.removeFromDequeue("foo");
@@ -91,7 +91,7 @@ public class RedisQueueTest {
 
   @Test
   public void removeAllShouldExclude() {
-    RedisQueue queue = new RedisQueue(redis, "test");
+    RedisQueue queue = new RedisQueue(pooled, "test");
     redis.lpush("test", "foo", "bar", "foo");
 
     queue.removeAll("foo");
@@ -101,7 +101,7 @@ public class RedisQueueTest {
 
   @Test
   public void takeShouldPrependToDequeue() {
-    RedisQueue queue = new RedisQueue(redis, "test");
+    RedisQueue queue = new RedisQueue(pooled, "test");
     redis.lpush("test", "foo", "bar", "foo");
     redis.lpush(queue.getDequeueName(), "baz");
 
@@ -114,7 +114,7 @@ public class RedisQueueTest {
 
   @Test
   public void takeEmptyShouldReturnNullAfterTimeoutAndIgnoreDequeue() {
-    RedisQueue queue = new RedisQueue(redis, "test");
+    RedisQueue queue = new RedisQueue(pooled, "test");
     redis.lpush(queue.getDequeueName(), "foo");
 
     String value = queue.take(Duration.ofMillis(1));
@@ -126,7 +126,7 @@ public class RedisQueueTest {
 
   @Test
   public void pollShouldPrependToDequeue() {
-    RedisQueue queue = new RedisQueue(redis, "test");
+    RedisQueue queue = new RedisQueue(pooled, "test");
     redis.lpush("test", "foo", "bar", "foo");
     redis.lpush(queue.getDequeueName(), "baz");
 
@@ -139,7 +139,7 @@ public class RedisQueueTest {
 
   @Test
   public void pollEmptyShouldReturnNullAndIgnoreDequeue() {
-    RedisQueue queue = new RedisQueue(redis, "test");
+    RedisQueue queue = new RedisQueue(pooled, "test");
     redis.lpush(queue.getDequeueName(), "foo");
 
     String value = queue.poll();
@@ -151,7 +151,7 @@ public class RedisQueueTest {
 
   @Test
   public void sizeYieldsLengthAndIgnoresDequeue() {
-    RedisQueue queue = new RedisQueue(redis, "test");
+    RedisQueue queue = new RedisQueue(pooled, "test");
 
     redis.lpush(queue.getDequeueName(), "foo");
     assertThat(queue.size()).isEqualTo(0);
@@ -166,7 +166,7 @@ public class RedisQueueTest {
   @Test
   public void visitShouldEnumerateAndIgnoreDequeue() {
     int listPageSize = 3;
-    RedisQueue queue = new RedisQueue(redis, "test", listPageSize);
+    RedisQueue queue = new RedisQueue(pooled, "test", listPageSize);
     redis.lpush(queue.getDequeueName(), "processing");
     for (String entry : VISIT_ENTRIES) {
       redis.lpush("test", entry);
@@ -183,7 +183,7 @@ public class RedisQueueTest {
   @Test
   public void visitDequeueShouldEnumerateAndIgnoreQueue() {
     int listPageSize = 3;
-    RedisQueue queue = new RedisQueue(redis, "test", listPageSize);
+    RedisQueue queue = new RedisQueue(pooled, "test", listPageSize);
     redis.lpush("test", "processing");
     for (String entry : VISIT_ENTRIES) {
       redis.lpush(queue.getDequeueName(), entry);
