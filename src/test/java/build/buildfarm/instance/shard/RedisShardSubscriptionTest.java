@@ -46,6 +46,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import redis.clients.jedis.DefaultJedisClientConfig;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.exceptions.JedisException;
@@ -84,7 +85,10 @@ public class RedisShardSubscriptionTest {
   }
 
   private UnifiedJedis createJedis(RedisServer server) {
-    return new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+    return redis.clients.jedis.RedisClient.builder()
+        .hostAndPort(new HostAndPort(server.getHost(), server.getBindPort()))
+        .clientConfig(DefaultJedisClientConfig.builder().serverDefaultProtocol().build())
+        .build();
   }
 
   @After

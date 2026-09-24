@@ -40,7 +40,6 @@ import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Connection;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.resps.ScanResult;
 import redis.clients.jedis.util.JedisClusterCRC16;
@@ -329,7 +328,7 @@ public class BalancedRedisQueue<E> {
     Connection connection = null;
     if (jedis instanceof JedisCluster cluster) {
       connection = cluster.getConnectionFromSlot(JedisClusterCRC16.getSlot(name));
-    } else if (jedis instanceof JedisPooled pooled) {
+    } else if (jedis instanceof Pooled pooled) {
       connection = pooled.getPool().getResource();
     }
     if (connection == null) {

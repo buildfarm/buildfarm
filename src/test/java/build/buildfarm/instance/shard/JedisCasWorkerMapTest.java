@@ -15,6 +15,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import redis.clients.jedis.DefaultJedisClientConfig;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisCluster;
 
@@ -35,7 +36,8 @@ public class JedisCasWorkerMapTest {
     jedis =
         new JedisCluster(
             Collections.singleton(
-                new HostAndPort(redisServer.getHost(), redisServer.getBindPort())));
+                new HostAndPort(redisServer.getHost(), redisServer.getBindPort())),
+            DefaultJedisClientConfig.builder().serverDefaultProtocol().build());
     jedisCasWorkerMap = new JedisCasWorkerMap(jedis, CAS_PREFIX, 60);
   }
 

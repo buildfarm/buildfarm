@@ -21,7 +21,7 @@ import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.UnifiedJedis;
 
 /**
  * @class RedisNodeHashesTest
@@ -39,7 +39,7 @@ public class RedisNodeHashesTest {
   @Test
   public void getEvenlyDistributedHashesCanRetrieveDistributedHashes() throws Exception {
     // ARRANGE
-    JedisCluster redis = JedisClusterFactory.createTest();
+    UnifiedJedis redis = JedisClusterFactory.createTest();
 
     // ACT
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
@@ -55,7 +55,7 @@ public class RedisNodeHashesTest {
   @Test
   public void getEvenlyDistributedHashesWithPrefixCanRetrieveDistributedHashes() throws Exception {
     // ARRANGE
-    JedisCluster redis = JedisClusterFactory.createTest();
+    UnifiedJedis redis = JedisClusterFactory.createTest();
 
     // ACT
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);

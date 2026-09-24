@@ -30,7 +30,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.UnifiedJedis;
 
 /**
@@ -45,15 +44,15 @@ import redis.clients.jedis.UnifiedJedis;
 @RunWith(JUnit4.class)
 public class RedisQueueTest {
   private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-  private JedisPooled pooled;
+  private Pooled pooled;
   private Jedis redis;
 
   @Before
   public void setUp() throws Exception {
     configs.getBackplane().setRedisUri("redis://localhost:6379");
     UnifiedJedis unified = JedisClusterFactory.createTest();
-    assertThat(unified).isInstanceOf(JedisPooled.class);
-    pooled = (JedisPooled) unified;
+    assertThat(unified).isInstanceOf(Pooled.class);
+    pooled = (Pooled) unified;
     redis = new Jedis(pooled.getPool().getResource());
     redis.flushDB();
   }
