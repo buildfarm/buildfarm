@@ -1,4 +1,4 @@
-load("@rules_oci//oci:defs.bzl", "oci_image")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
@@ -211,4 +211,18 @@ multiarch_oci_image(
 multiarch_oci_image(
     name = "buildfarm-worker",
     image = ":_buildfarm-worker.image",
+)
+
+# Local single-arch tarball loaders for development (e.g. Tilt).
+# Produce a .tar that `docker load` can consume.
+oci_load(
+    name = "buildfarm-server.load",
+    image = ":_buildfarm-server.image",
+    repo_tags = ["bazel:buildfarm-server"],
+)
+
+oci_load(
+    name = "buildfarm-worker.load",
+    image = ":_buildfarm-worker.image",
+    repo_tags = ["bazel:buildfarm-worker"],
 )
