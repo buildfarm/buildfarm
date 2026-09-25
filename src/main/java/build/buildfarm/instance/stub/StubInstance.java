@@ -40,6 +40,7 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CapabilitiesGrpc;
 import build.bazel.remote.execution.v2.CapabilitiesGrpc.CapabilitiesBlockingStub;
+import build.bazel.remote.execution.v2.ChunkingFunction;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
@@ -61,6 +62,10 @@ import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.SpliceBlobRequest;
+import build.bazel.remote.execution.v2.SpliceBlobResponse;
+import build.bazel.remote.execution.v2.SplitBlobRequest;
+import build.bazel.remote.execution.v2.SplitBlobResponse;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.buildfarm.common.CasIndexResults;
@@ -1021,5 +1026,48 @@ public class StubInstance extends InstanceBase {
         .get()
         .prepareWorkerForGracefulShutdown(
             PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
+  }
+
+  @Override
+  public void splitBlob(
+      build.buildfarm.v1test.Digest digest,
+      ChunkingFunction.Value chunkingFunction,
+      StreamObserver<Digest> responseObserver,
+      RequestMetadata requestMetadata) {
+    throwIfStopped();
+    SplitBlobResponse response =
+        deadlined(casBlockingStub)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata))
+            .splitBlob(
+                SplitBlobRequest.newBuilder()
+                    .setBlobDigest(DigestUtil.toDigest(digest))
+                    .setDigestFunction(digest.getDigestFunction())
+                    .setChunkingFunction(chunkingFunction)
+                    .build());
+    for (Digest chunkDigest : response.getChunkDigestsList()) {
+      responseObserver.onNext(chunkDigest);
+    }
+    responseObserver.onCompleted();
+  }
+
+  @Override
+  public ListenableFuture<Digest> spliceBlob(
+      build.buildfarm.v1test.Digest digest,
+      Iterable<Digest> chunkDigests,
+      ChunkingFunction.Value chunkingFunction,
+      RequestMetadata requestMetadata) {
+    throwIfStopped();
+    return transform(
+        deadlined(casFutureStub)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata))
+            .spliceBlob(
+                SpliceBlobRequest.newBuilder()
+                    .setBlobDigest(DigestUtil.toDigest(digest))
+                    .addAllChunkDigests(chunkDigests)
+                    .setDigestFunction(digest.getDigestFunction())
+                    .setChunkingFunction(chunkingFunction)
+                    .build()),
+        SpliceBlobResponse::getBlobDigest,
+        directExecutor());
   }
 }

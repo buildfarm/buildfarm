@@ -54,6 +54,9 @@ public class Server {
   private boolean grpcChannelz = false;
   private int gracefulShutdownSeconds = 0;
   private Set<String> correlatedInvocationsIndexScopes = ImmutableSet.of("host", "username");
+  private int fastCdc2020AvgChunkSizeBytes = 512 * 1024;
+  private int fastCdc2020Seed = 0;
+  private int fastCdc2020Normalization = 2;
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);
