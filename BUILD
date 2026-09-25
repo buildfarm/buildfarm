@@ -1,6 +1,5 @@
 load("@buildifier_prebuilt//:rules.bzl", "buildifier")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
-load("@rules_java//java:java_binary.bzl", "java_binary")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -43,12 +42,3 @@ exports_files([
     "delay.sh",
     "macos-wrapper.sh",
 ])
-
-java_binary(
-    name = "cancel-test",
-    srcs = ["cancel.java"],
-    main_class = "cancel",
-    deps = [
-        "@buildfarm_maven//:com_google_guava_guava",
-    ],
-)
