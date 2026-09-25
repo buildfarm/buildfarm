@@ -76,14 +76,18 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
@@ -398,6 +402,69 @@ class CASFileCacheTest {
       context.cancel(null);
       releaseFileRead.countDown();
     }
+  }
+
+  @Test
+  public void putDirectoryDoesNotPublishWhenCancelledAfterWriteAccessRemoval() throws Exception {
+    Directory childDirectory = Directory.getDefaultInstance();
+    Digest childDirectoryDigest = DIGEST_UTIL.compute(childDirectory);
+    Directory directory =
+        Directory.newBuilder()
+            .addDirectories(
+                DirectoryNode.newBuilder()
+                    .setName("child")
+                    .setDigest(DigestUtil.toDigest(childDirectoryDigest))
+                    .build())
+            .build();
+    Digest directoryDigest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(
+            DigestUtil.toDigest(directoryDigest), directory,
+            DigestUtil.toDigest(childDirectoryDigest), childDirectory);
+    DirectoryEntryCFC directoryCache =
+        new DirectoryEntryCFC(
+            root.resolve("directory-entry"),
+            /* maxSizeInBytes= */ 1024,
+            /* maxEntrySizeInBytes= */ 1024,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            directExecutor(),
+            Maps.newConcurrentMap(),
+            zstdBufferPool,
+            onPut,
+            onExpire,
+            delegate,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              throw new AssertionError("an empty directory should not fetch a file");
+            });
+    directoryCache.initializeRootDirectory();
+
+    QueuedExecutorService service = new QueuedExecutorService();
+    Path directoryPath = directoryCache.getDirectoryPath(directoryDigest);
+    ListenableFuture<CASFileCache.PathResult> directoryFuture =
+        directoryCache.putDirectory(directoryDigest, directoriesIndex, service);
+    Path temporaryDirectory;
+    try (DirectoryStream<Path> paths =
+        Files.newDirectoryStream(
+            directoryPath.getParent(), directoryPath.getFileName() + ".tmp.*")) {
+      temporaryDirectory = Iterables.getOnlyElement(paths);
+    }
+
+    // Empty directories queue only fetch completion and limited before the rename continuation.
+    service.runNext();
+    service.runNext();
+    assertThat(Files.isDirectory(temporaryDirectory.resolve("child"))).isTrue();
+    if (!System.getProperty("user.name").equals("root")) {
+      assertThat(Files.isWritable(temporaryDirectory.resolve("child"))).isFalse();
+    }
+
+    assertThat(directoryFuture.cancel(/* mayInterruptIfRunning= */ false)).isTrue();
+    service.runAll();
+
+    assertThat(directoryFuture.isCancelled()).isTrue();
+    assertThat(Files.exists(directoryPath)).isFalse();
+    assertThat(Files.exists(temporaryDirectory)).isFalse();
   }
 
   @Test
@@ -1638,6 +1705,57 @@ class CASFileCacheTest {
                   .getRootDirectories(),
               null),
           /* storeFileDirsIndexInMemory= */ false);
+    }
+  }
+
+  private static final class QueuedExecutorService extends AbstractExecutorService {
+    private final Deque<Runnable> tasks = new ArrayDeque<>();
+    private boolean shutdown = false;
+
+    @Override
+    public void shutdown() {
+      shutdown = true;
+    }
+
+    @Override
+    public java.util.List<Runnable> shutdownNow() {
+      shutdown = true;
+      java.util.List<Runnable> pendingTasks = ImmutableList.copyOf(tasks);
+      tasks.clear();
+      return pendingTasks;
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return shutdown;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return shutdown && tasks.isEmpty();
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      return isTerminated();
+    }
+
+    @Override
+    public void execute(Runnable command) {
+      if (shutdown) {
+        throw new java.util.concurrent.RejectedExecutionException();
+      }
+      tasks.add(command);
+    }
+
+    void runNext() {
+      tasks.remove().run();
+    }
+
+    void runAll() {
+      while (!tasks.isEmpty()) {
+        runNext();
+      }
     }
   }
 }
