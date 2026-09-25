@@ -3,6 +3,7 @@ package build.buildfarm.instance;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.ChunkingFunction;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
@@ -26,6 +27,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
@@ -240,6 +242,24 @@ class DummyInstanceBase extends InstanceBase {
 
   @Override
   public void deregisterWorker(String workerName) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void splitBlob(
+      build.buildfarm.v1test.Digest digest,
+      ChunkingFunction.Value chunkingFunction,
+      StreamObserver<Digest> responseObserver,
+      RequestMetadata requestMetadata) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ListenableFuture<Digest> spliceBlob(
+      build.buildfarm.v1test.Digest expectedDigest,
+      Iterable<Digest> chunkDigests,
+      ChunkingFunction.Value chunkingFunction,
+      RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 }
