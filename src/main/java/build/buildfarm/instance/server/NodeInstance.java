@@ -69,6 +69,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.cas.FastCDCChunker;
+import build.buildfarm.cas.RepMaxCDCChunker;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -1930,12 +1931,15 @@ public abstract class NodeInstance extends InstanceBase {
 
   private Iterator<Blob> createBlobChunker(
       ChunkingFunction.Value chunkingFunction, DigestUtil digestUtil, InputStream in) {
-    if (chunkingFunction == ChunkingFunction.Value.FAST_CDC_2020) {
-      return new FastCDCChunker(
-          digestUtil,
-          in,
-          configs.getServer().getFastCdc2020AvgChunkSizeBytes(),
-          configs.getServer().getFastCdc2020Normalization());
+    switch (chunkingFunction) {
+      case FAST_CDC_2020:
+        return new FastCDCChunker(
+            digestUtil,
+            in,
+            configs.getServer().getFastCdc2020AvgChunkSizeBytes(),
+            configs.getServer().getFastCdc2020Normalization());
+      case REP_MAX_CDC:
+        return new RepMaxCDCChunker(digestUtil, in);
     }
     throw new UnsupportedOperationException(
         format("chunking_function '%s' is not supported", chunkingFunction));
