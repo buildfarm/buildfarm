@@ -243,30 +243,49 @@ public class DirectoryEntryCFC extends CASFileCache {
               return immediateFailedFuture(e);
             },
             service);
-    return transformAsync(
-        rolled,
-        result -> {
-          String key = filename.toString();
-          long blobSizeInBytes = getCompleted(fetched);
+    ListenableFuture<Void> added =
+        transformAsync(
+            rolled,
+            result -> {
+              String key = filename.toString();
+              long blobSizeInBytes = getCompleted(fetched);
 
-          // might be able to clean this call up, need the expiration, but not the boolean
-          // consider the file size being too large for the cas
-          // consider just calling a safe 'charge' during the enumeration of the size
-          // ... since we're consuming the size anyway, but then we have to worry about rolling the
-          // partial charge back
-          // ... or we just compute early and charge then, though we run the risk of evicting useful
-          // blobs for this fetch
-          try {
-            checkState(charge(key, blobSizeInBytes, new AtomicBoolean()), true);
-          } catch (IOException e) {
-            return immediateFailedFuture(e);
+              // might be able to clean this call up, need the expiration, but not the boolean
+              // consider the file size being too large for the cas
+              // consider just calling a safe 'charge' during the enumeration of the size
+              // ... since we're consuming the size anyway, but then we have to worry about rolling
+              // the
+              // partial charge back
+              // ... or we just compute early and charge then, though we run the risk of evicting
+              // useful
+              // blobs for this fetch
+              try {
+                checkState(charge(key, blobSizeInBytes, new AtomicBoolean()), true);
+              } catch (IOException e) {
+                return immediateFailedFuture(e);
+              }
+              Entry e = new Entry(key, blobSizeInBytes, Deadline.after(10, HOURS));
+              safeStorageInsertion(key, e);
+              fetchers.invalidate(digest);
+              return immediateFuture(result);
+            },
+            service);
+    added.addListener(
+        () -> {
+          if (added.isCancelled()) {
+            Context.ROOT.run(
+                () -> {
+                  try {
+                    Directories.remove(tmpPath, fileStore);
+                  } catch (IOException e) {
+                    log.log(
+                        Level.WARNING, "error removing cancelled directory fetch " + tmpPath, e);
+                  }
+                });
           }
-          Entry e = new Entry(key, blobSizeInBytes, Deadline.after(10, HOURS));
-          safeStorageInsertion(key, e);
-          fetchers.invalidate(digest);
-          return immediateFuture(result);
         },
         service);
+    return added;
   }
 
   private ListenableFuture<Long> fetch(
