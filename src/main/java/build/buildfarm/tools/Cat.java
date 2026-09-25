@@ -24,6 +24,7 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.ChunkingFunction;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.DigestFunction;
@@ -80,6 +81,7 @@ import com.google.rpc.RetryInfo;
 import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -125,6 +127,8 @@ import picocli.CommandLine.ParentCommand;
       Cat.CatDirectory.class,
       Cat.CatFetch.class,
       Cat.CatWriteStatus.class,
+      Cat.CatSplit.class,
+      Cat.CatSplice.class,
     })
 class Cat implements Callable<Integer> {
   private IndentStream out() {
@@ -958,7 +962,9 @@ class Cat implements Callable<Integer> {
 
   Instance createInstance() {
     ManagedChannel channel = createChannel(host);
-    return new StubInstance(instanceName, "bf-cat", channel, Durations.fromSeconds(10));
+    Duration duration =
+        timeoutSeconds == 0 ? Durations.fromDays(10) : Durations.fromSeconds(timeoutSeconds);
+    return new StubInstance(instanceName, "bf-cat", channel, duration);
   }
 
   @SuppressWarnings("ThrowFromFinallyBlock")
@@ -1624,6 +1630,97 @@ class Cat implements Callable<Integer> {
           System.out.println("committedSize: " + write.getCommittedSize());
           System.out.println("complete: " + write.isComplete());
         }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "Split",
+      mixinStandardHelpOptions = true,
+      description = "Split chunks into a digest")
+  static class CatSplit implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(arity = "1..*", description = "Digests")
+    private List<String> digestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(parent.timeoutSeconds, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        for (Digest digest :
+            digestStrings.stream().map(DigestUtil::parseDigest).collect(Collectors.toList())) {
+          instance.splitBlob(
+              digest,
+              ChunkingFunction.Value.FAST_CDC_2020,
+              new StreamObserver<build.bazel.remote.execution.v2.Digest>() {
+                @Override
+                public void onNext(build.bazel.remote.execution.v2.Digest chunkDigest) {
+                  System.out.println(
+                      DigestUtil.toString(
+                          DigestUtil.fromDigest(chunkDigest, digest.getDigestFunction())));
+                }
+
+                @Override
+                public void onCompleted() {}
+
+                @Override
+                public void onError(Throwable t) {
+                  throw new RuntimeException(t);
+                }
+              },
+              RequestMetadata.getDefaultInstance());
+        }
+      } finally {
+        instance.stop();
+      }
+      return 0;
+    }
+  }
+
+  @picocli.CommandLine.Command(
+      name = "Splice",
+      mixinStandardHelpOptions = true,
+      description = "Splice a digest into chunks")
+  static class CatSplice implements Callable<Integer> {
+    @ParentCommand private Cat parent;
+
+    @Parameters(index = "0", description = "Expected Digest")
+    private String expectedDigestString;
+
+    @Parameters(index = "1..*", description = "Chunk Digests")
+    private List<String> chunkDigestStrings;
+
+    @Override
+    public Integer call() throws Exception {
+      return runWithDeadline(parent.timeoutSeconds, this::run);
+    }
+
+    private int run() throws Exception {
+      Instance instance = parent.createInstance();
+      try {
+        Digest expectedDigest = DigestUtil.parseDigest(expectedDigestString);
+        ListenableFuture<build.bazel.remote.execution.v2.Digest> digestFuture =
+            instance.spliceBlob(
+                expectedDigest,
+                chunkDigestStrings.stream()
+                    .map(DigestUtil::parseDigest)
+                    .map(DigestUtil::toDigest)
+                    .collect(Collectors.toList()),
+                ChunkingFunction.Value.FAST_CDC_2020,
+                RequestMetadata.getDefaultInstance());
+        Digest digest =
+            DigestUtil.fromDigest(digestFuture.get(), expectedDigest.getDigestFunction());
+        System.out.println(DigestUtil.toString(digest));
+      } catch (ExecutionException e) {
+        throw Status.fromThrowable(e.getCause()).asException();
       } finally {
         instance.stop();
       }
