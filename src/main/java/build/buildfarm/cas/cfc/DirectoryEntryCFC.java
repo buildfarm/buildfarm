@@ -43,6 +43,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import io.grpc.Context;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.io.InputStream;
@@ -218,7 +219,7 @@ public class DirectoryEntryCFC extends CASFileCache {
               disableAllWriteAccess(tmpPath, fileStore, /* excludeTopLevel= */ true);
               return immediateFuture(null);
             },
-            service);
+            Context.current().fixedContextExecutor(service));
     ListenableFuture<Void> renamed =
         transformAsync(
             limited,
@@ -227,13 +228,14 @@ public class DirectoryEntryCFC extends CASFileCache {
               makeWritable(path, /* writable= */ false, fileStore);
               return immediateFuture(result);
             },
-            service);
+            Context.current().fixedContextExecutor(service));
     ListenableFuture<Void> rolled =
         catchingAsync(
             renamed,
             Throwable.class,
             e -> {
               try {
+                // does this need a new uncancelled context?
                 Directories.remove(tmpPath, fileStore);
               } catch (IOException removeException) {
                 e.addSuppressed(removeException);
