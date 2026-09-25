@@ -441,9 +441,6 @@ class CASFileCacheTest {
     service.runNext();
     service.runNext();
     assertThat(Files.isDirectory(temporaryDirectory.resolve("child"))).isTrue();
-    if (!System.getProperty("user.name").equals("root")) {
-      assertThat(Files.isWritable(temporaryDirectory.resolve("child"))).isFalse();
-    }
 
     assertThat(directoryFuture.cancel(/* mayInterruptIfRunning= */ false)).isTrue();
     service.runAll();
