@@ -40,6 +40,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.grpc.Context;
+import io.grpc.Context.CancellableContext;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -395,55 +397,29 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     }
   }
 
-  @Override
-  public Path createExecDir(
-      String operationName,
+  private void createInputRoot(
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       Digest inputRootDigest,
-      Command command,
-      @Nullable UserPrincipal owner,
-      WorkerExecutedMetadata.Builder workerExecutedMetadata)
+      Path execDir,
+      LinkExecFileVisitor visitor,
+      Consumer<Throwable> onCancelled)
       throws IOException, InterruptedException {
-    OutputDirectory outputDirectory = createOutputDirectory(command);
-
-    Path execDir = root().resolve(operationName);
     if (Files.exists(execDir)) {
       Directories.remove(execDir, fileStore);
     }
     Files.createDirectories(execDir);
 
-    // output_paths should never be linked themselves, and their output path chain
-    // will terminate at their parent, making them appear valid for some selections
-    Set<String> ignorePaths = ImmutableSet.copyOf(command.getOutputPathsList());
-    Set<Path> linkedInputDirectories =
-        linkInputDirectories
-            ? ImmutableSet.copyOf(
-                Iterables.transform(
-                    linkedDirectories(
-                        directoriesIndex, DigestUtil.toDigest(inputRootDigest), ignorePaths),
-                    execDir::resolve))
-            : ImmutableSet.of(); // does this work on windows with / separators?
-
-    log.log(Level.FINER, operationName + " walking execTree");
     ExecTree execTree = new ExecTree(directoriesIndex);
-    LinkExecFileVisitor visitor =
-        new LinkExecFileVisitor(
-            workerExecutedMetadata,
-            execDir,
-            linkedInputDirectories,
-            directoriesIndex,
-            outputDirectory);
     execTree.walk(execDir, inputRootDigest, visitor);
     Iterable<ListenableFuture<Void>> fetchedFutures = visitor.futures();
     boolean success = false;
     try {
+      // REFACTOR THIS INTO A SEPARATE METHOD
       InterruptedException exception = null;
       boolean wasInterrupted = false;
       ImmutableList.Builder<Throwable> exceptions = ImmutableList.builder();
       for (ListenableFuture<Void> fetchedFuture : fetchedFutures) {
-        if (exception != null || wasInterrupted) {
-          fetchedFuture.cancel(true);
-        } else {
+        if (exception == null) {
           try {
             fetchedFuture.get();
           } catch (CancellationException e) {
@@ -452,11 +428,15 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
             // just to ensure that no other code can react to interrupt status
             exceptions.add(e.getCause());
           } catch (InterruptedException e) {
-            fetchedFuture.cancel(true);
+            onCancelled.accept(e);
             exception = e;
           }
         }
         wasInterrupted = Thread.interrupted() || wasInterrupted;
+        if (wasInterrupted && exception == null) {
+          exception = new InterruptedException();
+          onCancelled.accept(exception);
+        }
       }
       if (wasInterrupted) {
         Thread.currentThread().interrupt();
@@ -475,6 +455,54 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         fileCache.decrementReferences(
             visitor.inputFiles(), visitor.inputDirectories(), inputRootDigest.getDigestFunction());
         Directories.remove(execDir, fileStore);
+      }
+    }
+  }
+
+  @Override
+  public Path createExecDir(
+      String operationName,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      Digest inputRootDigest,
+      Command command,
+      @Nullable UserPrincipal owner,
+      WorkerExecutedMetadata.Builder workerExecutedMetadata)
+      throws IOException, InterruptedException {
+    OutputDirectory outputDirectory = createOutputDirectory(command);
+    Path execDir = root().resolve(operationName);
+
+    // output_paths should never be linked themselves, and their output path chain
+    // will terminate at their parent, making them appear valid for some selections
+    Set<String> ignorePaths = ImmutableSet.copyOf(command.getOutputPathsList());
+
+    Set<Path> linkedInputDirectories =
+        linkInputDirectories
+            ? ImmutableSet.copyOf(
+                Iterables.transform(
+                    linkedDirectories(
+                        directoriesIndex, DigestUtil.toDigest(inputRootDigest), ignorePaths),
+                    execDir::resolve))
+            : ImmutableSet.of(); // does this work on windows with / separators?
+    LinkExecFileVisitor visitor =
+        new LinkExecFileVisitor(
+            workerExecutedMetadata,
+            execDir,
+            linkedInputDirectories,
+            directoriesIndex,
+            outputDirectory);
+    // to avoid leaking memory, every CancellableContext must have a defined lifetime, after which
+    // is is guaranteed to be cancelled.
+    try (CancellableContext withCancellation = Context.current().withCancellation()) {
+      Context toRestore = withCancellation.attach();
+      try {
+        createInputRoot(
+            directoriesIndex,
+            inputRootDigest,
+            execDir,
+            visitor,
+            withCancellation::cancel);
+      } finally {
+        withCancellation.detach(toRestore);
       }
     }
 
