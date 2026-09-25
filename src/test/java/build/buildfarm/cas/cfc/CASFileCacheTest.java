@@ -304,6 +304,103 @@ class CASFileCacheTest {
   }
 
   @Test
+  public void putDirectorySharedFetchDoesNotPublishAfterOwnerContextCancellation()
+      throws Exception {
+    ByteString file = ByteString.copyFromUtf8("Peanut Butter");
+    Digest fileDigest = DIGEST_UTIL.compute(file);
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("file")
+                    .setDigest(DigestUtil.toDigest(fileDigest))
+                    .build())
+            .build();
+    Digest directoryDigest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(DigestUtil.toDigest(directoryDigest), directory);
+    java.util.concurrent.CountDownLatch fileReadStarted =
+        new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch releaseFileRead =
+        new java.util.concurrent.CountDownLatch(1);
+    AtomicInteger inputStreams = new AtomicInteger();
+    DirectoryEntryCFC directoryCache =
+        new DirectoryEntryCFC(
+            root.resolve("directory-entry"),
+            /* maxSizeInBytes= */ 1024,
+            /* maxEntrySizeInBytes= */ 1024,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            directExecutor(),
+            Maps.newConcurrentMap(),
+            zstdBufferPool,
+            onPut,
+            onExpire,
+            delegate,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              assertThat(compressor).isEqualTo(Compressor.Value.IDENTITY);
+              assertThat(digest).isEqualTo(fileDigest);
+              inputStreams.incrementAndGet();
+              return new InputStream() {
+                private final InputStream delegate = file.substring((int) offset).newInput();
+
+                @Override
+                public int read() throws IOException {
+                  awaitRelease();
+                  return delegate.read();
+                }
+
+                @Override
+                public int read(byte[] buffer, int off, int len) throws IOException {
+                  awaitRelease();
+                  return delegate.read(buffer, off, len);
+                }
+
+                private void awaitRelease() throws IOException {
+                  fileReadStarted.countDown();
+                  try {
+                    releaseFileRead.await();
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                  }
+                }
+              };
+            });
+    directoryCache.initializeRootDirectory();
+
+    io.grpc.Context.CancellableContext context = io.grpc.Context.current().withCancellation();
+    io.grpc.Context previous = context.attach();
+    boolean attached = true;
+    try {
+      ListenableFuture<CASFileCache.PathResult> ownerFuture =
+          directoryCache.putDirectory(directoryDigest, directoriesIndex, putService);
+      assertThat(fileReadStarted.await(5, SECONDS)).isTrue();
+
+      context.detach(previous);
+      attached = false;
+      ListenableFuture<CASFileCache.PathResult> followerFuture =
+          directoryCache.putDirectory(directoryDigest, directoriesIndex, putService);
+      assertThat(inputStreams.get()).isEqualTo(1);
+      assertThat(followerFuture.isDone()).isFalse();
+
+      context.cancel(null);
+      releaseFileRead.countDown();
+
+      assertThrows(ExecutionException.class, () -> ownerFuture.get(5, SECONDS));
+      assertThrows(ExecutionException.class, () -> followerFuture.get(5, SECONDS));
+      assertThat(Files.exists(directoryCache.getDirectoryPath(directoryDigest))).isFalse();
+    } finally {
+      if (attached) {
+        context.detach(previous);
+      }
+      context.cancel(null);
+      releaseFileRead.countDown();
+    }
+  }
+
+  @Test
   public void expireUnreferencedEntryRemovesBlobFile() throws IOException, InterruptedException {
     byte[] bigData = new byte[1000];
     ByteString bigBlob = ByteString.copyFrom(bigData);
