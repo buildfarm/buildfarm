@@ -18,6 +18,7 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.grpc.Context;
 import java.io.IOException;
 import java.nio.file.FileStore;
 import java.nio.file.FileVisitResult;
@@ -83,6 +84,9 @@ public final class Directories {
 
   public static void makeWritable(Path dir, boolean writable, FileStore fileStore)
       throws IOException {
+    if (Context.current().isCancelled()) {
+      onCancelled();
+    }
     if (fileStore.supportsFileAttributeView("posix")) {
       if (writable) {
         Files.setPosixFilePermissions(dir, writablePerms);
@@ -180,14 +184,25 @@ public final class Directories {
     forAllPostDirsAndFiles(directory, path -> {}, onPostVisit);
   }
 
+  private static void onCancelled() throws IOException {
+    Thread.currentThread().interrupt();
+    throw new IOException(new InterruptedException());
+  }
+
   private static void forAllPostDirsAndFiles(
       Path directory, PathConsumer onFileVisit, PathConsumer onPostVisit) throws IOException {
+    if (Context.current().isCancelled()) {
+      onCancelled();
+    }
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<>() {
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
+            if (Context.current().isCancelled()) {
+              onCancelled();
+            }
             onFileVisit.accept(file);
             return FileVisitResult.CONTINUE;
           }
@@ -196,6 +211,9 @@ public final class Directories {
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e != null) {
               throw e;
+            }
+            if (Context.current().isCancelled()) {
+              onCancelled();
             }
             onPostVisit.accept(dir);
             return FileVisitResult.CONTINUE;
