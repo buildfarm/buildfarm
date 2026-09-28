@@ -1,5 +1,6 @@
 package build.buildfarm.common.redis;
 
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -25,6 +26,23 @@ public class RedisSetMap extends RedisMap {
     if (jedis.sadd(keyName, value) == 1 || expireOnEach) {
       jedis.expire(keyName, expiration_s);
     }
+  }
+
+  /**
+   * @brief Pipeline-compatible add.
+   * @details Adds a value to a set and sets expiration via pipeline (always expires).
+   * @param pipeline Redis pipeline.
+   * @param key The name of the key.
+   * @param value The value to add to the set.
+   */
+  public void add(AbstractPipeline pipeline, String key, String value) {
+    if (key.isEmpty()) {
+      return;
+    }
+
+    String keyName = createKeyName(key);
+    pipeline.sadd(keyName, value);
+    pipeline.expire(keyName, expiration_s);
   }
 
   public ScanResult<String> scan(UnifiedJedis jedis, String key, String setCursor, int count) {
