@@ -4,6 +4,12 @@ load("@container_structure_test//:defs.bzl", "container_structure_test")
 
 DRIVER = "docker"  # Use tar if your host is not amd64, but it's a lot slower. (for example, you use hardware from Apple and you have aarch64)
 
+# Platform should match the host architecture for Docker driver
+PLATFORM = select({
+    "@platforms//cpu:aarch64": "linux/arm64",
+    "//conditions:default": "linux/amd64",
+})
+
 container_structure_test(
     name = "worker_test",
     configs = [
@@ -15,6 +21,7 @@ container_structure_test(
     ],
     driver = DRIVER,
     image = "//container:_buildfarm-worker.image",
+    platform = PLATFORM,
     tags = ["container"],
 )
 
@@ -28,5 +35,6 @@ container_structure_test(
     ],
     driver = DRIVER,
     image = "//container:_buildfarm-server.image",
+    platform = PLATFORM,
     tags = ["container"],
 )
