@@ -17,6 +17,7 @@ COMMON_DEPS = [
 
 NATIVE_REDIS_TESTS = [
     "BalancedRedisQueueTest.java",
+    "LeaderElectionTest.java",
     "RedisNodeHashesTest.java",
     "RedisQueueTest.java",
     "RedisPriorityQueueTest.java",
@@ -106,6 +107,18 @@ java_test(
     name = "hashmap-redis",
     size = "small",
     srcs = ["RedisHashMapTest.java"],
+    tags = [
+        "exclusive",
+        "redis",
+    ],
+    test_class = "build.buildfarm.AllTests",
+    deps = COMMON_DEPS,
+)
+
+java_test(
+    name = "leaderelection-redis",
+    size = "small",
+    srcs = ["LeaderElectionTest.java"],
     tags = [
         "exclusive",
         "redis",
