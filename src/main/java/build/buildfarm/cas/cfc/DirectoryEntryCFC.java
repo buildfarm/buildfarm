@@ -224,6 +224,9 @@ public class DirectoryEntryCFC extends CASFileCache {
         transformAsync(
             fetched,
             weight -> {
+              if (Context.current().isCancelled()) {
+                return immediateFailedFuture(Context.current().cancellationCause());
+              }
               disableAllWriteAccess(tmpPath, fileStore, /* excludeTopLevel= */ true);
               return immediateFuture(null);
             },
@@ -232,6 +235,9 @@ public class DirectoryEntryCFC extends CASFileCache {
         transformAsync(
             limited,
             result -> {
+              if (Context.current().isCancelled()) {
+                return immediateFailedFuture(Context.current().cancellationCause());
+              }
               Files.move(tmpPath, path);
               makeWritable(path, /* writable= */ false, fileStore);
               return immediateFuture(result);
@@ -310,6 +316,9 @@ public class DirectoryEntryCFC extends CASFileCache {
           ImmutableList.Builder<Throwable> failures = ImmutableList.builder();
           boolean failed = false;
           for (int i = 0; i < paths.size(); i++) {
+            if (Context.current().isCancelled()) {
+              return immediateFailedFuture(Context.current().cancellationCause());
+            }
             Path putPath = paths.get(i);
             if (putPath == null) {
               failed = true;
