@@ -42,7 +42,7 @@
       "enabled": false
     },
     {
-      "description": "Maven dependencies need to be pinned by 'REPIN=1 bazelisk run @maven//:pin && git add maven_install.json && git commit' to pass CI, then they can be auto-merged after approval",
+      "description": "Maven lockfile is re-pinned on renovate/** by .github/workflows/renovate-pin-maven.yml after MODULE.bazel changes",
       "matchManagers": ["bazel-module"],
       "matchDatasources": ["maven"],
       "dependencyDashboardApproval": true,
