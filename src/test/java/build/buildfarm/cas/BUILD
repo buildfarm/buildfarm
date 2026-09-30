@@ -6,6 +6,7 @@ java_test(
     size = "small",
     srcs = glob(["**/*.java"]),
     jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
+    resources = ["fastcdc2020/SekienAkashita.jpg.base64"],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/cas",
