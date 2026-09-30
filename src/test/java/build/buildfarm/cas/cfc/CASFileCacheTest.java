@@ -405,7 +405,7 @@ class CASFileCacheTest {
   }
 
   @Test
-  public void putDirectoryDoesNotPublishWhenCancelledAfterWriteAccessRemoval() throws Exception {
+  public void putDirectoryDoesNotPublishAfterOwnerContextCancellation() throws Exception {
     Directory childDirectory = Directory.getDefaultInstance();
     Digest childDirectoryDigest = DIGEST_UTIL.compute(childDirectory);
     Directory directory =
@@ -442,8 +442,11 @@ class CASFileCacheTest {
 
     QueuedExecutorService service = new QueuedExecutorService();
     Path directoryPath = directoryCache.getDirectoryPath(directoryDigest);
+    Context.CancellableContext context = Context.current().withCancellation();
+    Context previous = context.attach();
     ListenableFuture<CASFileCache.PathResult> directoryFuture =
         directoryCache.putDirectory(directoryDigest, directoriesIndex, service);
+    context.detach(previous);
     Path temporaryDirectory;
     try (DirectoryStream<Path> paths =
         Files.newDirectoryStream(
@@ -456,10 +459,9 @@ class CASFileCacheTest {
     service.runNext();
     assertThat(Files.isDirectory(temporaryDirectory.resolve("child"))).isTrue();
 
-    assertThat(directoryFuture.cancel(/* mayInterruptIfRunning= */ false)).isTrue();
+    context.cancel(null);
     service.runAll();
 
-    assertThat(directoryFuture.isCancelled()).isTrue();
     assertThat(Files.exists(directoryPath)).isFalse();
     assertThat(Files.exists(temporaryDirectory)).isFalse();
   }
@@ -531,8 +533,8 @@ class CASFileCacheTest {
             });
     directoryCache.initializeRootDirectory();
 
-    io.grpc.Context.CancellableContext context = io.grpc.Context.current().withCancellation();
-    io.grpc.Context previous = context.attach();
+    Context.CancellableContext context = Context.current().withCancellation();
+    Context previous = context.attach();
     boolean attached = true;
     try {
       ListenableFuture<CASFileCache.PathResult> ownerFuture =
