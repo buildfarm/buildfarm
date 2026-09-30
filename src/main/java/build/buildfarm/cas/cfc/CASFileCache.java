@@ -89,6 +89,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
 import io.grpc.Deadline;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
@@ -2043,8 +2044,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path path,
       FileContent onFileContent,
       ImmutableList.Builder<ListenableFuture<Path>> putFutures,
-      ExecutorService service) {
+      ExecutorService service) throws IOException {
     for (FileNode fileNode : files) {
+      if (Context.current().isCancelled()) {
+        throw new IOException(Context.current().cancellationCause());
+      }
       boolean isExecutable = fileNode.getIsExecutable();
       Path filePath = path.resolve(fileNode.getName());
       final ListenableFuture<Path> putFuture;
@@ -2154,6 +2158,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         new AbstractMap.SimpleEntry<>(
             rootPath, getDirectoryFromDigest(directoriesIndex, rootPath, digest)));
     while (!stack.isEmpty()) {
+      if (Context.current().isCancelled()) {
+        throw new IOException(Context.current().cancellationCause());
+      }
       Map.Entry<Path, Directory> pathDirectoryPair = stack.pop();
       Path path = pathDirectoryPair.getKey();
       Directory directory = pathDirectoryPair.getValue();
