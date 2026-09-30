@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/build_rules:utilities.bzl", "java_library_srcs")
+load("@bazel_skylib//rules:select_file.bzl", "select_file")
 load("@com_google_protobuf//bazel:java_proto_library.bzl", "java_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 
@@ -18,9 +18,10 @@ FILES = [
     deps = [":" + s + "_proto"],
 ) for s in FILES]
 
-[java_library_srcs(
+[select_file(
     name = s + "_java_proto_srcs",
-    deps = [":" + s + "_java_proto"],
+    srcs = ":" + s + "_java_proto",
+    subpath = s + "_proto-speed-src.jar",
 ) for s in FILES]
 
 filegroup(

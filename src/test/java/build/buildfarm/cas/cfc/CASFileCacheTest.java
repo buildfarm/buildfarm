@@ -333,6 +333,26 @@ class CASFileCacheTest {
   }
 
   @Test
+  public void cacheLoadProgressReportsCompletedEntries() {
+    CASFileCache.CacheLoadProgress progress =
+        new CASFileCache.CacheLoadProgress("Scanning cache root", 4);
+
+    progress.complete();
+    progress.complete();
+
+    assertThat(progress.message()).isEqualTo("Scanning cache root: 2/4 entries complete (50.0%)");
+  }
+
+  @Test
+  public void cacheLoadProgressReportsEmptyPhaseAsComplete() {
+    CASFileCache.CacheLoadProgress progress =
+        new CASFileCache.CacheLoadProgress("Deleting invalid files", 0);
+
+    assertThat(progress.message())
+        .isEqualTo("Deleting invalid files: 0/0 entries complete (100.0%)");
+  }
+
+  @Test
   public void startCasAssumeDirectory() throws Exception {
     // create a "_dir" file on the root
     Path path = root.resolve("foobar_dir");

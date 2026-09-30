@@ -70,6 +70,7 @@ import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.io.FileStatus;
+import build.buildfarm.common.io.FileStoreMover;
 import build.buildfarm.v1test.BlobWriteKey;
 import build.buildfarm.v1test.Digest;
 import com.google.common.annotations.VisibleForTesting;
@@ -128,6 +129,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
@@ -174,7 +176,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
-  private final LRUDB db = new TextLRUDB();
+  private LRUDB db;
+  private FileStoreMover fileStoreMover;
   private volatile Deadline saveLRUAfter = Deadline.after(10, MINUTES);
   private final Path lru;
 
@@ -274,6 +277,27 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   public record StartupCacheResults(
       Path cacheDirectory, CacheLoadResults load, Duration startupTime) {}
+
+  static final class CacheLoadProgress {
+    private final String phase;
+    private final int total;
+    private final AtomicInteger completed = new AtomicInteger();
+
+    CacheLoadProgress(String phase, int total) {
+      this.phase = phase;
+      this.total = total;
+    }
+
+    void complete() {
+      completed.incrementAndGet();
+    }
+
+    String message() {
+      int completedEntries = completed.get();
+      double percent = total == 0 ? 100.0 : (100.0 * completedEntries) / total;
+      return format("%s: %d/%d entries complete (%.1f%%)", phase, completedEntries, total, percent);
+    }
+  }
 
   public static class IncompleteBlobException extends IOException {
     IncompleteBlobException(Path writePath, String key, long committed, long expected) {
@@ -1296,6 +1320,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Files.createDirectories(dir);
     }
     fileStore = Files.getFileStore(root);
+    if (fileStoreMover == null) {
+      fileStoreMover = FileStoreMover.probe(root);
+      db = new TextLRUDB(fileStoreMover);
+    }
   }
 
   @SuppressWarnings({"PMD.CompareObjectsWithEquals"})
@@ -1407,18 +1435,21 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     // build scan cache results by analyzing each file on the root.
     CacheScanResults scan = scanRoot(onStartPut);
     logCacheScanResults(scan);
-    deleteInvalidFileContent(scan.deleteFiles, removeDirectoryService);
+    deleteInvalidFileContent("invalid files", scan.deleteFiles, removeDirectoryService);
 
     // Phase 2: Compute
     // recursively construct all directory structures.
     List<Path> invalidDirectories = computeDirectories(scan);
     logComputeDirectoriesResults(invalidDirectories);
-    deleteInvalidFileContent(invalidDirectories, removeDirectoryService);
+    deleteInvalidFileContent("invalid directories", invalidDirectories, removeDirectoryService);
 
     return new CacheLoadResults(false, scan, invalidDirectories);
   }
 
-  private void deleteInvalidFileContent(List<Path> files, ExecutorService removeDirectoryService) {
+  private void deleteInvalidFileContent(
+      String contentType, List<Path> files, ExecutorService removeDirectoryService) {
+    CacheLoadProgress progress = new CacheLoadProgress("Deleting " + contentType, files.size());
+    log.log(Level.INFO, progress.message());
     for (Path path : files) {
       try {
         if (Files.isDirectory(path)) {
@@ -1428,8 +1459,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
       } catch (Exception e) {
         log.log(Level.SEVERE, "failure to delete CAS content: ", e);
+      } finally {
+        progress.complete();
       }
     }
+    log.log(Level.INFO, progress.message());
   }
 
   @SuppressWarnings("unchecked")
@@ -1465,6 +1499,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     for (Path path : entryPathStrategy) {
       files.addAll(listDir(path));
     }
+    CacheLoadProgress progress =
+        new CacheLoadProgress("Scanning cache root", files.size() - (files.contains(lru) ? 1 : 0));
 
     for (Path branchDir : entryPathStrategy.branchDirectories()) {
       for (Path file : listDir(branchDir)) {
@@ -1488,6 +1524,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Path path = entryPathStrategy.getPath(digest, entry.key());
         if (files.remove(path)) {
           processRootFile(onStartPut, path, entry, computeDirsBuilder, deleteFilesBuilder);
+          progress.complete();
         }
       }
       // prevent the lru db from being processed -> removed in the purge below
@@ -1523,11 +1560,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                   deleteFilesBuilder);
             } catch (Exception e) {
               log.log(Level.SEVERE, "error reading file " + file.toString(), e);
+            } finally {
+              progress.complete();
             }
           });
     }
 
-    joinThreads(pool, "Scanning Cache Root...");
+    joinThreads(pool, progress);
 
     // log information from scanning cache root.
     return new CacheScanResults(computeDirsBuilder.build(), deleteFilesBuilder.build(), null);
@@ -1586,13 +1625,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throws InterruptedException;
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
-  protected static void joinThreads(ExecutorService pool, String message)
+  protected static void joinThreads(ExecutorService pool, CacheLoadProgress progress)
       throws InterruptedException {
     pool.shutdown();
     while (!pool.isTerminated()) {
-      log.log(Level.INFO, message);
+      log.log(Level.INFO, progress.message());
       pool.awaitTermination(1, MINUTES);
     }
+    log.log(Level.INFO, progress.message());
   }
 
   static String digestFilename(Digest digest) {
@@ -2640,13 +2680,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         boolean inserted = false;
         try {
           // acquire the key lock
-          Files.createLink(CASFileCache.this.getPath(actual, key), writePath);
+          fileStoreMover.move(writePath, CASFileCache.this.getPath(actual, key));
           existingEntry = safeStorageInsertion(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
           log.log(Level.FINER, "file already exists for " + key + ", nonexistent entry will fail");
         } finally {
-          Files.delete(writePath);
+          Files.deleteIfExists(writePath);
           if (!inserted) {
             dischargeAndNotify(writeKey, blobSizeInBytes);
           }
