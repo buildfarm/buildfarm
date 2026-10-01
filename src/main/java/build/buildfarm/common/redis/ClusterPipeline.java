@@ -1,5 +1,6 @@
 package build.buildfarm.common.redis;
 
+import com.google.common.collect.Iterables;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import redis.clients.jedis.ClusterCommandObjects;
@@ -37,7 +38,7 @@ public class ClusterPipeline extends MultiNodePipelineBase {
     if (slots.isEmpty()) {
       return null;
     }
-    return provider.getNode(slots.iterator().next());
+    return provider.getNode(Iterables.getOnlyElement(slots));
   }
 
   @Override
