@@ -496,11 +496,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       Context toRestore = withCancellation.attach();
       try {
         createInputRoot(
-            directoriesIndex,
-            inputRootDigest,
-            execDir,
-            visitor,
-            withCancellation::cancel);
+            directoriesIndex, inputRootDigest, execDir, visitor, withCancellation::cancel);
       } finally {
         withCancellation.detach(toRestore);
       }

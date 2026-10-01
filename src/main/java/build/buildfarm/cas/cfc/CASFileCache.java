@@ -2044,7 +2044,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path path,
       FileContent onFileContent,
       ImmutableList.Builder<ListenableFuture<Path>> putFutures,
-      ExecutorService service) throws IOException {
+      ExecutorService service)
+      throws IOException {
     for (FileNode fileNode : files) {
       if (Context.current().isCancelled()) {
         throw new IOException(Context.current().cancellationCause());
