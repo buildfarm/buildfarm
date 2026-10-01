@@ -454,6 +454,8 @@ class CASFileCacheTest {
     context.cancel(null);
     service.runAll();
 
+    assertThat(directoryFuture.isDone()).isTrue();
+    assertThrows(ExecutionException.class, directoryFuture::get);
     assertThat(Files.exists(directoryPath)).isFalse();
     assertThat(Files.exists(temporaryDirectory)).isFalse();
   }
