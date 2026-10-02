@@ -21,6 +21,7 @@ import build.buildfarm.common.config.Backplane;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.redis.Cluster;
 import build.buildfarm.common.redis.GoogleCredentialProvider;
+import build.buildfarm.common.redis.NodeClient;
 import build.buildfarm.common.redis.Pooled;
 import build.buildfarm.common.redis.RedisSSL;
 import com.google.common.base.Strings;
@@ -109,7 +110,7 @@ public class JedisClusterFactory {
   private static void deleteExistingKeys(UnifiedJedis jedis) throws Exception {
     if (jedis instanceof JedisCluster cluster) {
       for (ConnectionPool pool : cluster.getClusterNodes().values()) {
-        UnifiedJedis node = new UnifiedJedis(pool.getResource());
+        UnifiedJedis node = new NodeClient(pool.getResource());
         deleteNodeExistingKeys(node);
       }
     } else {
@@ -232,6 +233,7 @@ public class JedisClusterFactory {
     builder.connectionTimeoutMillis(Integer.max(2000, backplane.getTimeout()));
     builder.socketTimeoutMillis(Integer.max(2000, backplane.getTimeout()));
     builder.clientName(identifier);
+    builder.serverDefaultProtocol();
 
     if (!Strings.isNullOrEmpty(backplane.getRedisUri())) {
       try {

@@ -53,7 +53,7 @@ public class ScanCount {
           .values()
           .forEach(
               pool -> {
-                try (UnifiedJedis node = new UnifiedJedis(pool.getResource())) {
+                try (UnifiedJedis node = new NodeClient(pool.getResource())) {
                   addKeys(node, keys, query, scanCount);
                 }
               });
