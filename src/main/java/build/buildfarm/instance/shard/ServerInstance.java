@@ -52,6 +52,7 @@ import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.CacheCapabilities;
+import build.bazel.remote.execution.v2.ChunkingFunction;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
@@ -62,6 +63,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.FastCdc2020Params;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -142,6 +144,7 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.grpc.stub.StreamObserver;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
@@ -3395,6 +3398,10 @@ public class ServerInstance extends NodeInstance {
             ActionCacheUpdateCapabilities.newBuilder()
                 .setUpdateEnabled(!configs.getServer().isActionCacheReadOnly()))
         .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
+        .setSplitBlobSupport(true)
+        .setSpliceBlobSupport(true)
+        .setFastCdc2020Params(
+            FastCdc2020Params.newBuilder().setAvgChunkSizeBytes(512 * 1024).setSeed(0))
         .build();
   }
 
@@ -3506,5 +3513,153 @@ public class ServerInstance extends NodeInstance {
       throws IOException {
     // TODO maybe track per server instance as well
     backplane.incrementRequestCounters(actionId, toolInvocationId, actionMnemonic, targetId);
+  }
+
+  private void splitBlobOnWorker(
+      build.buildfarm.v1test.Digest blobDigest,
+      ChunkingFunction.Value chunkingFunction,
+      Deque<String> workers,
+      StreamObserver<Digest> digestObserver,
+      RequestMetadata requestMetadata) {
+    String worker = workers.removeFirst();
+    workerStub(worker)
+        .splitBlob(
+            blobDigest,
+            chunkingFunction,
+            new StreamObserver<Digest>() {
+              @Override
+              public void onNext(Digest digest) {
+                digestObserver.onNext(digest);
+              }
+
+              @Override
+              public void onError(Throwable t) {
+                Status status = Status.fromThrowable(t);
+                if (status.getCode() == Code.UNAVAILABLE) {
+                  removeMalfunctioningWorker(
+                      worker, t, "splitBlob(" + DigestUtil.toString(blobDigest) + ")");
+                } else if (status.getCode() == Code.NOT_FOUND) {
+                  casMissCounter.inc();
+                  log.log(
+                      configs.getServer().isEnsureOutputsPresent() ? Level.WARNING : Level.FINER,
+                      worker + " did not contain " + DigestUtil.toString(blobDigest));
+                  // ignore this, the worker will update the backplane eventually
+                } else if (status.getCode() != Code.DEADLINE_EXCEEDED
+                    && SHARD_IS_RETRIABLE.test(status)) {
+                  // SPECIAL splitBlob - we may want to increase the timeout for this - we have a
+                  // potentially variable amount of processing to do here
+
+                  // why not, always
+                  workers.addLast(worker);
+                } else {
+                  log.log(
+                      Level.WARNING,
+                      format(
+                          "%s: splitBlob(%s) on worker %s",
+                          status.getCode().name(), DigestUtil.toString(blobDigest), worker));
+                  digestObserver.onError(t);
+                  return;
+                }
+
+                // in failover, above is mostly boilerplate
+                if (workers.isEmpty()) {
+                  digestObserver.onError(Status.NOT_FOUND.asException());
+                  return;
+                }
+
+                try {
+                  splitBlobOnWorker(
+                      blobDigest, chunkingFunction, workers, digestObserver, requestMetadata);
+                } catch (Exception e) {
+                  digestObserver.onError(e);
+                }
+              }
+
+              @Override
+              public void onCompleted() {
+                digestObserver.onCompleted();
+              }
+            },
+            requestMetadata);
+  }
+
+  private ListenableFuture<List<String>> blobDigestWorkers(
+      build.buildfarm.v1test.Digest blobDigest) {
+    /* snip this below into something sensible */
+    List<String> workersList;
+    Set<String> workerSet;
+    Set<String> locationSet;
+    try {
+      // this needs to be async'd
+      workerSet =
+          backplane.getStorageWorkers().stream()
+              .map(w -> w.getEndpoint())
+              .collect(Collectors.toSet());
+      locationSet = backplane.getBlobLocationSet(blobDigest);
+      workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
+    } catch (IOException e) {
+      return immediateFailedFuture(e);
+    }
+    if (!workersList.isEmpty()) {
+      return immediateFuture(workersList);
+    }
+
+    log.log(
+        Level.FINER,
+        format(
+            "worker list was initially empty for %s, attempting to correct",
+            DigestUtil.toString(blobDigest)));
+    return transform(
+        correctMissingBlob(
+            backplane,
+            workerSet,
+            locationSet,
+            this::workerStub,
+            blobDigest,
+            directExecutor(),
+            RequestMetadata.getDefaultInstance()),
+        foundOnWorkers -> {
+          log.log(
+              Level.FINER,
+              format(
+                  "worker list was corrected for %s to be %s",
+                  DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
+          Iterables.addAll(workersList, foundOnWorkers);
+          return workersList;
+        },
+        directExecutor());
+  }
+
+  @Override
+  public void splitBlob(
+      build.buildfarm.v1test.Digest blobDigest,
+      ChunkingFunction.Value chunkingFunction,
+      StreamObserver<Digest> digestObserver,
+      RequestMetadata requestMetadata) {
+    // try to land this request on a shard with the digest
+    Context ctx = Context.current();
+    addCallback(
+        blobDigestWorkers(blobDigest),
+        new WorkersCallback(rand) {
+          void request(Deque<String> workers) {
+            try {
+              splitBlobOnWorker(
+                  blobDigest, chunkingFunction, workers, digestObserver, requestMetadata);
+            } catch (Exception e) {
+              onFailure(e);
+            }
+          }
+
+          @Override
+          public void onQueue(Deque<String> workers) {
+            ctx.run(() -> request(workers));
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            digestObserver.onError(t);
+          }
+        },
+        directExecutor());
   }
 }

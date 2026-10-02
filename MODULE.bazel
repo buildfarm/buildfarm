@@ -61,17 +61,17 @@ bazel_dep(
     dev_dependency = True,
 )
 
-bazel_dep(name = "bazel_remote_apis", version = "b02e15a6d354e2fb553216132ccec79f3f5b39cb", repo_name = "remoteapis")
+bazel_dep(name = "bazel_remote_apis", version = "becdd8f9ff811df88a22d3eadd6341753d51d167", repo_name = "remoteapis")
 archive_override(
     module_name = "bazel_remote_apis",
-    integrity = "sha256-6/f8P1tElIJnbGlKyYjWfu4GicS/Ai/ECay+Uqy/JyY=",
+    integrity = "sha256-X3yn43grsGpq3S3lEelllefNp7GzET8LXTBBmVPzrjY=",
     patch_strip = 1,
     patches = [
         "//third_party:remote-apis.patch",
     ],
-    strip_prefix = "remote-apis-b02e15a6d354e2fb553216132ccec79f3f5b39cb",
+    strip_prefix = "remote-apis-becdd8f9ff811df88a22d3eadd6341753d51d167",
     urls = [
-        "https://github.com/bazelbuild/remote-apis/archive/b02e15a6d354e2fb553216132ccec79f3f5b39cb.zip",
+        "https://github.com/bazelbuild/remote-apis/archive/becdd8f9ff811df88a22d3eadd6341753d51d167.zip",
     ],
 )
 

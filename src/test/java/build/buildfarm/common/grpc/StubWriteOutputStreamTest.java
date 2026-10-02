@@ -471,7 +471,6 @@ public class StubWriteOutputStreamTest {
     try {
       IOException exception =
           assertThrows(IOException.class, () -> write.getOutput(1, SECONDS, () -> {}));
-
       assertThat(exception).hasCauseThat().isInstanceOf(InterruptedException.class);
       assertThat(Thread.currentThread().isInterrupted()).isTrue();
     } finally {

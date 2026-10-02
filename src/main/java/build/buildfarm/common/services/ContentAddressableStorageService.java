@@ -20,6 +20,7 @@ import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static io.grpc.Status.NOT_FOUND;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
@@ -36,6 +37,11 @@ import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
+import build.bazel.remote.execution.v2.SpliceBlobRequest;
+import build.bazel.remote.execution.v2.SpliceBlobResponse;
+import build.bazel.remote.execution.v2.SplitBlobRequest;
+import build.bazel.remote.execution.v2.SplitBlobResponse;
+import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
@@ -49,6 +55,7 @@ import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.StreamObserver;
 import io.prometheus.client.Histogram;
+import java.nio.file.NoSuchFileException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -202,22 +209,7 @@ public class ContentAddressableStorageService
             (result) -> response.build(),
             directExecutor());
 
-    addCallback(
-        responseFuture,
-        new FutureCallback<>() {
-          @Override
-          public void onSuccess(BatchUpdateBlobsResponse response) {
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-          }
-
-          @SuppressWarnings("NullableProblems")
-          @Override
-          public void onFailure(Throwable t) {
-            responseObserver.onError(t);
-          }
-        },
-        directExecutor());
+    addCallback(responseFuture, new FutureObserver<>(responseObserver), directExecutor());
   }
 
   private void getInstanceTree(
@@ -294,5 +286,91 @@ public class ContentAddressableStorageService
     }
 
     getInstanceTree(instance, rootDigest, request.getPageToken(), pageSize, responseObserver);
+  }
+
+  @Override
+  public void splitBlob(
+      SplitBlobRequest request, StreamObserver<SplitBlobResponse> responseObserver) {
+    build.buildfarm.v1test.Digest blobDigest =
+        DigestUtil.fromDigest(request.getBlobDigest(), request.getDigestFunction());
+    instance.splitBlob(
+        blobDigest,
+        request.getChunkingFunction(),
+        new StreamObserver<>() {
+          SplitBlobResponse.Builder response =
+              SplitBlobResponse.newBuilder()
+                  // TODO translate unknown to something else
+                  .setChunkingFunction(request.getChunkingFunction());
+
+          @Override
+          public void onNext(Digest digest) {
+            response.addChunkDigests(digest);
+          }
+
+          @Override
+          public void onCompleted() {
+            responseObserver.onNext(response.build());
+            responseObserver.onCompleted();
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            // general translation for these sorts of things?
+            if (t instanceof NoSuchFileException) {
+              t =
+                  NOT_FOUND
+                      .withDescription(
+                          String.format("Blob not found: %s", DigestUtil.toString(blobDigest)))
+                      .asException();
+            }
+            responseObserver.onError(t);
+          }
+        },
+        TracingMetadataUtils.fromCurrentContext());
+  }
+
+  private static class FutureObserver<T> implements FutureCallback<T> {
+    private final StreamObserver<T> observer;
+
+    FutureObserver(StreamObserver<T> observer) {
+      this.observer = observer;
+    }
+
+    @Override
+    public void onSuccess(T response) {
+      observer.onNext(response);
+      observer.onCompleted();
+    }
+
+    @SuppressWarnings("NullableProblems")
+    @Override
+    public void onFailure(Throwable t) {
+      // maybe too specific
+      if (t instanceof IllegalArgumentException e || t instanceof DigestMismatchException) {
+        t = Status.INVALID_ARGUMENT.withDescription(t.getMessage()).asException();
+      } else {
+        t = Status.fromThrowable(t).asException();
+      }
+      observer.onError(t);
+    }
+  }
+
+  @Override
+  public void spliceBlob(
+      SpliceBlobRequest request, StreamObserver<SpliceBlobResponse> responseObserver) {
+    // probably swap this to a future...
+    ListenableFuture<Digest> digestFuture =
+        instance.spliceBlob(
+            DigestUtil.fromDigest(request.getBlobDigest(), request.getDigestFunction()),
+            request.getChunkDigestsList(),
+            request.getChunkingFunction(),
+            TracingMetadataUtils.fromCurrentContext());
+    addCallback(
+        transform(
+            digestFuture,
+            digest -> SpliceBlobResponse.newBuilder().setBlobDigest(digest).build(),
+            directExecutor()),
+        new FutureObserver<>(responseObserver),
+        directExecutor());
   }
 }

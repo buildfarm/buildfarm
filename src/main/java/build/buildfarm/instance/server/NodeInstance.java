@@ -22,6 +22,7 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Throwables.propagateIfInstanceOf;
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
@@ -42,6 +43,7 @@ import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CacheCapabilities;
+import build.bazel.remote.execution.v2.ChunkingFunction;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.DigestFunction;
@@ -65,6 +67,7 @@ import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
+import build.buildfarm.cas.FastCDCChunker;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -75,6 +78,7 @@ import build.buildfarm.common.Size;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.net.URL;
@@ -118,6 +122,7 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.grpc.stub.StreamObserver;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import java.io.IOException;
 import java.io.InputStream;
@@ -130,6 +135,7 @@ import java.nio.file.NoSuchFileException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -423,10 +429,7 @@ public abstract class NodeInstance extends InstanceBase {
 
   @Override
   public Write getBlobWrite(
-      Compressor.Value compressor,
-      build.buildfarm.v1test.Digest digest,
-      UUID uuid,
-      RequestMetadata requestMetadata)
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException {
     return contentAddressableStorage.getWrite(compressor, digest, uuid, requestMetadata);
   }
@@ -573,6 +576,9 @@ public abstract class NodeInstance extends InstanceBase {
                 SECONDS,
                 requestMetadata);
         blobDigestsBuilder.add(DigestUtil.toDigest(responseDigest));
+      } catch (WriteCompleteException e) {
+        // write is complete, nothing to do here
+        blobDigestsBuilder.add(digest);
       } catch (StatusException e) {
         if (exception == null) {
           exception = new PutAllBlobsException();
@@ -620,11 +626,10 @@ public abstract class NodeInstance extends InstanceBase {
   protected abstract int getTreeMaxPageSize();
 
   protected abstract TokenizableIterator<DirectoryEntry> createTreeIterator(
-      String reason, build.buildfarm.v1test.Digest rootDigest, String pageToken);
+      String reason, Digest rootDigest, String pageToken);
 
   @Override
-  public String getTree(
-      build.buildfarm.v1test.Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
+  public String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
     tree.setRootDigest(rootDigest);
 
     if (pageSize == 0) {
@@ -720,7 +725,7 @@ public abstract class NodeInstance extends InstanceBase {
     try (InputStream in = inSupplier.get();
         OutputStream out = write.getOutput(1, DAYS, () -> {})) {
       ByteStreams.copy(in, out);
-    } catch (Write.WriteCompleteException e) {
+    } catch (WriteCompleteException e) {
       // ignore - completed write transform below delivers early result, future should be done
     }
 
@@ -1868,4 +1873,154 @@ public abstract class NodeInstance extends InstanceBase {
   public abstract void deregisterWorker(String workerName);
 
   protected abstract Logger getLogger();
+
+  private static BatchUpdateBlobsRequest.Request chunkToRequest(Blob chunk) {
+    return BatchUpdateBlobsRequest.Request.newBuilder()
+        .setDigest(DigestUtil.toDigest(chunk.getDigest()))
+        .setData(chunk.getData())
+        .setCompressor(Compressor.Value.IDENTITY)
+        .build();
+  }
+
+  private Iterator<Blob> createBlobChunker(
+      ChunkingFunction.Value chunkingFunction, DigestUtil digestUtil, InputStream in) {
+    if (chunkingFunction == ChunkingFunction.Value.FAST_CDC_2020) {
+      return new FastCDCChunker(digestUtil, in);
+    }
+    throw new UnsupportedOperationException(
+        format("chunking_function '%s' is not supported", chunkingFunction));
+  }
+
+  @Override
+  public void splitBlob(
+      Digest digest,
+      ChunkingFunction.Value chunkingFunction,
+      StreamObserver<build.bazel.remote.execution.v2.Digest> digestObserver,
+      RequestMetadata requestMetadata) {
+    HashFunction hashFn = HashFunction.get(digest.getDigestFunction());
+    DigestUtil digestUtil = new DigestUtil(hashFn);
+    // TODO route through chunkingFunction
+    try (InputStream input =
+        newBlobInput(
+            Compressor.Value.IDENTITY, digest, /* offset= */ 0, 10, DAYS, requestMetadata)) {
+      // need to specify hash
+      Iterator<Blob> chunkIterator = createBlobChunker(chunkingFunction, digestUtil, input);
+      // need to translate RuntimeException...
+      Set<build.bazel.remote.execution.v2.Digest> seen = new HashSet<>();
+      try {
+        while (chunkIterator.hasNext()) {
+          Blob chunk = chunkIterator.next();
+          Digest chunkDigest = chunk.getDigest();
+          if (chunkDigest.getSize() == 0) {
+            continue;
+          }
+          build.bazel.remote.execution.v2.Digest reDigest = DigestUtil.toDigest(chunkDigest);
+          digestObserver.onNext(reDigest);
+          // banal, still no benefit to batch on workers
+          if (!seen.contains(reDigest)) {
+            // need to push this into a future
+            if (!containsBlob(chunkDigest, null, requestMetadata)) {
+              putBlob(
+                  this,
+                  Compressor.Value.IDENTITY,
+                  chunkDigest,
+                  chunk.getData(),
+                  1,
+                  SECONDS,
+                  requestMetadata);
+            }
+            seen.add(reDigest);
+          }
+        }
+      } catch (RuntimeException e) {
+        // hasNext will throw io exception if input stream failed
+        propagateIfInstanceOf(e.getCause(), IOException.class);
+        throw e;
+      }
+      digestObserver.onCompleted();
+    } catch (IOException | InterruptedException | StatusException e) {
+      log.log(
+          Level.WARNING,
+          format("Split %s, %s failed", DigestUtil.toString(digest), chunkingFunction),
+          e);
+      digestObserver.onError(e);
+    }
+  }
+
+  @Override
+  public ListenableFuture<build.bazel.remote.execution.v2.Digest> spliceBlob(
+      Digest expectedBlobDigest,
+      Iterable<build.bazel.remote.execution.v2.Digest> chunkDigests,
+      ChunkingFunction.Value chunkingFunction,
+      RequestMetadata requestMetadata) {
+    if (expectedBlobDigest.getSize() < FastCDCChunker.minBlobSize()) {
+      return immediateFailedFuture(
+          new IllegalArgumentException(
+              format(
+                  "Blob size %d < minimum size %d.",
+                  expectedBlobDigest.getSize(), FastCDCChunker.minBlobSize())));
+    }
+
+    long accumulatedSize = 0;
+    for (build.bazel.remote.execution.v2.Digest chunkDigest : chunkDigests) {
+      accumulatedSize += chunkDigest.getSizeBytes();
+    }
+    if (accumulatedSize != expectedBlobDigest.getSize()) {
+      // we must not start the write. if we had less than the amount, it would hang and consume
+      // charge size
+      return immediateFailedFuture(
+          new IllegalArgumentException(
+              format(
+                  "Splice chunks size %d cannot represent %s",
+                  accumulatedSize, DigestUtil.toString(expectedBlobDigest))));
+    }
+
+    try {
+      // docs indicate that we should be able to check for this digest and just return it if it
+      // exists
+      build.bazel.remote.execution.v2.Digest digest = DigestUtil.toDigest(expectedBlobDigest);
+      // we could potentially store these as 'virtual entries', respond immediately, and collate
+      // them for the rest
+      // absolutely no reason to actually read these blobs, we just return NOT_FOUND when one entry
+      // goes away on the read, which needs to be virtual-aware
+      if (containsBlob(expectedBlobDigest, digest.toBuilder(), requestMetadata)) {
+        return immediateFuture(digest);
+      }
+
+      return transform(
+          writeSpliceBlob(expectedBlobDigest, chunkDigests, requestMetadata),
+          size -> digest,
+          directExecutor());
+    } catch (InterruptedException | IOException e) {
+      log.log(
+          Level.WARNING,
+          format(
+              "Splice of %s, %s failed", DigestUtil.toString(expectedBlobDigest), chunkingFunction),
+          e);
+      return immediateFailedFuture(e);
+    }
+  }
+
+  private ListenableFuture<Long> writeSpliceBlob(
+      Digest expectedBlobDigest,
+      Iterable<build.bazel.remote.execution.v2.Digest> chunkDigests,
+      RequestMetadata requestMetadata)
+      throws IOException, InterruptedException {
+    // does the chunking function even matter here??
+    DigestFunction.Value digestFunction = expectedBlobDigest.getDigestFunction();
+    Write write =
+        getBlobWrite(
+            Compressor.Value.IDENTITY, expectedBlobDigest, UUID.randomUUID(), requestMetadata);
+    try (OutputStream out = write.getOutput(1, DAYS, () -> {})) {
+      for (build.bazel.remote.execution.v2.Digest chunkDigest : chunkDigests) {
+        Digest inDigest = DigestUtil.fromDigest(chunkDigest, digestFunction);
+        try (InputStream in =
+            newBlobInput(
+                Compressor.Value.IDENTITY, inDigest, /* offset= */ 0, 1, DAYS, requestMetadata)) {
+          ByteStreams.copy(in, out);
+        }
+      }
+    }
+    return write.getFuture();
+  }
 }
