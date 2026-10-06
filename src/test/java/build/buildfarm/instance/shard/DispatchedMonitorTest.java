@@ -68,6 +68,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> true,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -107,6 +108,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -132,6 +134,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -148,6 +151,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -176,6 +180,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -199,6 +204,7 @@ public class DispatchedMonitorTest {
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
             /* shouldStop= */ () -> false,
+            /* isLeader= */ () -> true,
             location,
             requeuer,
             /* intervalSeconds= */ 0,
@@ -221,7 +227,12 @@ public class DispatchedMonitorTest {
     when(shouldStop.getAsBoolean()).thenReturn(false).thenReturn(true);
     DispatchedMonitor dispatchedMonitor =
         new DispatchedMonitor(
-            shouldStop, location, requeuer, /* intervalSeconds= */ 0, Durations.fromSeconds(1));
+            shouldStop,
+            /* isLeader= */ () -> true,
+            location,
+            requeuer,
+            /* intervalSeconds= */ 0,
+            /* requeueDelay= */ Durations.fromSeconds(1));
     dispatchedMonitor.run();
     verify(location, atLeastOnce())
         .scan(any(Integer.class), any(String.class), any(Consumer.class));
