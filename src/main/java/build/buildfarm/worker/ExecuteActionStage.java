@@ -43,6 +43,7 @@ public class ExecuteActionStage extends PipelineStage {
   public static final int SHARES_PER_SLOT = 1000;
 
   private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
+  private final Object cpuClaimLock = new Object();
   private final ExecutorService executor = Executors.newCachedThreadPool();
   private final Map<String, Executor> executions = new ConcurrentHashMap<>();
 
@@ -200,18 +201,22 @@ public class ExecuteActionStage extends PipelineStage {
     return workerContext.market().balance();
   }
 
-  public synchronized boolean claim(ExecutionContext executionContext) throws InterruptedException {
-    // issue blocking buy order for SHARES_PER_SLOT * claims
-    int slots =
-        executionContext.marketExecution
-            ? 1
-            : workerContext.commandExecutionClaims(executionContext.command);
-    int sharesToBuy = SHARES_PER_SLOT * slots;
+  // Serialize CPU claims without holding the stage monitor. An action that owns the remaining
+  // shares may need that monitor in iterate() before it can run and return them.
+  public boolean claim(ExecutionContext executionContext) throws InterruptedException {
+    synchronized (cpuClaimLock) {
+      // issue blocking buy order for SHARES_PER_SLOT * claims
+      int slots =
+          executionContext.marketExecution
+              ? 1
+              : workerContext.commandExecutionClaims(executionContext.command);
+      int sharesToBuy = SHARES_PER_SLOT * slots;
 
-    CPULease lease = new CPULease(sharesToBuy, workerContext.market());
-    executionContext.claim.add(lease);
+      CPULease lease = new CPULease(sharesToBuy, workerContext.market());
+      executionContext.claim.add(lease);
 
-    return true;
+      return true;
+    }
   }
 
   @Override

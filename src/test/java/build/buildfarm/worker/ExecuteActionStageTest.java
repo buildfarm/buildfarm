@@ -14,20 +14,98 @@
 
 package build.buildfarm.worker;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import build.bazel.remote.execution.v2.Command;
+import build.buildfarm.common.Claim;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ExecuteActionStageTest {
+  @Test(timeout = 15000)
+  public void waitingForCpuSharesDoesNotBlockExecutionStage() throws Exception {
+    Market market = new Market();
+    WorkerContext context = mock(WorkerContext.class);
+    when(context.market()).thenReturn(market);
+    when(context.commandExecutionClaims(any(Command.class))).thenReturn(1);
+
+    ExecuteActionStage stage =
+        new ExecuteActionStage(context, mock(PipelineStage.class), mock(PipelineStage.class));
+    ExecutionContext firstAction =
+        ExecutionContext.newBuilder()
+            .setCommand(Command.getDefaultInstance())
+            .setClaim(mock(Claim.class))
+            .build();
+    ExecutionContext secondAction =
+        ExecutionContext.newBuilder()
+            .setCommand(Command.getDefaultInstance())
+            .setClaim(mock(Claim.class))
+            .build();
+
+    market.start();
+    market.sell(ExecuteActionStage.SHARES_PER_SLOT);
+    Thread waitingClaim = new Thread(() -> claim(stage, secondAction), "waiting-cpu-claim");
+    CountDownLatch executionStageEntered = new CountDownLatch(1);
+    Thread executionStage =
+        new Thread(
+            () -> {
+              synchronized (stage) {
+                executionStageEntered.countDown();
+              }
+            },
+            "execution-stage-start");
+    try {
+      assertThat(stage.claim(firstAction)).isTrue();
+      waitingClaim.start();
+      assertThat(waitingInCpuLease(waitingClaim)).isTrue();
+
+      // ExecuteActionStage.iterate takes the first action, then enters this monitor to start it.
+      // If the second claim holds that monitor while waiting, the first action can never run and
+      // return its CPU shares.
+      executionStage.start();
+      assertThat(executionStageEntered.await(2, TimeUnit.SECONDS)).isTrue();
+    } finally {
+      market.sell(ExecuteActionStage.SHARES_PER_SLOT);
+      waitingClaim.join(5000);
+      executionStage.join(5000);
+      market.stop();
+    }
+  }
+
+  private static void claim(ExecuteActionStage stage, ExecutionContext executionContext) {
+    try {
+      stage.claim(executionContext);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  private static boolean waitingInCpuLease(Thread thread) throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (System.nanoTime() < deadline) {
+      if (thread.getState() == Thread.State.WAITING
+          && Arrays.stream(thread.getStackTrace())
+              .anyMatch(frame -> frame.getClassName().equals(CPULease.class.getName()))) {
+        return true;
+      }
+      Thread.sleep(10);
+    }
+    return false;
+  }
+
   @Test
   public void errorPathDestroysExecDir() throws Exception {
     WorkerContext context = mock(WorkerContext.class);
