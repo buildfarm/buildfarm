@@ -58,6 +58,8 @@ public class ExecuteActionStageTest {
             .build();
 
     market.start();
+    // The first action claims two of four slots. The second claims the two remaining slots but
+    // waits for a third, which the first action cannot return until the execution stage starts it.
     market.sell(4 * ExecuteActionStage.SHARES_PER_SLOT);
     Thread waitingClaim = new Thread(() -> claim(stage, secondAction), "waiting-cpu-claim");
     CountDownLatch executionStageEntered = new CountDownLatch(1);
