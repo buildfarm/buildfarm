@@ -15,7 +15,6 @@
 package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -40,23 +39,26 @@ public class ExecuteActionStageTest {
     Market market = new Market();
     WorkerContext context = mock(WorkerContext.class);
     when(context.market()).thenReturn(market);
-    when(context.commandExecutionClaims(any(Command.class))).thenReturn(1);
+    Command firstCommand = Command.newBuilder().addArguments("first").build();
+    Command secondCommand = Command.newBuilder().addArguments("second").build();
+    when(context.commandExecutionClaims(firstCommand)).thenReturn(2);
+    when(context.commandExecutionClaims(secondCommand)).thenReturn(3);
 
     ExecuteActionStage stage =
         new ExecuteActionStage(context, mock(PipelineStage.class), mock(PipelineStage.class));
     ExecutionContext firstAction =
         ExecutionContext.newBuilder()
-            .setCommand(Command.getDefaultInstance())
+            .setCommand(firstCommand)
             .setClaim(mock(Claim.class))
             .build();
     ExecutionContext secondAction =
         ExecutionContext.newBuilder()
-            .setCommand(Command.getDefaultInstance())
+            .setCommand(secondCommand)
             .setClaim(mock(Claim.class))
             .build();
 
     market.start();
-    market.sell(ExecuteActionStage.SHARES_PER_SLOT);
+    market.sell(4 * ExecuteActionStage.SHARES_PER_SLOT);
     Thread waitingClaim = new Thread(() -> claim(stage, secondAction), "waiting-cpu-claim");
     CountDownLatch executionStageEntered = new CountDownLatch(1);
     Thread executionStage =
