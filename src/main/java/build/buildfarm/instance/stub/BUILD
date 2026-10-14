@@ -13,8 +13,6 @@ java_library(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_grpc",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
-        "//third_party/remote-apis:build_bazel_remote_asset_v1_remote_asset_java_grpc",
-        "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@buildfarm_maven//:com_google_code_findbugs_jsr305",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
@@ -31,7 +29,9 @@ java_library(
         "@googleapis//google/longrunning:longrunning_java_grpc",
         "@googleapis//google/longrunning:longrunning_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",
+        "@remoteapis//build/bazel/remote/asset/v1:remote_asset_java_grpc",
         "@remoteapis//build/bazel/remote/asset/v1:remote_asset_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
