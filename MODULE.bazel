@@ -150,6 +150,7 @@ maven.install(
         "io.opentelemetry:opentelemetry-exporter-otlp",
         "io.opentelemetry:opentelemetry-sdk",
         "io.opentelemetry:opentelemetry-sdk-common",
+        "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure",
         "io.opentelemetry:opentelemetry-sdk-trace",
         "io.prometheus:simpleclient:0.16.0",
         "io.prometheus:simpleclient_hotspot:0.16.0",

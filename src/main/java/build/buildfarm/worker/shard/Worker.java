@@ -116,14 +116,10 @@ import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
 import io.grpc.services.ChannelzService;
 import io.opentelemetry.api.OpenTelemetry;
-import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
-import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.opentelemetry.sdk.resources.Resource;
-import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import java.io.File;
@@ -153,9 +149,6 @@ import org.jspecify.annotations.Nullable;
 
 @Log
 public final class Worker extends LoggingMain {
-  /* all docs on using this from io.opentelemetry.semconv result in failure */
-  private static final AttributeKey SERVICE_NAME = AttributeKey.stringKey("service.name");
-
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
   private final Counter healthCheckMetric =
@@ -217,7 +210,6 @@ public final class Worker extends LoggingMain {
   private AtomicBoolean released = new AtomicBoolean(true);
   private AtomicBoolean shutdownInitiated = new AtomicBoolean(false);
   private boolean startWritable = true;
-  private SdkTracerProvider oTelSdkTracerProvider;
 
   /**
    * The method will prepare the worker for graceful shutdown when the worker is ready. Note on
@@ -783,26 +775,8 @@ public final class Worker extends LoggingMain {
           "execOwners is not large enough to fill requested stage widths");
     }
 
-    /** need to tie all of the below up together */
-    String oTelURL = configs.getWorker().getOpenTelemetryURL();
-    Tracer tracer;
-    if (!oTelURL.isEmpty()) {
-      Resource resource = Resource.getDefault().toBuilder().put(SERVICE_NAME, "Buildfarm").build();
-      oTelSdkTracerProvider =
-          SdkTracerProvider.builder()
-              .setResource(resource)
-              .addSpanProcessor(
-                  SpanProcessorConfig.batchSpanProcessor(
-                      SpanExporterConfig.otlpHttpSpanExporter(oTelURL)))
-              .build();
-
-      OpenTelemetry oTel =
-          OpenTelemetrySdk.builder().setTracerProvider(oTelSdkTracerProvider).build();
-
-      tracer = oTel.getTracer("Buildfarm Worker");
-    } else {
-      tracer = null;
-    }
+    OpenTelemetry oTel = OpenTelemetryProvider.get();
+    Tracer tracer = oTel.getTracer("buildfarm-worker");
 
     WorkerEventObserver workerEventObserver =
         new WorkerEventObserver() {
@@ -897,16 +871,14 @@ public final class Worker extends LoggingMain {
               String name,
               Timestamp start,
               Timestamp end) {
-            if (tracer != null) {
-              SpanBuilder builder = tracer.spanBuilder(name);
-              decorator.accept(builder);
-              Span span =
-                  builder.setStartTimestamp(Timestamps.toNanos(start), NANOSECONDS).startSpan();
-              if (withContext != null) {
-                withContext.accept(Context.current().with(span));
-              }
-              span.end(Timestamps.toNanos(end), NANOSECONDS);
+            SpanBuilder builder = tracer.spanBuilder(name);
+            decorator.accept(builder);
+            Span span =
+                builder.setStartTimestamp(Timestamps.toNanos(start), NANOSECONDS).startSpan();
+            if (withContext != null) {
+              withContext.accept(Context.current().with(span));
             }
+            span.end(Timestamps.toNanos(end), NANOSECONDS);
           }
 
           private static void decorateExecution(
@@ -1284,9 +1256,6 @@ public final class Worker extends LoggingMain {
     if (workerStubs != null) {
       workerStubs.invalidateAll();
       workerStubs = null;
-    }
-    if (oTelSdkTracerProvider != null) {
-      oTelSdkTracerProvider.close();
     }
     if (interrupted) {
       Thread.currentThread().interrupt();

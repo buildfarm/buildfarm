@@ -32,6 +32,8 @@ worker: !include "worker.yml"
 The configuration can be provided to the server and worker as a CLI argument or through the environment variable `CONFIG_PATH`
 For an example configuration containing all of the configuration values, see `examples/config.yml`.
 
+For OpenTelemetry tracing configuration, see [OpenTelemetry](opentelemetry/). OpenTelemetry uses standard JVM properties and environment variables rather than this YAML configuration.
+
 ## All Configurations
 
 ### Common

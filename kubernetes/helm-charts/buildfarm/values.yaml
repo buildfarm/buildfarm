@@ -119,6 +119,10 @@ server:
   extraEnv:
     - name: JAVABIN
       value: "/usr/bin/java"
+    # OpenTelemetry is configured with standard OTEL_* environment variables. To enable the
+    # bundled Java agent, add -javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar to
+    # javaToolOptions and configure OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT, and related
+    # settings here. See https://opentelemetry.io/docs/zero-code/java/agent/configuration/.
 
   serviceMonitor:
     ## If true, a ServiceMonitor CRD is created for a prometheus operator
@@ -169,7 +173,7 @@ shardWorker:
             type: Utilization
             averageUtilization: 50
     targetCPUUtilizationPercentage: 50 # effective only in `v1`
-  
+
   javaToolOptions: >-
     -XX:+UseContainerSupport
     -XX:MaxRAMPercentage=80.0
@@ -246,6 +250,10 @@ shardWorker:
   extraEnv:
     - name: JAVABIN
       value: "/usr/bin/java"
+    # OpenTelemetry is configured with standard OTEL_* environment variables. To enable the
+    # bundled Java agent, add -javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar to
+    # javaToolOptions and configure OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT, and related
+    # settings here. See https://opentelemetry.io/docs/zero-code/java/agent/configuration/.
 
   serviceMonitor:
     ## If true, a ServiceMonitor CRD is created for a prometheus operator
@@ -377,6 +385,10 @@ execWorker:
   extraEnv:
     - name: JAVABIN
       value: "/usr/bin/java"
+    # OpenTelemetry is configured with standard OTEL_* environment variables. To enable the
+    # bundled Java agent, add -javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar to
+    # javaToolOptions and configure OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT, and related
+    # settings here. See https://opentelemetry.io/docs/zero-code/java/agent/configuration/.
 
   serviceMonitor:
     ## If true, a ServiceMonitor CRD is created for a prometheus operator

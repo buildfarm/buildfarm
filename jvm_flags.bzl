@@ -4,22 +4,10 @@ buildfarm definitions and configurations around choosing JVM flags for java imag
 
 SERVER_TELEMETRY_JVM_FLAGS = [
     "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-    "-Dotel.resource.attributes=service.name=server",
-    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-    "-Dotel.instrumentation.http.capture-headers.client.request",
-    "-Dotel.instrumentation.http.capture-headers.client.response",
-    "-Dotel.instrumentation.http.capture-headers.server.request",
-    "-Dotel.instrumentation.http.capture-headers.server.response",
 ]
 
 WORKER_TELEMETRY_JVM_FLAGS = [
     "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-    "-Dotel.resource.attributes=service.name=worker",
-    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-    "-Dotel.instrumentation.http.capture-headers.client.request",
-    "-Dotel.instrumentation.http.capture-headers.client.response",
-    "-Dotel.instrumentation.http.capture-headers.server.request",
-    "-Dotel.instrumentation.http.capture-headers.server.response",
 ]
 
 RECOMMENDED_JVM_FLAGS = [
