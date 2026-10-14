@@ -168,10 +168,10 @@ public abstract class NodeInstance extends InstanceBase {
   protected final Map<Digest, ByteString> activeBlobWrites;
   protected final boolean ensureOutputsPresent;
 
-  // The default grpc max message size (4 MiB). A getTree page is truncated to stay below this so
-  // that the resulting GetTreeResponse does not exceed the grpc per-message byte limit. A buffer is
-  // reserved within the page builder below to leave room for the response envelope (nextPageToken).
-  private static final int DEFAULT_GET_TREE_MAX_MESSAGE_SIZE_BYTES = 4 * 1024 * 1024;
+  // Keep GetTree pages below the default 4 MiB gRPC message limit. The serialized response can be
+  // larger than its repeated directory entries, so use the same conservative 3 MiB limit as other
+  // request batching.
+  private static final int DEFAULT_GET_TREE_MAX_MESSAGE_SIZE_BYTES = (int) Size.mbToBytes(3);
 
   // Reserve a small portion of the message budget for the GetTreeResponse fields surrounding the
   // repeated directories (notably nextPageToken) and grpc framing slack.
