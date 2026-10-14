@@ -27,6 +27,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.redis.NodeClient;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.Digest;
@@ -60,7 +61,7 @@ import picocli.CommandLine;
 import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.RedisClient;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -427,7 +428,7 @@ class LinkDirectoryScanner implements Callable<Integer> {
             jedisCluster.getClusterNodes().size(), operationPrefix);
         System.err.flush();
         for (ConnectionPool pool : jedisCluster.getClusterNodes().values()) {
-          try (UnifiedJedis node = new UnifiedJedis(pool.getResource())) {
+          try (UnifiedJedis node = new NodeClient(pool.getResource())) {
             // Skip replica nodes — each key lives on exactly one master; scanning replicas
             // would produce duplicates.
             if (!node.info("replication").contains("role:master")) {
@@ -442,7 +443,7 @@ class LinkDirectoryScanner implements Callable<Integer> {
         }
       }
     } else {
-      try (JedisPooled jedis = new JedisPooled(new URI(redisUri))) {
+      try (RedisClient jedis = RedisClient.create(new URI(redisUri))) {
         System.err.printf("Connected. Scanning for %s:* ...%n", operationPrefix);
         System.err.flush();
         scanNode(jedis, jedis, params, totals, reservoir, random);
