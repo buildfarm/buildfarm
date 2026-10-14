@@ -70,6 +70,7 @@ import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.io.FileStatus;
+import build.buildfarm.common.io.FileStoreMover;
 import build.buildfarm.v1test.BlobWriteKey;
 import build.buildfarm.v1test.Digest;
 import com.google.common.annotations.VisibleForTesting;
@@ -175,7 +176,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
-  private final LRUDB db = new TextLRUDB();
+  private LRUDB db;
+  private FileStoreMover fileStoreMover;
   private volatile Deadline saveLRUAfter = Deadline.after(10, MINUTES);
   private final Path lru;
 
@@ -220,7 +222,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 }
               });
 
+  private static final long DEFAULT_BLOCK_SIZE = 4096;
+  private static final long ESTIMATED_BYTES_PER_DIRECTORY_ENTRY = 32;
+
   protected FileStore fileStore; // bound to root
+  protected long blockSize = DEFAULT_BLOCK_SIZE;
   protected transient long sizeInBytes = 0;
   protected final transient Entry header = new SentinelEntry();
   protected volatile long unreferencedEntryCount = 0;
@@ -1318,6 +1324,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Files.createDirectories(dir);
     }
     fileStore = Files.getFileStore(root);
+    if (fileStoreMover == null) {
+      fileStoreMover = FileStoreMover.probe(root);
+      db = new TextLRUDB(fileStoreMover);
+    }
+    try {
+      blockSize = fileStore.getBlockSize();
+    } catch (UnsupportedOperationException | IOException e) {
+      // blockSize retains its initial value of DEFAULT_BLOCK_SIZE
+    }
+  }
+
+  @VisibleForTesting
+  void setBlockSizeForTesting(long blockSize) {
+    this.blockSize = blockSize;
   }
 
   @SuppressWarnings({"PMD.CompareObjectsWithEquals"})
@@ -1584,7 +1604,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     } else {
       // if cas is full or entry is oversized or empty, mark file for later deletion.
       long size = entry.size();
-      if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes || size == 0) {
+      if (sizeInBytes + estimateSizeOnDisk(size, blockSize, /* isHardlink= */ false)
+              > maxSizeInBytes
+          || size > maxEntrySizeInBytes
+          || size == 0) {
         synchronized (deleteFiles) {
           deleteFiles.add(path);
         }
@@ -1607,8 +1630,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             if (e.decrementReference(header)) {
               unreferencedEntryCount++;
             }
+            sizeInBytes += estimateSizeOnDisk(size, blockSize, /* isHardlink= */ false);
           }
-          sizeInBytes += size;
         }
       }
     }
@@ -1712,9 +1735,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   protected synchronized void discharge(String key, long size) {
-    sizeInBytes -= size;
+    long diskSize = estimateSizeOnDisk(size, blockSize, /* isHardlink= */ false);
+    sizeInBytes -= diskSize;
     removedEntryCount++;
-    removedEntrySize += size;
+    removedEntrySize += diskSize;
   }
 
   @GuardedBy("this")
@@ -2065,7 +2089,58 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  protected void fetchDirectory(
+  /**
+   * Estimates the physical on-disk size of a file by rounding up to the nearest filesystem block
+   * boundary.
+   *
+   * <p>For many files and filesystems this will be accurate. However, for some files on some
+   * filesystems this will overestimate the physical size by up to blockSize bytes. To clarify, this
+   * likely overestimates for smaller files on filesystems that use inlining, block suballocation,
+   * variable block sizes, etc. It can also overestimate for compressed filesystems proportional to
+   * the compression ratio.
+   *
+   * <p>When {@code isHardlink} is {@code true}, the caller is creating (or has verified) a hardlink
+   * to an already-resident inode rather than writing a fresh inode; the physical cost is then just
+   * a directory entry (~64 bytes on typical filesystems, rounding to 0 under block alignment), so
+   * this method returns 0. Callers must only pass {@code true} when a hardlink to an
+   * already-accounted inode is being made.
+   */
+  @VisibleForTesting
+  static long estimateSizeOnDisk(long logicalSize, long blockSize, boolean isHardlink) {
+    checkArgument(blockSize > 0, "blockSize (%s) must be positive", blockSize);
+    checkArgument(logicalSize >= 0, "logicalSize (%s) must be non-negative", logicalSize);
+    if (isHardlink) {
+      // Hardlinks reuse an existing inode's blocks and add only a directory entry (~64 bytes on
+      // typical filesystems, which rounds to 0 under block alignment).
+      return 0;
+    }
+    if (logicalSize == 0) {
+      return 0;
+    }
+    // Use long division to get the ceiling in order to round up to the next largest blocksize.
+    // This should return correct answers for sizes that are block aligned as well as those that
+    // are not.
+    return ((logicalSize + blockSize - 1) / blockSize) * blockSize;
+  }
+
+  /**
+   * Estimates the on-disk size of a directory's entry table based on its contents. On typical Linux
+   * filesystems (ext4, XFS), each directory entry is approximately 8 bytes of header plus the
+   * filename length, aligned to 4 bytes. Each directory occupies at least one filesystem block.
+   */
+  @VisibleForTesting
+  static long estimateDirectorySizeOnDisk(Directory directory, long blockSize) {
+    checkArgument(blockSize > 0, "blockSize (%s) must be positive", blockSize);
+    long entryCount =
+        directory.getFilesCount() + directory.getSymlinksCount() + directory.getDirectoriesCount();
+    // ~32 bytes per entry is a reasonable average for typical filename lengths
+    // on ext4/XFS (8-byte header + ~20-char name + alignment padding)
+    long estimatedBytes = entryCount * ESTIMATED_BYTES_PER_DIRECTORY_ENTRY;
+    long blocks = Math.max(1, Math.ceilDiv(estimatedBytes, blockSize));
+    return blocks * blockSize;
+  }
+
+  protected long fetchDirectory(
       Path rootPath,
       Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
@@ -2073,6 +2148,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ImmutableList.Builder<ListenableFuture<Path>> putFutures,
       ExecutorService service)
       throws IOException, InterruptedException {
+    long directoryOverhead = 0;
     Stack<Map.Entry<Path, Directory>> stack = new Stack<>();
     stack.push(
         new AbstractMap.SimpleEntry<>(
@@ -2084,6 +2160,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       removeFilePath(path);
       Files.createDirectory(path);
+      directoryOverhead += estimateDirectorySizeOnDisk(directory, blockSize);
       putDirectoryFiles(
           digest.getDigestFunction(),
           directory.getFilesList(),
@@ -2103,6 +2180,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     DigestUtil.fromDigest(directoryNode.getDigest(), digest.getDigestFunction()))));
       }
     }
+    return directoryOverhead;
   }
 
   private void removeFilePath(Path path) throws IOException {
@@ -2456,7 +2534,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       if (referenceIfExists(key)) {
         return false;
       }
-      sizeInBytes += blobSizeInBytes;
+      sizeInBytes += estimateSizeOnDisk(blobSizeInBytes, blockSize, /* isHardlink= */ false);
       requiresDischarge.set(true);
 
       ImmutableList.Builder<ListenableFuture<Digest>> builder = ImmutableList.builder();
@@ -2674,13 +2752,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         boolean inserted = false;
         try {
           // acquire the key lock
-          Files.createLink(CASFileCache.this.getPath(actual, key), writePath);
+          fileStoreMover.move(writePath, CASFileCache.this.getPath(actual, key));
           existingEntry = safeStorageInsertion(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
           log.log(Level.FINER, "file already exists for " + key + ", nonexistent entry will fail");
         } finally {
-          Files.delete(writePath);
+          Files.deleteIfExists(writePath);
           if (!inserted) {
             dischargeAndNotify(writeKey, blobSizeInBytes);
           }

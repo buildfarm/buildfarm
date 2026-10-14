@@ -146,10 +146,8 @@ public class ExecuteActionStage extends PipelineStage {
             limits.maxSharesSold,
             executor);
 
-    synchronized (this) {
-      start(executionContext.operation.getName(), actionExecutor);
-      executor.execute(() -> actionExecutor.run(limits));
-    }
+    start(executionContext.operation.getName(), actionExecutor);
+    executor.execute(() -> actionExecutor.run(limits));
   }
 
   @Override

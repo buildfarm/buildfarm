@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.java.Log;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
@@ -67,12 +68,12 @@ public class WorkerIndexer {
           .values()
           .forEach(
               pool -> {
-                try (UnifiedJedis node = new UnifiedJedis(pool.getResource())) {
-                  reindexNode(cluster, node, settings, results);
+                try (Jedis node = new Jedis(pool.getResource())) {
+                  reindexNode(cluster, node.toString(), node::scan, settings, results);
                 }
               });
     } else {
-      reindexNode(jedis, jedis, settings, results);
+      reindexNode(jedis, jedis.toString(), jedis::scan, settings, results);
     }
     return results;
   }
@@ -81,13 +82,23 @@ public class WorkerIndexer {
    * @brief Scan all CAS entires on existing Jedis node and remove particular worker indices.
    * @details Results are accumulated onto.
    * @param cluster An established redis cluster.
-   * @param node A node of the cluster.
+   * @param nodeName Identifier for the scanned node.
+   * @param scanner SCAN implementation for the node.
    * @param settings Settings on how to traverse the CAS and which worker to remove.
    * @param results Accumulating results from performing reindexing.
    */
+  @FunctionalInterface
+  private interface NodeScanner {
+    ScanResult<String> scan(String cursor, ScanParams params);
+  }
+
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static void reindexNode(
-      UnifiedJedis cluster, UnifiedJedis node, CasIndexSettings settings, CasIndexResults results) {
+      UnifiedJedis cluster,
+      String nodeName,
+      NodeScanner scanner,
+      CasIndexSettings settings,
+      CasIndexResults results) {
     Long totalKeys = 0L;
     Long removedKeys = 0L;
     Long removedHosts = 0L;
@@ -95,7 +106,7 @@ public class WorkerIndexer {
     log.info(
         String.format(
             "Initializing CAS Indexer for Node %s with %d active workers.",
-            node.toString(), activeWorkers.size()));
+            nodeName, activeWorkers.size()));
 
     // iterate over all CAS entries via scanning
     // and remove worker from the CAS keys.
@@ -107,7 +118,7 @@ public class WorkerIndexer {
     String cursor = "0";
     ScanResult scanResult;
     do {
-      scanResult = node.scan(cursor, params);
+      scanResult = scanner.scan(cursor, params);
       if (scanResult != null) {
         List<String> casKeys = scanResult.getResult();
         for (String casKey : casKeys) {
@@ -132,7 +143,7 @@ public class WorkerIndexer {
     results.totalKeys += totalKeys;
     results.removedKeys += removedKeys;
     results.removedHosts += removedHosts;
-    indexerHostsRemovedGauge.labels(node.toString()).set(removedHosts);
-    indexerKeysRemovedGauge.labels(node.toString()).set(removedKeys);
+    indexerHostsRemovedGauge.labels(nodeName).set(removedHosts);
+    indexerKeysRemovedGauge.labels(nodeName).set(removedKeys);
   }
 }

@@ -302,7 +302,7 @@ public class RedisMap<T> {
       }
       // acquire and assign resource to UnifiedJedis for release
       Connection connection = cluster.getConnectionFromSlot(JedisClusterCRC16.getSlot(currentHash));
-      try (UnifiedJedis jedis = new UnifiedJedis(connection)) {
+      try (UnifiedJedis jedis = new NodeClient(connection)) {
         ScanResult<String> scanResult = scanNode(jedis, mapCursor, count - result.size(), match);
         mapCursor = scanResult.getCursor();
         result.addAll(scanResult.getResult());
