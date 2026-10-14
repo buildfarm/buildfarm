@@ -38,6 +38,7 @@ java_library(
         "@buildfarm_maven//:io_grpc_grpc_stub",
         "@buildfarm_maven//:io_opentelemetry_opentelemetry_api",
         "@buildfarm_maven//:io_opentelemetry_opentelemetry_context",
+        "@buildfarm_maven//:io_opentelemetry_opentelemetry_exporter_otlp",
         "@buildfarm_maven//:io_opentelemetry_opentelemetry_sdk_extension_autoconfigure",
         "@buildfarm_maven//:io_prometheus_simpleclient",
         "@buildfarm_maven//:javax_annotation_javax_annotation_api",
