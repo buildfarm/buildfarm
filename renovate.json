@@ -9,6 +9,18 @@
     "helpers:pinGitHubActionDigests"
   ],
   "prConcurrentLimit": 2,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Keep native and Java gRPC dependencies synchronized",
+      "managerFilePatterns": [
+        "/^MODULE\\.bazel$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+) versioning=(?<versioning>[^\\s]+)\\s+GRPC_VERSION = \\\"(?<currentValue>[^\\\"]+)\\\""
+      ]
+    }
+  ],
   "packageRules": [
     {
       "groupName": "Bazel",

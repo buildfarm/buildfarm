@@ -5,6 +5,9 @@ module(
     repo_name = "build_buildfarm",
 )
 
+# renovate: datasource=github-releases depName=grpc/grpc-java versioning=semver
+GRPC_VERSION = "1.84.0"
+
 bazel_dep(name = "protobuf", version = "33.4", repo_name = "com_google_protobuf")
 archive_override(
     module_name = "protobuf",
@@ -19,13 +22,13 @@ archive_override(
     ],
 )
 
-bazel_dep(name = "grpc", version = "1.76.0.bcr.1", repo_name = "com_github_grpc_grpc")
+bazel_dep(name = "grpc", version = GRPC_VERSION, repo_name = "com_github_grpc_grpc")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "blake3", version = "1.8.2.bcr.1")
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
-bazel_dep(name = "grpc-java", version = "1.78.0")
+bazel_dep(name = "grpc-java", version = GRPC_VERSION)
 bazel_dep(name = "googleapis", version = "0.0.0-20260109-6145b5ff")
 single_version_override(
     module_name = "googleapis",
@@ -182,7 +185,7 @@ maven.install(
         "com.amazonaws:aws-java-sdk-bom:1.12.544",
         "com.github.docker-java:docker-java-bom:3.3.3",
         "com.google.auth:google-auth-library-bom:1.23.0",
-        "io.grpc:grpc-bom:1.75.0",
+        "io.grpc:grpc-bom:" + GRPC_VERSION,
         "io.netty:netty-bom:4.1.108.Final",
         "io.opentelemetry:opentelemetry-bom:1.66.0",
     ],
@@ -209,8 +212,8 @@ maven.install(
         "com.github.fppt:jedis-mock:1.1.12",
         "com.google.jimfs:jimfs:1.3.0",
         "com.google.truth:truth:1.4.2",
-        "io.grpc:grpc-inprocess:1.75.0",
-        "io.grpc:grpc-testing:1.75.0",
+        "io.grpc:grpc-inprocess:" + GRPC_VERSION,
+        "io.grpc:grpc-testing:" + GRPC_VERSION,
         "junit:junit:4.13.2",
     ]]
 ]
