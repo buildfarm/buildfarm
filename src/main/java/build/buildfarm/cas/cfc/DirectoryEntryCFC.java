@@ -68,7 +68,8 @@ import org.jspecify.annotations.Nullable;
 
 @Log
 public class DirectoryEntryCFC extends CASFileCache {
-  private final Cache<Digest, ListenableFuture<Boolean>> fetchers = CacheBuilder.newBuilder().build();
+  private final Cache<Digest, ListenableFuture<Boolean>> fetchers =
+      CacheBuilder.newBuilder().build();
 
   public DirectoryEntryCFC(
       Path root,

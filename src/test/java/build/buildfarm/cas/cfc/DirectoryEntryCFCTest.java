@@ -38,6 +38,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache.Entry;
+import build.buildfarm.cas.cfc.CASFileCache.PathResult;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Write.NullWrite;
@@ -49,6 +50,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -163,7 +165,8 @@ class DirectoryEntryCFCTest {
     fileCache.put(new ContentAddressableStorage.Blob(content, DIGEST_UTIL));
     Directory directory =
         Directory.newBuilder()
-            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .addFiles(
+                FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
             .build();
     Digest digest = DIGEST_UTIL.compute(directory);
     Map<build.bazel.remote.execution.v2.Digest, Directory> index =
@@ -193,7 +196,8 @@ class DirectoryEntryCFCTest {
     Digest fileDigest = DIGEST_UTIL.compute(content);
     Directory directory =
         Directory.newBuilder()
-            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .addFiles(
+                FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
             .build();
     Digest digest = DIGEST_UTIL.compute(directory);
     Map<build.bazel.remote.execution.v2.Digest, Directory> index =
@@ -220,7 +224,8 @@ class DirectoryEntryCFCTest {
     fileCache.put(new ContentAddressableStorage.Blob(content, DIGEST_UTIL));
     Directory directory =
         Directory.newBuilder()
-            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .addFiles(
+                FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
             .build();
     Digest digest = DIGEST_UTIL.compute(directory);
     Map<build.bazel.remote.execution.v2.Digest, Directory> index =
@@ -234,7 +239,7 @@ class DirectoryEntryCFCTest {
             })
         .when(queued)
         .execute(any(Runnable.class));
-    var owner = fileCache.putDirectory(digest, index, queued);
+    ListenableFuture<PathResult> owner = fileCache.putDirectory(digest, index, queued);
     owner.addListener(
         () -> {
           try {
@@ -256,7 +261,7 @@ class DirectoryEntryCFCTest {
           }
         },
         directExecutor());
-    var follower = fileCache.putDirectory(digest, index, queued);
+    ListenableFuture<PathResult> follower = fileCache.putDirectory(digest, index, queued);
     while (!tasks.isEmpty()) {
       tasks.remove().run();
     }
@@ -277,10 +282,12 @@ class DirectoryEntryCFCTest {
     blobs.put(fileDigest, content);
     Directory directory =
         Directory.newBuilder()
-            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .addFiles(
+                FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
             .build();
     Digest digest = DIGEST_UTIL.compute(directory);
-    var index = ImmutableMap.of(DigestUtil.toDigest(digest), directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> index =
+        ImmutableMap.of(DigestUtil.toDigest(digest), directory);
     ArrayDeque<Runnable> tasks = new ArrayDeque<>();
     ExecutorService queued = mock(ExecutorService.class);
     doAnswer(
@@ -290,8 +297,8 @@ class DirectoryEntryCFCTest {
             })
         .when(queued)
         .execute(any(Runnable.class));
-    var owner = fileCache.putDirectory(digest, index, queued);
-    var follower = fileCache.putDirectory(digest, index, queued);
+    ListenableFuture<PathResult> owner = fileCache.putDirectory(digest, index, queued);
+    ListenableFuture<PathResult> follower = fileCache.putDirectory(digest, index, queued);
     while (!tasks.isEmpty()) {
       tasks.remove().run();
     }
@@ -319,10 +326,12 @@ class DirectoryEntryCFCTest {
     fileCache.put(new ContentAddressableStorage.Blob(content, DIGEST_UTIL));
     Directory directory =
         Directory.newBuilder()
-            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .addFiles(
+                FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
             .build();
     Digest digest = DIGEST_UTIL.compute(directory);
-    var index = ImmutableMap.of(DigestUtil.toDigest(digest), directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> index =
+        ImmutableMap.of(DigestUtil.toDigest(digest), directory);
     ExecutorService synchronous = newDirectExecutorService();
     CASFileCache concurrentCache = spy(fileCache);
     AtomicBoolean first = new AtomicBoolean(true);
@@ -331,17 +340,19 @@ class DirectoryEntryCFCTest {
             invocation -> {
               boolean exists = (boolean) invocation.callRealMethod();
               if (first.getAndSet(false)) {
-                getInterruptiblyOrIOException(concurrentCache.putDirectory(digest, index, synchronous));
+                getInterruptiblyOrIOException(
+                    concurrentCache.putDirectory(digest, index, synchronous));
               }
               return exists;
             })
         .when(concurrentCache)
         .referenceIfExists(key);
     try {
-      var result =
+      PathResult result =
           getInterruptiblyOrIOException(concurrentCache.putDirectory(digest, index, synchronous));
       assertThat(result.isMissed()).isFalse();
-      assertThat(Files.readAllBytes(result.path().resolve("file"))).isEqualTo(content.toByteArray());
+      assertThat(Files.readAllBytes(result.path().resolve("file")))
+          .isEqualTo(content.toByteArray());
       assertThat(storage.get(concurrentCache.getDirectoryKey(digest)).referenceCount).isEqualTo(2);
     } finally {
       synchronous.shutdown();
