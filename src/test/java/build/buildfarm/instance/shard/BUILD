@@ -255,3 +255,43 @@ java_test(
         "@buildfarm_maven//:redis_clients_jedis",
     ],
 )
+
+java_test(
+    name = "WritesTest",
+    size = "small",
+    srcs = [
+        "RecordingWrite.java",
+        "WritesTest.java",
+    ],
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/instance/shard",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "//src/test/java/build/buildfarm:test_runner",
+        "@buildfarm_maven//:com_google_guava_guava",
+        "@buildfarm_maven//:com_google_truth_truth",
+        "@buildfarm_maven//:io_grpc_grpc_api",
+        "@buildfarm_maven//:org_mockito_mockito_core",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+    ],
+)
+
+java_test(
+    name = "ReadOnlyAwareWriteTest",
+    size = "small",
+    srcs = [
+        "ReadOnlyAwareWriteTest.java",
+        "RecordingWrite.java",
+    ],
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/instance/shard",
+        "//src/test/java/build/buildfarm:test_runner",
+        "@buildfarm_maven//:com_google_guava_guava",
+        "@buildfarm_maven//:com_google_truth_truth",
+        "@buildfarm_maven//:io_grpc_grpc_api",
+    ],
+)

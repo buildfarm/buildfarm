@@ -21,8 +21,11 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.grpc.Status;
+import io.grpc.StatusException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 // still toying with the idea of just making a Write implement a ListenableFuture
 public interface Write {
@@ -54,6 +57,21 @@ public interface Write {
   }
 
   void reset();
+
+  /**
+   * Irreversibly cancel the write. For gRPC backed writes this cancels the gRPC call. For in-memory
+   * or file based writes, the default no-op is likely correct.
+   *
+   * @param message human-readable cancellation reason, surfaced via the resulting {@code CANCELLED}
+   *     status
+   * @param cause optional underlying throwable - null when cancel is purely caller-initiated
+   */
+  default void cancel(String message, @Nullable Throwable cause) {}
+
+  /** Convenience function for creating an cancellation exception for use by {@link #cancel} */
+  static StatusException cancelledException(String message, @Nullable Throwable cause) {
+    return Status.CANCELLED.withDescription(message).withCause(cause).asException();
+  }
 
   ListenableFuture<Long> getFuture();
 

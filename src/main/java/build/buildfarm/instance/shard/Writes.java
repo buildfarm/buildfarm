@@ -39,6 +39,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 class Writes {
   private final LoadingCache<BlobWriteKey, Instance> blobWriteInstances;
@@ -106,6 +107,15 @@ class Writes {
     public void reset() {
       try {
         delegate.reset();
+      } finally {
+        onInvalidation.run();
+      }
+    }
+
+    @Override
+    public void cancel(String message, @Nullable Throwable cause) {
+      try {
+        delegate.cancel(message, cause);
       } finally {
         onInvalidation.run();
       }

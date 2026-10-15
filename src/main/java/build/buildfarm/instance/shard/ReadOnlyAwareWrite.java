@@ -13,6 +13,7 @@ import io.grpc.Status;
 import io.grpc.Status.Code;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 /**
  * The response to any write may be FAILED_PRECONDITION, which indicates that the backend is in a
@@ -63,6 +64,10 @@ class ReadOnlyAwareWrite implements Write {
 
   private synchronized Write getDelegate() throws IOException {
     if (delegate == null) {
+      // If the future is already done, then don't start a new delegate on this same instance
+      if (future.isDone()) {
+        throw new IOException("write already terminated");
+      }
       delegate = delegateSupplier.get();
       addCallback(delegate.getFuture(), delegateCallback(), directExecutor());
     }
@@ -110,6 +115,19 @@ class ReadOnlyAwareWrite implements Write {
       getDelegate().reset();
     } catch (IOException e) {
       // unlikely, ignore
+    }
+  }
+
+  @Override
+  public void cancel(String message, @Nullable Throwable cause) {
+    Write current;
+    synchronized (this) {
+      current = delegate;
+      delegate = null;
+    }
+    future.setException(Write.cancelledException(message, cause));
+    if (current != null) {
+      current.cancel(message, cause);
     }
   }
 }
