@@ -68,7 +68,7 @@ import org.jspecify.annotations.Nullable;
 
 @Log
 public class DirectoryEntryCFC extends CASFileCache {
-  private final Cache<Digest, ListenableFuture<Void>> fetchers = CacheBuilder.newBuilder().build();
+  private final Cache<Digest, ListenableFuture<Boolean>> fetchers = CacheBuilder.newBuilder().build();
 
   public DirectoryEntryCFC(
       Path root,
@@ -269,7 +269,6 @@ public class DirectoryEntryCFC extends CASFileCache {
           }
           Entry e = new Entry(key, blobSizeInBytes, Deadline.after(10, HOURS));
           safeStorageInsertion(key, e);
-          fetchers.invalidate(digest);
           return immediateFuture(result);
         },
         service);
@@ -343,17 +342,8 @@ public class DirectoryEntryCFC extends CASFileCache {
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
-    // we must acquire a reference to this entry before delivering it to the client
-    // unfortunately that means that it will be placed onto the LRU queue briefly
-    // we could probably retry the whole procedure in that case, but maybe there is
-    // simply too much contention at that point
-    //
-    // to correct this, we could find a way to identify the fetching thread and perform
-    // the dereference only after all of the callbacks have been satisfied. Very funky
-    // future stuff would need to be in place.
-    //
-    // we can play games with the immediacy of the callback though
-    ListenableFuture<Void> fetch;
+    // A newly inserted entry owns the fetch creator's reference; followers acquire their own.
+    ListenableFuture<Boolean> fetch;
     // true if we were the creator of the fetch
     AtomicBoolean owner = new AtomicBoolean();
     try {
@@ -362,10 +352,19 @@ public class DirectoryEntryCFC extends CASFileCache {
               digest,
               () -> {
                 owner.set(true);
-                return add(path, digest, directoriesIndex, service);
+                if (referenceIfExists(key)) {
+                  return immediateFuture(false);
+                }
+                return transform(
+                    add(path, digest, directoriesIndex, service), result -> true, directExecutor());
               });
     } catch (ExecutionException e) {
       return immediateFailedFuture(e);
+    }
+    // Register cleanup after get has stored the future, including synchronous completion/failure.
+    ListenableFuture<Boolean> pendingFetch = fetch;
+    if (owner.get()) {
+      fetch.addListener(() -> fetchers.asMap().remove(digest, pendingFetch), directExecutor());
     }
     // we wil need to increment the reference count, as we did not call the future creator
     if (!owner.get()) {
@@ -373,10 +372,15 @@ public class DirectoryEntryCFC extends CASFileCache {
           transformAsync(
               fetch,
               result -> {
-                // completely unacceptable if it does not exist or is not available for reference
-                // here
+                // The owner's reference may have been released and evicted before this callback.
                 try {
-                  checkState(referenceIfExists(key));
+                  if (!referenceIfExists(key)) {
+                    fetchers.asMap().remove(digest, pendingFetch);
+                    return transform(
+                        putDirectory(digest, directoriesIndex, service),
+                        PathResult::isMissed,
+                        directExecutor());
+                  }
                 } catch (IOException e) {
                   return immediateFailedFuture(e);
                 }
@@ -384,7 +388,7 @@ public class DirectoryEntryCFC extends CASFileCache {
               },
               directExecutor());
     }
-    return transform(fetch, result -> new PathResult(path, true), directExecutor());
+    return transform(fetch, missed -> new PathResult(path, missed), directExecutor());
   }
 
   @Override

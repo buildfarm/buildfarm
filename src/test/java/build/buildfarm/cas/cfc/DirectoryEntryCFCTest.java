@@ -18,12 +18,15 @@ import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Compressor;
@@ -40,6 +43,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.v1test.Digest;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -52,10 +56,12 @@ import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.junit.After;
 import org.junit.Before;
@@ -147,6 +153,199 @@ class DirectoryEntryCFCTest {
       throw new RuntimeException("could not shut down expire service");
     }
     Directories.remove(root, fileStore);
+  }
+
+  @Test
+  public void completedDirectoryFetchCanBeRepeatedAfterRemoval() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("cached input");
+    Digest fileDigest = DIGEST_UTIL.compute(content);
+    blobs.put(fileDigest, content);
+    fileCache.put(new ContentAddressableStorage.Blob(content, DIGEST_UTIL));
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .build();
+    Digest digest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> index =
+        ImmutableMap.of(DigestUtil.toDigest(digest), directory);
+    ExecutorService synchronous = newDirectExecutorService();
+    try {
+      Path path =
+          getInterruptiblyOrIOException(fileCache.putDirectory(digest, index, synchronous)).path();
+      fileCache.decrementReferences(
+          ImmutableList.of(),
+          ImmutableList.of(DigestUtil.toDigest(digest)),
+          DIGEST_UTIL.getDigestFunction());
+      Entry entry = storage.remove(fileCache.getDirectoryKey(digest));
+      getInterruptiblyOrIOException(fileCache.dischargeEntryFuture(entry, synchronous));
+      Directories.remove(path, Files.getFileStore(root));
+      Path refetched =
+          getInterruptiblyOrIOException(fileCache.putDirectory(digest, index, synchronous)).path();
+      assertThat(Files.readAllBytes(refetched.resolve("file"))).isEqualTo(content.toByteArray());
+    } finally {
+      synchronous.shutdown();
+    }
+  }
+
+  @Test
+  public void failedDirectoryFetchCanBeRetried() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("initially missing input");
+    Digest fileDigest = DIGEST_UTIL.compute(content);
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .build();
+    Digest digest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> index =
+        ImmutableMap.of(DigestUtil.toDigest(digest), directory);
+    ExecutorService synchronous = newDirectExecutorService();
+    try {
+      assertThrows(
+          PutDirectoryException.class,
+          () -> getInterruptiblyOrIOException(fileCache.putDirectory(digest, index, synchronous)));
+      blobs.put(fileDigest, content);
+      Path path =
+          getInterruptiblyOrIOException(fileCache.putDirectory(digest, index, synchronous)).path();
+      assertThat(Files.readAllBytes(path.resolve("file"))).isEqualTo(content.toByteArray());
+    } finally {
+      synchronous.shutdown();
+    }
+  }
+
+  @Test
+  public void followerRefetchesDirectoryRemovedAfterOwnerCompletes() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("shared input");
+    Digest fileDigest = DIGEST_UTIL.compute(content);
+    blobs.put(fileDigest, content);
+    fileCache.put(new ContentAddressableStorage.Blob(content, DIGEST_UTIL));
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .build();
+    Digest digest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> index =
+        ImmutableMap.of(DigestUtil.toDigest(digest), directory);
+    ArrayDeque<Runnable> tasks = new ArrayDeque<>();
+    ExecutorService queued = mock(ExecutorService.class);
+    doAnswer(
+            invocation -> {
+              tasks.add(invocation.getArgument(0));
+              return null;
+            })
+        .when(queued)
+        .execute(any(Runnable.class));
+    var owner = fileCache.putDirectory(digest, index, queued);
+    owner.addListener(
+        () -> {
+          try {
+            Path path = getInterruptiblyOrIOException(owner).path();
+            fileCache.decrementReferences(
+                ImmutableList.of(),
+                ImmutableList.of(DigestUtil.toDigest(digest)),
+                DIGEST_UTIL.getDigestFunction());
+            Entry entry = storage.remove(fileCache.getDirectoryKey(digest));
+            ExecutorService synchronous = newDirectExecutorService();
+            try {
+              getInterruptiblyOrIOException(fileCache.dischargeEntryFuture(entry, synchronous));
+            } finally {
+              synchronous.shutdown();
+            }
+            Directories.remove(path, Files.getFileStore(root));
+          } catch (Exception e) {
+            throw new AssertionError(e);
+          }
+        },
+        directExecutor());
+    var follower = fileCache.putDirectory(digest, index, queued);
+    while (!tasks.isEmpty()) {
+      tasks.remove().run();
+    }
+    Path path = getInterruptiblyOrIOException(follower).path();
+    assertThat(Files.readAllBytes(path.resolve("file"))).isEqualTo(content.toByteArray());
+    assertThat(storage.get(fileCache.getDirectoryKey(digest)).referenceCount).isEqualTo(1);
+    fileCache.decrementReferences(
+        ImmutableList.of(),
+        ImmutableList.of(DigestUtil.toDigest(digest)),
+        DIGEST_UTIL.getDigestFunction());
+    assertThat(storage.get(fileCache.getDirectoryKey(digest)).referenceCount).isEqualTo(0);
+  }
+
+  @Test
+  public void concurrentCallersShareFetchAndHoldSeparateReferences() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("shared input");
+    Digest fileDigest = DIGEST_UTIL.compute(content);
+    blobs.put(fileDigest, content);
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .build();
+    Digest digest = DIGEST_UTIL.compute(directory);
+    var index = ImmutableMap.of(DigestUtil.toDigest(digest), directory);
+    ArrayDeque<Runnable> tasks = new ArrayDeque<>();
+    ExecutorService queued = mock(ExecutorService.class);
+    doAnswer(
+            invocation -> {
+              tasks.add(invocation.getArgument(0));
+              return null;
+            })
+        .when(queued)
+        .execute(any(Runnable.class));
+    var owner = fileCache.putDirectory(digest, index, queued);
+    var follower = fileCache.putDirectory(digest, index, queued);
+    while (!tasks.isEmpty()) {
+      tasks.remove().run();
+    }
+    assertThat(getInterruptiblyOrIOException(owner).path())
+        .isEqualTo(getInterruptiblyOrIOException(follower).path());
+    Entry entry = storage.get(fileCache.getDirectoryKey(digest));
+    assertThat(entry.referenceCount).isEqualTo(2);
+    fileCache.decrementReferences(
+        ImmutableList.of(),
+        ImmutableList.of(DigestUtil.toDigest(digest)),
+        DIGEST_UTIL.getDigestFunction());
+    assertThat(entry.referenceCount).isEqualTo(1);
+    fileCache.decrementReferences(
+        ImmutableList.of(),
+        ImmutableList.of(DigestUtil.toDigest(digest)),
+        DIGEST_UTIL.getDigestFunction());
+    assertThat(entry.referenceCount).isEqualTo(0);
+  }
+
+  @Test
+  public void directoryPublishedAfterInitialMissIsReferencedWithoutRefetch() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("late cached input");
+    Digest fileDigest = DIGEST_UTIL.compute(content);
+    blobs.put(fileDigest, content);
+    fileCache.put(new ContentAddressableStorage.Blob(content, DIGEST_UTIL));
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(FileNode.newBuilder().setName("file").setDigest(DigestUtil.toDigest(fileDigest)))
+            .build();
+    Digest digest = DIGEST_UTIL.compute(directory);
+    var index = ImmutableMap.of(DigestUtil.toDigest(digest), directory);
+    ExecutorService synchronous = newDirectExecutorService();
+    CASFileCache concurrentCache = spy(fileCache);
+    AtomicBoolean first = new AtomicBoolean(true);
+    String key = concurrentCache.getDirectoryKey(digest);
+    doAnswer(
+            invocation -> {
+              boolean exists = (boolean) invocation.callRealMethod();
+              if (first.getAndSet(false)) {
+                getInterruptiblyOrIOException(concurrentCache.putDirectory(digest, index, synchronous));
+              }
+              return exists;
+            })
+        .when(concurrentCache)
+        .referenceIfExists(key);
+    try {
+      var result =
+          getInterruptiblyOrIOException(concurrentCache.putDirectory(digest, index, synchronous));
+      assertThat(result.isMissed()).isFalse();
+      assertThat(Files.readAllBytes(result.path().resolve("file"))).isEqualTo(content.toByteArray());
+      assertThat(storage.get(concurrentCache.getDirectoryKey(digest)).referenceCount).isEqualTo(2);
+    } finally {
+      synchronous.shutdown();
+    }
   }
 
   @Test
