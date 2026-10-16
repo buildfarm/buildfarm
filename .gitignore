@@ -5,8 +5,12 @@ bazel-*
 /.vscode/
 
 # IntelliJ IDEA
+/.bazelbsp/
 /.idea/
 *.iml
+
+# Metals v2 LSP
+/.metals/
 
 # Eclipse
 /.project

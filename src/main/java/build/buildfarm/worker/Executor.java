@@ -79,6 +79,8 @@ import lombok.extern.java.Log;
 @Log
 public class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
+  private static final String CGROUP_INTERPOLATION = "cgroup";
+  private static final String EXECUTION_CGROUP_PREFIX = "executions/operations/";
   private static final long SAMPLE_NANOS = 100_000_000;
   private static final String SAMPLE_CPU_USAGE_USEC = "cpu.usage_usec";
   private static final String SAMPLE_CPU_THROTTLED_USEC = "cpu.throttled_usec";
@@ -246,7 +248,7 @@ public class Executor {
     return timeout;
   }
 
-  private static final class Interpolator {
+  static final class Interpolator {
     private final Iterable<?> value;
 
     Interpolator(String value) {
@@ -262,8 +264,8 @@ public class Executor {
     }
   }
 
-  private static Map<String, Interpolator> createInterpolations(
-      Claim claim, Iterable<Property> properties) {
+  static Map<String, Interpolator> createInterpolations(
+      Claim claim, Iterable<Property> properties, String executionName) {
     Map<String, Interpolator> interpolations = new HashMap<>();
     if (claim != null) {
       for (Map.Entry<String, List<Object>> pool : claim.getPools()) {
@@ -278,10 +280,13 @@ public class Executor {
         transformValues(
             uniqueIndex(properties, Property::getName),
             property -> new Interpolator(property.getValue())));
+    String operationId = executionName.substring(executionName.lastIndexOf('/') + 1);
+    interpolations.put(
+        CGROUP_INTERPOLATION, new Interpolator(EXECUTION_CGROUP_PREFIX + operationId));
     return interpolations;
   }
 
-  private static Iterable<String> transformWrapper(
+  static Iterable<String> transformWrapper(
       ExecutionWrapper wrapper, Map<String, Interpolator> interpolations) {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
@@ -331,7 +336,9 @@ public class Executor {
     // similar to the policy selection here
     Map<String, Interpolator> interpolations =
         createInterpolations(
-            executionContext.claim, executionContext.queueEntry.getPlatform().getPropertiesList());
+            executionContext.claim,
+            executionContext.queueEntry.getPlatform().getPropertiesList(),
+            executionName);
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
