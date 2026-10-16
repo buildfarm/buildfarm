@@ -335,8 +335,8 @@ class CASFileCacheTest {
     DirectoryEntryCFC directoryCache =
         new DirectoryEntryCFC(
             root.resolve("directory-entry"),
-            /* maxSizeInBytes= */ 1024,
-            /* maxEntrySizeInBytes= */ 1024,
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
             /* hexBucketLevels= */ 1,
             expireService,
             directExecutor(),
@@ -416,8 +416,8 @@ class CASFileCacheTest {
     DirectoryEntryCFC directoryCache =
         new DirectoryEntryCFC(
             root.resolve("directory-entry"),
-            /* maxSizeInBytes= */ 1024,
-            /* maxEntrySizeInBytes= */ 1024,
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
             /* hexBucketLevels= */ 1,
             expireService,
             directExecutor(),
@@ -484,8 +484,8 @@ class CASFileCacheTest {
     DirectoryEntryCFC directoryCache =
         new DirectoryEntryCFC(
             root.resolve("directory-entry"),
-            /* maxSizeInBytes= */ 1024,
-            /* maxEntrySizeInBytes= */ 1024,
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
             /* hexBucketLevels= */ 1,
             expireService,
             directExecutor(),

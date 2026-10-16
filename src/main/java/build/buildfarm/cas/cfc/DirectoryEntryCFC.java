@@ -18,7 +18,7 @@ import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
 import static build.buildfarm.common.io.Directories.makeWritable;
 import static build.buildfarm.common.io.EvenMoreFiles.setReadOnlyPerms;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.Futures.catchingAsync;
+import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.successfulAsList;
@@ -41,6 +41,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.grpc.Context;
@@ -214,6 +215,7 @@ public class DirectoryEntryCFC extends CASFileCache {
       Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       ExecutorService service) {
+    Context context = Context.current();
     String suffix = UUID.randomUUID().toString();
     Path filename = path.getFileName();
     String tmpFilename = filename + ".tmp." + suffix;
@@ -230,7 +232,7 @@ public class DirectoryEntryCFC extends CASFileCache {
               disableAllWriteAccess(tmpPath, fileStore, /* excludeTopLevel= */ true);
               return immediateFuture(null);
             },
-            Context.current().fixedContextExecutor(service));
+            context.fixedContextExecutor(service));
     ListenableFuture<Void> renamed =
         transformAsync(
             limited,
@@ -242,23 +244,45 @@ public class DirectoryEntryCFC extends CASFileCache {
               makeWritable(path, /* writable= */ false, fileStore);
               return immediateFuture(result);
             },
-            Context.current().fixedContextExecutor(service));
-    ListenableFuture<Void> rolled =
-        catchingAsync(
-            renamed,
-            Throwable.class,
-            e -> {
-              try {
-                // does this need a new uncancelled context?
-                Directories.remove(tmpPath, fileStore);
-              } catch (IOException removeException) {
-                e.addSuppressed(removeException);
-              }
-              return immediateFailedFuture(e);
-            },
-            service);
+            context.fixedContextExecutor(service));
+    Context.CancellationListener cleanupOnCancellation =
+        cancelledContext -> {
+          Context previous = Context.ROOT.attach();
+          try {
+            try {
+              Directories.remove(tmpPath, fileStore);
+            } catch (IOException e) {
+              log.log(Level.WARNING, "error removing cancelled directory fetch " + tmpPath, e);
+            }
+          } finally {
+            Context.ROOT.detach(previous);
+          }
+        };
+    context.addListener(cleanupOnCancellation, directExecutor());
+    addCallback(
+        renamed,
+        new FutureCallback<>() {
+          @Override
+          public void onSuccess(@Nullable Void result) {
+            context.removeListener(cleanupOnCancellation);
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            if (context.isCancelled()) {
+              return;
+            }
+            context.removeListener(cleanupOnCancellation);
+            try {
+              Directories.remove(tmpPath, fileStore);
+            } catch (IOException removeException) {
+              t.addSuppressed(removeException);
+            }
+          }
+        },
+        directExecutor());
     return transformAsync(
-        rolled,
+        renamed,
         result -> {
           String key = filename.toString();
           long blobSizeInBytes = getCompleted(fetched);
