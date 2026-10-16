@@ -42,6 +42,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
@@ -54,6 +55,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.TokenizableIterator;
+import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
@@ -83,7 +85,9 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.UUID;
@@ -232,6 +236,152 @@ public class NodeInstanceTest {
         Watcher watcher) {
       throw new UnsupportedOperationException();
     }
+  }
+
+  /**
+   * A NodeInstance backed by an in-memory directory map, exposing getTree over a real TreeIterator.
+   * Used to exercise page-size and message-size limiting of getTree.
+   */
+  static class TreeServerInstance extends DummyServerInstance {
+    private final Map<Digest, Directory> directoriesIndex;
+    private final int maxPageSize;
+
+    TreeServerInstance(Map<Digest, Directory> directoriesIndex, int maxPageSize) {
+      this.directoriesIndex = directoriesIndex;
+      this.maxPageSize = maxPageSize;
+    }
+
+    @Override
+    protected int getTreeDefaultPageSize() {
+      return maxPageSize;
+    }
+
+    @Override
+    protected int getTreeMaxPageSize() {
+      return maxPageSize;
+    }
+
+    @Override
+    protected TokenizableIterator<DirectoryEntry> createTreeIterator(
+        String reason, Digest rootDigest, String pageToken) {
+      return new TreeIterator(directoriesIndex::get, rootDigest, pageToken);
+    }
+  }
+
+  private static Directory directoryWithFiles(int fileCount, int nameSize) {
+    Directory.Builder builder = Directory.newBuilder();
+    for (int i = 0; i < fileCount; i++) {
+      builder.addFiles(
+          FileNode.newBuilder().setName(String.format("%0" + nameSize + "d", i)).build());
+    }
+    return builder.build();
+  }
+
+  /**
+   * Walks the entire tree via getTree, collecting every directory page. Returns the concatenation
+   * of all pages' directory hashes in encounter order so callers can assert no loss/duplication.
+   */
+  private static List<String> walkTree(NodeInstance instance, Digest rootDigest, int pageSize) {
+    List<String> hashes = new ArrayList<>();
+    String pageToken = "";
+    int pages = 0;
+    do {
+      build.buildfarm.v1test.Tree.Builder tree = build.buildfarm.v1test.Tree.newBuilder();
+      pageToken = instance.getTree(rootDigest, pageSize, pageToken, tree);
+      hashes.addAll(tree.getDirectoriesMap().keySet());
+      if (++pages > 1000) {
+        throw new IllegalStateException("walkTree did not terminate after 1000 pages");
+      }
+    } while (!pageToken.isEmpty());
+    return hashes;
+  }
+
+  /*-
+   * A root directory referencing many sibling child directories, each large enough that
+   * the requested pageSize worth of them exceeds the grpc message limit. getTree must
+   * return a truncated page that fits under the limit, with a continuation token, and
+   * lose no directories across the full walk.
+   */
+  @Test
+  public void getTreeTruncatesPageToMessageSizeLimit() {
+    Map<Digest, Directory> directoriesIndex = new HashMap<>();
+
+    // each child directory is ~1KiB serialized; vary content so digests are distinct (the
+    // TreeIterator page token resumes by digest, so identical siblings cannot be distinguished)
+    List<DirectoryNode> children = new ArrayList<>();
+    int childCount = 32;
+    for (int i = 0; i < childCount; i++) {
+      Directory child =
+          directoryWithFiles(/* fileCount= */ 16, /* nameSize= */ 60).toBuilder()
+              .addFiles(FileNode.newBuilder().setName(String.format("unique-%05d", i)).build())
+              .build();
+      Digest childDigest = DIGEST_UTIL.compute(child);
+      directoriesIndex.put(childDigest, child);
+      children.add(
+          DirectoryNode.newBuilder()
+              .setName(String.format("child-%05d", i))
+              .setDigest(DigestUtil.toDigest(childDigest))
+              .build());
+    }
+    // DirectoryNodes must be sorted by name for a valid Directory
+    children.sort((a, b) -> a.getName().compareTo(b.getName()));
+    Directory root = Directory.newBuilder().addAllDirectories(children).build();
+    Digest rootDigest = DIGEST_UTIL.compute(root);
+    directoriesIndex.put(rootDigest, root);
+
+    // limit chosen so several, but not all, children fit in a single page
+    int maxPageSizeBytes = 8 * 1024;
+    TreeServerInstance instance =
+        new TreeServerInstance(directoriesIndex, /* maxPageSize= */ childCount + 1);
+    instance.setGetTreeMaxMessageSizeBytes(maxPageSizeBytes);
+
+    // request the whole tree in a single page
+    int pageSize = childCount + 1;
+    build.buildfarm.v1test.Tree.Builder firstPage = build.buildfarm.v1test.Tree.newBuilder();
+    String nextPageToken = instance.getTree(rootDigest, pageSize, "", firstPage);
+
+    // the response must not have swallowed the whole tree into one oversized message;
+    // measure the actual GetTreeResponse wire message the service would send for this page
+    int firstPageBytes =
+        GetTreeResponse.newBuilder()
+            .addAllDirectories(firstPage.build().getDirectoriesMap().values())
+            .build()
+            .getSerializedSize();
+    assertThat(firstPageBytes).isAtMost(maxPageSizeBytes);
+    assertThat(nextPageToken).isNotEmpty();
+
+    // walking the whole tree must yield root + every child exactly once
+    List<String> allHashes = walkTree(instance, rootDigest, pageSize);
+    assertThat(allHashes).hasSize(childCount + 1);
+    assertThat(allHashes).containsNoDuplicates();
+    assertThat(allHashes).contains(rootDigest.getHash());
+    for (DirectoryNode child : children) {
+      assertThat(allHashes).contains(child.getDigest().getHash());
+    }
+  }
+
+  /*-
+   * The first directory of a page is always emitted, even when it alone exceeds the message
+   * size limit - otherwise getTree would make no progress and loop forever.
+   */
+  @Test
+  public void getTreeEmitsFirstDirectoryEvenWhenOversized() {
+    Map<Digest, Directory> directoriesIndex = new HashMap<>();
+    Directory root = directoryWithFiles(/* fileCount= */ 256, /* nameSize= */ 60);
+    Digest rootDigest = DIGEST_UTIL.compute(root);
+    directoriesIndex.put(rootDigest, root);
+
+    int maxPageSizeBytes = 1024; // smaller than root itself
+    assertThat(root.getSerializedSize()).isGreaterThan(maxPageSizeBytes);
+
+    TreeServerInstance instance = new TreeServerInstance(directoriesIndex, /* maxPageSize= */ 16);
+    instance.setGetTreeMaxMessageSizeBytes(maxPageSizeBytes);
+
+    build.buildfarm.v1test.Tree.Builder tree = build.buildfarm.v1test.Tree.newBuilder();
+    String nextPageToken = instance.getTree(rootDigest, /* pageSize= */ 16, "", tree);
+
+    assertThat(tree.getDirectoriesMap()).containsKey(rootDigest.getHash());
+    assertThat(nextPageToken).isEmpty();
   }
 
   @Test
