@@ -8,7 +8,7 @@ module(
 # renovate: datasource=github-releases depName=grpc/grpc-java versioning=semver
 GRPC_VERSION = "1.84.0"
 
-bazel_dep(name = "protobuf", version = "36.2", repo_name = "com_google_protobuf")
+bazel_dep(name = "protobuf", version = "36.2")
 archive_override(
     module_name = "protobuf",
     integrity = "sha256-nORMOJDuk/j0A9shmOvXEfz4vq49E/GKNvW8FFh0j0A=",

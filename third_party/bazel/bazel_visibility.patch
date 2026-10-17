@@ -8,3 +8,79 @@ index 7e2d2a1461..a10ebef005 100644
 
  cc_binary(
      name = "daemonize",
+
+diff --git a/src/main/protobuf/BUILD b/src/main/protobuf/BUILD
+--- a/src/main/protobuf/BUILD
++++ b/src/main/protobuf/BUILD
+@@ -1,7 +1,7 @@
+ load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+-load("@com_google_protobuf//bazel:java_proto_library.bzl", "java_proto_library")
+-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+-load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
++load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
++load("@protobuf//bazel:java_proto_library.bzl", "java_proto_library")
++load("@protobuf//bazel:proto_library.bzl", "proto_library")
++load("@protobuf//bazel:py_proto_library.bzl", "py_proto_library")
+ load("@grpc-java//:java_grpc_library.bzl", "java_grpc_library")
+ load("//tools/build_rules:utilities.bzl", "java_library_srcs")
+
+@@ -81,8 +81,8 @@
+ java_proto_library(
+     name = "any_java_proto",
+-    deps = ["@com_google_protobuf//:any_proto"],
++    deps = ["@protobuf//:any_proto"],
+ )
+
+ java_proto_library(
+     name = "wrappers_java_proto",
+-    deps = ["@com_google_protobuf//:wrappers_proto"],
++    deps = ["@protobuf//:wrappers_proto"],
+ )
+
+@@ -94,6 +94,6 @@
+     srcs = ["command_server.proto"],
+     deps = [
+         ":failure_details_proto",
+-        "@com_google_protobuf//:any_proto",
++        "@protobuf//:any_proto",
+     ],
+ )
+
+@@ -111,5 +111,5 @@
+ proto_library(
+     name = "failure_details_proto",
+     srcs = ["failure_details.proto"],
+-    deps = ["@com_google_protobuf//:descriptor_proto"],
++    deps = ["@protobuf//:descriptor_proto"],
+ )
+
+ java_proto_library(
+@@ -237,7 +237,7 @@
+     name = "remote_execution_log_proto",
+     srcs = ["remote_execution_log.proto"],
+     deps = [
+-        "@com_google_protobuf//:timestamp_proto",
++        "@protobuf//:timestamp_proto",
+         "@googleapis//google/bytestream:bytestream_proto",
+         "@googleapis//google/longrunning:operations_proto",
+         "@googleapis//google/rpc:status_proto",
+@@ -289,7 +289,7 @@
+     name = "bazel_output_service_proto",
+     srcs = ["bazel_output_service.proto"],
+     deps = [
+-        "@com_google_protobuf//:any_proto",
++        "@protobuf//:any_proto",
+         "@googleapis//google/rpc:status_proto",
+     ],
+ )
+@@ -349,7 +349,7 @@
+     name = "spawn_proto",
+     srcs = ["spawn.proto"],
+     deps = [
+-        "@com_google_protobuf//:duration_proto",
+-        "@com_google_protobuf//:timestamp_proto",
++        "@protobuf//:duration_proto",
++        "@protobuf//:timestamp_proto",
+     ],
+ )
