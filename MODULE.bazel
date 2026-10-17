@@ -36,6 +36,7 @@ single_version_override(
     patches = [
         "//third_party:googleapis.patch",
     ],
+    version = "0.0.0-20260109-6145b5ff",
 )
 
 bazel_dep(name = "googleapis-grpc-java", version = "1.1.5")
@@ -44,15 +45,7 @@ bazel_dep(name = "hermetic_cc_toolchain", version = "4.3.0")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_cc", version = "0.2.26")
 bazel_dep(name = "rules_java", version = "9.9.0")
-bazel_dep(name = "rules_jvm_external", version = "6.9")
-single_version_override(
-    module_name = "rules_jvm_external",
-    patch_strip = 1,
-    patches = [
-        "//third_party:rules_jvm_external.patch",
-    ],
-)
-
+bazel_dep(name = "rules_jvm_external", version = "7.2")
 bazel_dep(name = "rules_license", version = "1.0.0")
 bazel_dep(name = "rules_oci", version = "2.3.0")
 bazel_dep(name = "rules_pkg", version = "1.3.0")
@@ -270,13 +263,6 @@ use_repo(
 
 # this is *only* required for bazel and should not be used in our repository
 bazel_dep(name = "rules_proto", version = "6.0.2")
-
-googleapis_switched_rules = use_extension("@googleapis//:extensions.bzl", "switched_rules")
-googleapis_switched_rules.use_languages(
-    grpc = True,
-    java = True,
-)
-use_repo(googleapis_switched_rules, "com_google_googleapis_imports")
 
 find_rpm = use_extension("@rules_pkg//toolchains/rpm:rpmbuild_configure.bzl", "find_system_rpmbuild_bzlmod")
 use_repo(find_rpm, "rules_pkg_rpmbuild")
