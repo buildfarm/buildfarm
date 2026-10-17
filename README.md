@@ -162,9 +162,9 @@ To install OCI bundled Helm chart:
 
 ```bash
 helm install \
-  -n bazel-buildfarm \
+  -n buildfarm \
   --create-namespace \
-  bazel-buildfarm \
+  buildfarm \
   oci://ghcr.io/buildfarm/buildfarm \
-  --version "0.4.1"
+  --version "0.5.0"
 ```
