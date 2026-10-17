@@ -1,0 +1,86 @@
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -61,6 +61,9 @@
+ bazel_dep(name = "rules_java", version = "9.1.0")
+ bazel_dep(name = "rules_jvm_external", version = "6.0")
+
++grpc_java_plugin = use_extension("//:grpc_java_plugin_extension.bzl", "grpc_java_plugin")
++use_repo(grpc_java_plugin, "grpc_java_plugin")
++
+ android_sdk_repository_extension = use_extension(
+     "@rules_android//rules/android_sdk_repository:rule.bzl",
+     "android_sdk_repository_extension",
+diff --git a/compiler/BUILD.bazel b/compiler/BUILD.bazel
+--- a/compiler/BUILD.bazel
++++ b/compiler/BUILD.bazel
+@@ -47,7 +47,7 @@
+     name = "java_grpc_library_toolchain",
+     command_line = "--rpc-plugin_out=$(OUT)",
+     output_files = "single",
+-    plugin = "//compiler:grpc_java_plugin",
++    plugin = "@grpc_java_plugin//:plugin",
+     plugin_format_flag = "--plugin=protoc-gen-rpc-plugin=%s",
+     runtime = ":java_grpc_library_deps__do_not_reference",
+     visibility = ["//visibility:public"],
+@@ -57,7 +57,7 @@
+     name = "java_lite_grpc_library_toolchain",
+     command_line = "--rpc-plugin_out=lite:$(OUT)",
+     output_files = "single",
+-    plugin = "//compiler:grpc_java_plugin",
++    plugin = "@grpc_java_plugin//:plugin",
+     plugin_format_flag = "--plugin=protoc-gen-rpc-plugin=%s",
+     runtime = ":java_lite_grpc_library_deps__do_not_reference",
+     visibility = ["//visibility:public"],
+diff --git a/grpc_java_plugin_extension.bzl b/grpc_java_plugin_extension.bzl
+new file mode 100644
+--- /dev/null
++++ b/grpc_java_plugin_extension.bzl
+@@ -0,0 +1,48 @@
++"""Fetch the published protoc-gen-grpc-java executable for the execution host."""
++
++_VERSION = "1.85.0"
++_ARTIFACTS = {
++    "aarch64-apple-darwin": ("osx-aarch_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
++    "aarch64-unknown-linux-gnu": ("linux-aarch_64", "44a64c742b4474841d6b41deef881a63936c1515600d2cb9c5f330f2926bd2ab"),
++    "i686-pc-windows-msvc": ("windows-x86_32", "253b3cdf99d7f87c157279c1c08c3a8cf1624914f307f741dcc9d24710e9006b"),
++    "i686-unknown-linux-gnu": ("linux-x86_32", "027aa5c4caf81602180cc268c129f29b1750b74a84c24b0accb3e6e4e19a63e9"),
++    "powerpc64le-unknown-linux-gnu": ("linux-ppcle_64", "55185f0cea2df697b4be7ff108df2846ff3b6969387ea359e70edf206d1b96d2"),
++    "s390x-unknown-linux-gnu": ("linux-s390_64", "50a6fa1d9932f14caaa2ae33f6418c9dffa91eebd3e1896687ec4384bd041fa9"),
++    "x86_64-apple-darwin": ("osx-x86_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
++    "x86_64-pc-windows-msvc": ("windows-x86_64", "c31e6e40033800789ba779e261703d2a5909fbd8dcff2cf115f00bec2863c21d"),
++    "amd64-linux": ("linux-x86_64", "9b44d03a2e9b3556a5077bd13a8a1fb06c67ced0495c930a678401fa19e297c0"),
++    "aarch64-darwin": ("osx-aarch_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
++    "aarch64-linux": ("linux-aarch_64", "44a64c742b4474841d6b41deef881a63936c1515600d2cb9c5f330f2926bd2ab"),
++    "amd64-darwin": ("osx-x86_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
++}
++
++def _grpc_java_plugin_repo_impl(rctx):
++    platform = rctx.os.arch + "-" + rctx.os.name
++    artifact, sha256 = _ARTIFACTS.get(platform, (None, None))
++    if not artifact:
++        fail("unsupported protoc-gen-grpc-java execution platform: {}".format(platform))
++    rctx.download(
++        url = "https://repo.maven.apache.org/maven2/io/grpc/protoc-gen-grpc-java/{0}/protoc-gen-grpc-java-{0}-{1}.exe".format(_VERSION, artifact),
++        output = "plugin_source",
++        sha256 = sha256,
++        executable = True,
++    )
++    rctx.file("BUILD.bazel", """\
++genrule(
++    name = \"plugin\",
++    srcs = [\"plugin_source\"],
++    outs = [\"protoc-gen-grpc-java.exe\"],
++    cmd = \"cp $(location plugin_source) $@ && chmod +x $@\",
++    executable = True,
++    visibility = [\"//visibility:public\"],
++)
++""")
++
++_grpc_java_plugin_repo = repository_rule(
++    implementation = _grpc_java_plugin_repo_impl,
++)
++
++def _grpc_java_plugin_impl(_ctx):
++    _grpc_java_plugin_repo(name = "grpc_java_plugin")
++
++grpc_java_plugin = module_extension(implementation = _grpc_java_plugin_impl)

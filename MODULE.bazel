@@ -5,8 +5,11 @@ module(
     repo_name = "build_buildfarm",
 )
 
-# renovate: datasource=github-releases depName=grpc/grpc-java versioning=semver
+# renovate: datasource=github-releases depName=grpc/grpc versioning=semver
 GRPC_VERSION = "1.84.0"
+
+# renovate: datasource=github-releases depName=grpc/grpc-java versioning=semver
+GRPC_JAVA_VERSION = "1.85.0"
 
 bazel_dep(name = "protobuf", version = "36.2")
 archive_override(
@@ -28,7 +31,16 @@ bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "blake3", version = "1.8.2.bcr.1")
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
-bazel_dep(name = "grpc-java", version = GRPC_VERSION)
+bazel_dep(name = "grpc-java", version = GRPC_JAVA_VERSION)
+archive_override(
+    module_name = "grpc-java",
+    integrity = "sha256-9pBG6BASS7w68LqlprnJ8m+/DD0cgwOzLU761xJi2D0=",
+    patch_strip = 1,
+    patches = ["//third_party:grpc-java.patch"],
+    strip_prefix = "grpc-java-" + GRPC_JAVA_VERSION,
+    urls = ["https://github.com/grpc/grpc-java/archive/refs/tags/v" + GRPC_JAVA_VERSION + ".tar.gz"],
+)
+
 bazel_dep(name = "googleapis", version = "0.0.0-20260929-28769825")
 bazel_dep(name = "googleapis-grpc-java", version = "1.1.5")
 bazel_dep(name = "grpc-proto", version = "0.0.0-20260915-dd549fc", repo_name = "io_grpc_grpc_proto")
