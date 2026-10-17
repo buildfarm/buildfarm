@@ -93,10 +93,10 @@ $ bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PW
 
 Most third-party dependencies (e.g. protobuf, gRPC, ...) are managed automatically via
 [rules_jvm_external](https://github.com/bazelbuild/rules_jvm_external). These dependencies are enumerated in
-the WORKSPACE with a `maven_install` `artifacts` parameter.
+`MODULE.bazel` with a `maven.install` `artifacts` parameter.
 
 Things that aren't supported by `rules_jvm_external` are being imported as manually managed remote repos via
-the `WORKSPACE` file.
+`MODULE.bazel`.
 
 ### Deployments
 
@@ -114,19 +114,22 @@ git_override(
 )
 
 # Transitive!
-# TODO: remove this after https://github.com/bazelbuild/remote-apis/pull/293 is merged
-bazel_dep(name = "remoteapis", version = "eb433accc6a666b782ea4b787eb598e5c3d27c93")
+bazel_dep(
+    name = "bazel_remote_apis",
+    version = "6def1c5d27a527c400875c24ae8b1a160145d7e1",
+    repo_name = "remoteapis",
+)
 archive_override(
-    module_name = "remoteapis",
-    integrity = "sha256-68wzxNAkPZ49/zFwPYQ5z9MYbgxoeIEazKJ24+4YqIQ=",
-    strip_prefix = "remote-apis-eb433accc6a666b782ea4b787eb598e5c3d27c93",
+    module_name = "bazel_remote_apis",
+    integrity = "sha256-5j9j/ERWqAmV5bqecN8RFDrNJlGM9tqfv/WqMCxJBSQ=",
+    strip_prefix = "remote-apis-6def1c5d27a527c400875c24ae8b1a160145d7e1",
     urls = [
-        "https://github.com/bazelbuild/remote-apis/archive/eb433accc6a666b782ea4b787eb598e5c3d27c93.zip",
+        "https://github.com/bazelbuild/remote-apis/archive/6def1c5d27a527c400875c24ae8b1a160145d7e1.zip",
     ],
 )
 
 bazel_dep(name = "googleapis", version = "0.0.0-20260929-28769825")
-bazel_dep(name = "grpc-java", version = "1.62.2")
+bazel_dep(name = "grpc-java", version = "1.84.0")
 
 ```
 
