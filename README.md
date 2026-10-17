@@ -125,15 +125,8 @@ archive_override(
     ],
 )
 
-bazel_dep(name = "googleapis", version = "0.0.0-20240326-1c8d509c5", repo_name = "com_google_googleapis")
+bazel_dep(name = "googleapis", version = "0.0.0-20260929-28769825")
 bazel_dep(name = "grpc-java", version = "1.62.2")
-
-googleapis_switched_rules = use_extension("@googleapis//:extensions.bzl", "switched_rules")
-googleapis_switched_rules.use_languages(
-    grpc = True,
-    java = True,
-)
-use_repo(googleapis_switched_rules, "com_google_googleapis_imports")
 
 ```
 
