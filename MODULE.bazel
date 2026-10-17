@@ -8,17 +8,17 @@ module(
 # renovate: datasource=github-releases depName=grpc/grpc-java versioning=semver
 GRPC_VERSION = "1.84.0"
 
-bazel_dep(name = "protobuf", version = "33.4", repo_name = "com_google_protobuf")
+bazel_dep(name = "protobuf", version = "36.2", repo_name = "com_google_protobuf")
 archive_override(
     module_name = "protobuf",
-    integrity = "sha256-aH6YpHGXO1xf1xF1DEC4uCwK3jP2Sdtl4AspDyk0Wis=",
+    integrity = "sha256-nORMOJDuk/j0A9shmOvXEfz4vq49E/GKNvW8FFh0j0A=",
     patch_strip = 1,
     patches = [
         "//third_party:protobuf.patch",
     ],
-    strip_prefix = "protobuf-33.4",
+    strip_prefix = "protobuf-36.2",
     urls = [
-        "https://github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz",
+        "https://github.com/protocolbuffers/protobuf/releases/download/v36.2/protobuf-36.2.bazel.tar.gz",
     ],
 )
 
@@ -262,7 +262,7 @@ use_repo(
 )
 
 # this is *only* required for bazel and should not be used in our repository
-bazel_dep(name = "rules_proto", version = "6.0.2")
+bazel_dep(name = "rules_proto", version = "7.1.0")
 
 find_rpm = use_extension("@rules_pkg//toolchains/rpm:rpmbuild_configure.bzl", "find_system_rpmbuild_bzlmod")
 use_repo(find_rpm, "rules_pkg_rpmbuild")
