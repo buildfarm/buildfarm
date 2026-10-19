@@ -25,8 +25,8 @@ import static build.buildfarm.instance.server.NodeInstance.OUTPUT_DIRECTORY_IS_O
 import static build.buildfarm.instance.server.NodeInstance.OUTPUT_FILE_IS_OUTPUT_ANCESTOR;
 import static build.buildfarm.instance.server.NodeInstance.SYMLINK_TARGET_ABSOLUTE;
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertThrows;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
@@ -40,9 +40,9 @@ import static org.mockito.Mockito.when;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.GetTreeResponse;
@@ -1095,18 +1095,22 @@ public class NodeInstanceTest {
     NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
     Write write = mock(Write.class);
     when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
-        .thenReturn(new FeedbackOutputStream() {
-          @Override
-          public void write(int b) {}
+        .thenReturn(
+            new FeedbackOutputStream() {
+              @Override
+              public void write(int b) {}
 
-          @Override
-          public boolean isReady() {
-            return true;
-          }
-        });
+              @Override
+              public boolean isReady() {
+                return true;
+              }
+            });
     when(write.getFuture()).thenReturn(immediateFuture((long) content.size()));
     when(contentAddressableStorage.getWrite(
-            eq(Compressor.Value.IDENTITY), eq(casDigest), any(UUID.class), any(RequestMetadata.class)))
+            eq(Compressor.Value.IDENTITY),
+            eq(casDigest),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(write);
     HttpURLConnection connection = mock(HttpURLConnection.class);
     when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
@@ -1126,7 +1130,10 @@ public class NodeInstanceTest {
         .isEqualTo(casDigest);
     verify(contentAddressableStorage)
         .getWrite(
-            eq(Compressor.Value.IDENTITY), eq(casDigest), any(UUID.class), any(RequestMetadata.class));
+            eq(Compressor.Value.IDENTITY),
+            eq(casDigest),
+            any(UUID.class),
+            any(RequestMetadata.class));
   }
 
   @Test

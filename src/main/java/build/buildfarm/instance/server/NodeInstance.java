@@ -775,7 +775,7 @@ public abstract class NodeInstance extends InstanceBase {
       Digest digest = casDigestUtil.build(casHasher.hash().toString(), size);
       Write write = getContentWrite.create(digest);
       try (InputStream in = Files.newInputStream(downloaded);
-        OutputStream out = write.getOutput(1, DAYS, () -> {})) {
+          OutputStream out = write.getOutput(1, DAYS, () -> {})) {
         ByteStreams.copy(in, out);
       } catch (WriteCompleteException e) {
         // ignore - completed write transform below delivers early result, future should be done

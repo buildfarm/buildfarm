@@ -72,13 +72,10 @@ public class FetchService extends FetchImplBase {
   }
 
   private static void parseQualifier(
-      String name,
-      String value,
-      FetchQualifiers.Builder fetchQualifiers) {
+      String name, String value, FetchQualifiers.Builder fetchQualifiers) {
     switch (name) {
       case QUALIFIER_CANONICAL_ID -> fetchQualifiers.setCanonicalId(value);
-      case QUALIFIER_CHECKSUM_SRI ->
-          fetchQualifiers.setDigest(parseChecksumSRI(value));
+      case QUALIFIER_CHECKSUM_SRI -> fetchQualifiers.setDigest(parseChecksumSRI(value));
       case String s when s.startsWith(QUALIFIER_HTTP_HEADER_PREFIX) ->
           fetchQualifiers.putHeaders(s.substring(QUALIFIER_HTTP_HEADER_PREFIX.length()), value);
       case String s when s.startsWith(QUALIFIER_HTTP_HEADER_URL_PREFIX) ->
