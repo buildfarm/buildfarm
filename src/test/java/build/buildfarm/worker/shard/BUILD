@@ -25,6 +25,7 @@ java_test(
         "@buildfarm_maven//:io_grpc_grpc_core",
         "@buildfarm_maven//:org_apache_commons_commons_pool2",
         "@buildfarm_maven//:org_mockito_mockito_core",
+        "@buildfarm_maven//:redis_clients_jedis",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

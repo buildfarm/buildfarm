@@ -46,6 +46,7 @@ java_library(
         "@buildfarm_maven//:javax_annotation_javax_annotation_api",
         "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
+        "@buildfarm_maven//:redis_clients_jedis",
         "@googleapis//google/rpc:rpc_java_proto",
         "@io_grpc_grpc_proto//:health_java_proto",
     ],
