@@ -130,8 +130,9 @@ public class FetchServiceTest {
                     .setValue(hashChecksumSRI(originDigest.getHash())))
             .setDigestFunction(DigestFunction.Value.BLAKE3)
             .build();
+    Digest parsedOriginDigest = originDigest.toBuilder().setSize(-1).build();
     when(instance.fetchBlob(
-            any(), any(), eq(originDigest), eq(DigestFunction.Value.BLAKE3), any()))
+            any(), any(), eq(parsedOriginDigest), eq(DigestFunction.Value.BLAKE3), any()))
         .thenReturn(Futures.immediateFuture(casDigest));
     StreamObserver<FetchBlobResponse> response = mock(StreamObserver.class);
 
@@ -141,7 +142,7 @@ public class FetchServiceTest {
         .fetchBlob(
             eq(ImmutableList.of("http://example.com/a")),
             eq(ImmutableMap.of()),
-            eq(originDigest),
+            eq(parsedOriginDigest),
             eq(DigestFunction.Value.BLAKE3),
             any(RequestMetadata.class));
     verify(response)

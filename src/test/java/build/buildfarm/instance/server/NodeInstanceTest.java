@@ -1109,7 +1109,6 @@ public class NodeInstanceTest {
             eq(Compressor.Value.IDENTITY), eq(casDigest), any(UUID.class), any(RequestMetadata.class)))
         .thenReturn(write);
     HttpURLConnection connection = mock(HttpURLConnection.class);
-    when(connection.getContentLengthLong()).thenReturn(content.size());
     when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
     when(connection.getInputStream()).thenReturn(content.newInput());
     URL url = mock(URL.class);
