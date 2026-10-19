@@ -119,7 +119,8 @@ public interface Instance {
   ListenableFuture<build.buildfarm.v1test.Digest> fetchBlob(
       Iterable<String> uris,
       Map<String, String> headers,
-      build.buildfarm.v1test.Digest expectedDigest,
+      build.buildfarm.v1test.Digest originDigest,
+      DigestFunction.Value digestFunction,
       RequestMetadata requestMetadata);
 
   Write getOperationStreamWrite(String name);

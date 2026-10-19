@@ -815,7 +815,8 @@ class Cat implements Callable<Integer> {
         instance.fetchBlob(
             uris,
             ImmutableMap.of(),
-            /* expectedDigest= */ Digest.getDefaultInstance(),
+            /* originDigest= */ Digest.getDefaultInstance(),
+            DigestFunction.Value.SHA256,
             RequestMetadata.getDefaultInstance());
     System.out.println(DigestUtil.toString(digest.get()));
   }

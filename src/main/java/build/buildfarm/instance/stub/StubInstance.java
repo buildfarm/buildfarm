@@ -119,6 +119,7 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -523,26 +524,32 @@ public class StubInstance extends InstanceBase {
   public ListenableFuture<build.buildfarm.v1test.Digest> fetchBlob(
       Iterable<String> uris,
       Map<String, String> headers,
-      build.buildfarm.v1test.Digest expectedDigest,
+      build.buildfarm.v1test.Digest originDigest,
+      DigestFunction.Value digestFunction,
       RequestMetadata requestMetadata) {
-    // needs to add expectedDigest, digestFunction, etc
-    FetchBlobRequest request =
-        FetchBlobRequest.newBuilder()
-            .addAllUris(uris)
-            .setDigestFunction(expectedDigest.getDigestFunction())
-            .build();
+    FetchBlobRequest.Builder request =
+        FetchBlobRequest.newBuilder().addAllUris(uris).setDigestFunction(digestFunction);
+    if (!originDigest.getHash().isEmpty()) {
+      request.addQualifiersBuilder()
+          .setName("checksum.sri")
+          .setValue(
+              originDigest.getDigestFunction().name().toLowerCase()
+                  + "-"
+                  + BaseEncoding.base64()
+                      .encode(BaseEncoding.base16().lowerCase().decode(originDigest.getHash())));
+    }
 
     return transform(
         deadlined(fetchFutureStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
-            .fetchBlob(request),
+            .fetchBlob(request.build()),
         response -> {
           if (Code.forNumber(response.getStatus().getCode()) != Code.OK) {
             throw StatusProto.toStatusRuntimeException(response.getStatus());
           }
           // other responses, uris, expirations, etc
           return DigestUtil.fromDigest(
-              response.getBlobDigest(), expectedDigest.getDigestFunction());
+              response.getBlobDigest(), digestFunction);
         },
         directExecutor());
   }

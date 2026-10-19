@@ -81,7 +81,6 @@ import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.net.URL;
 import build.buildfarm.common.resources.BlobInformation;
 import build.buildfarm.common.resources.DownloadBlobRequest;
@@ -103,6 +102,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.hash.Hasher;
 import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.FutureCallback;
@@ -133,7 +133,9 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -721,9 +723,10 @@ public abstract class NodeInstance extends InstanceBase {
 
   private static ListenableFuture<Digest> downloadUrl(
       URL url,
-      String expectedHash,
+      Digest originDigest,
       Map<String, String> headers,
-      DigestUtil digestUtil,
+      DigestUtil originDigestUtil,
+      DigestUtil casDigestUtil,
       ContentWriteFactory getContentWrite)
       throws IOException {
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -735,7 +738,6 @@ public abstract class NodeInstance extends InstanceBase {
     }
     connection.setInstanceFollowRedirects(true);
     // request timeout?
-    long contentLength = connection.getContentLengthLong();
     int status = connection.getResponseCode();
 
     if (status != HttpURLConnection.HTTP_OK) {
@@ -749,40 +751,47 @@ public abstract class NodeInstance extends InstanceBase {
       throw new IOException(message);
     }
 
-    IOSupplier<InputStream> inSupplier;
-    if (expectedHash.isEmpty() || contentLength < 0) {
-      // not great, plenty risky for large objects
-      ByteString data;
-      try (InputStream in = connection.getInputStream()) {
-        data = ByteString.readFrom(in);
+    Path downloaded = Files.createTempFile("buildfarm-fetch-", ".blob");
+    try {
+      Hasher originHasher = originDigestUtil.newHasher();
+      Hasher casHasher = casDigestUtil.newHasher();
+      long size = 0;
+      try (InputStream in = connection.getInputStream();
+          OutputStream out = Files.newOutputStream(downloaded)) {
+        byte[] buffer = new byte[8192];
+        for (int count; (count = in.read(buffer)) != -1; ) {
+          originHasher.putBytes(buffer, 0, count);
+          casHasher.putBytes(buffer, 0, count);
+          out.write(buffer, 0, count);
+          size += count;
+        }
       }
-      if (expectedHash.isEmpty()) {
-        expectedHash = digestUtil.computeHash(data).toString();
+      Digest actualOriginDigest = originDigestUtil.build(originHasher.hash().toString(), size);
+      if (!originDigest.getHash().isEmpty()
+          && (!originDigest.getHash().equals(actualOriginDigest.getHash())
+              || (originDigest.getSize() >= 0 && originDigest.getSize() != size))) {
+        throw new DigestMismatchException(actualOriginDigest, originDigest);
       }
-      contentLength = data.size();
-      inSupplier = data::newInput;
-    } else {
-      inSupplier = connection::getInputStream;
-    }
-    Digest digest = digestUtil.build(expectedHash, contentLength);
-
-    Write write = getContentWrite.create(digest);
-
-    try (InputStream in = inSupplier.get();
+      Digest digest = casDigestUtil.build(casHasher.hash().toString(), size);
+      Write write = getContentWrite.create(digest);
+      try (InputStream in = Files.newInputStream(downloaded);
         OutputStream out = write.getOutput(1, DAYS, () -> {})) {
-      ByteStreams.copy(in, out);
-    } catch (WriteCompleteException e) {
-      // ignore - completed write transform below delivers early result, future should be done
+        ByteStreams.copy(in, out);
+      } catch (WriteCompleteException e) {
+        // ignore - completed write transform below delivers early result, future should be done
+      }
+      return transform(write.getFuture(), committedSize -> digest, directExecutor());
+    } finally {
+      Files.deleteIfExists(downloaded);
     }
-
-    return transform(write.getFuture(), committedSize -> digest, directExecutor());
   }
 
   @Override
   public ListenableFuture<Digest> fetchBlob(
       Iterable<String> uris,
       Map<String, String> headers,
-      Digest expectedDigest,
+      Digest originDigest,
+      DigestFunction.Value digestFunction,
       RequestMetadata requestMetadata) {
     ImmutableList.Builder<URL> urls = ImmutableList.builder();
     for (String uri : uris) {
@@ -792,7 +801,7 @@ public abstract class NodeInstance extends InstanceBase {
         return immediateFailedFuture(e);
       }
     }
-    return fetchBlobUrls(urls.build(), headers, expectedDigest, requestMetadata);
+    return fetchBlobUrls(urls.build(), headers, originDigest, digestFunction, requestMetadata);
   }
 
   private static final String INDEXED_HEADER_REGEX = "^\\d+:.*$";
@@ -849,39 +858,40 @@ public abstract class NodeInstance extends InstanceBase {
   ListenableFuture<Digest> fetchBlobUrls(
       Iterable<URL> urls,
       Map<String, String> headers,
-      Digest expectedDigest,
+      Digest originDigest,
+      DigestFunction.Value digestFunction,
       RequestMetadata requestMetadata) {
     // First pass: collect global headers
     // These apply to all URLs.
     Map<String, String> globalHeaders = calculateGlobalHeaders(headers);
     // generate a map of headers for each URL, indexed by URL index
     Map<Integer, Map<String, String>> headersMapView = createHeadersMapView(headers, globalHeaders);
+    Exception lastException = null;
     int urlIndex = 0;
     for (URL url : urls) {
       try {
         // some minor abuse here, we want the download to set our built digest size as side effect
         return downloadUrl(
             url,
-            expectedDigest.getHash(),
+            originDigest,
             headersMapView.getOrDefault(urlIndex, globalHeaders),
-            new DigestUtil(HashFunction.get(expectedDigest.getDigestFunction())),
-            actualDigest -> {
-              if (!expectedDigest.getHash().isEmpty()
-                  && expectedDigest.getSize() >= 0
-                  && expectedDigest.getSize() != actualDigest.getSize()) {
-                // TODO digestFunction
-                throw new DigestMismatchException(actualDigest, expectedDigest);
-              }
-              return getBlobWrite(
-                  Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata);
-            });
+            new DigestUtil(
+                HashFunction.get(
+                    originDigest.getDigestFunction() == DigestFunction.Value.UNKNOWN
+                        ? digestFunction
+                        : originDigest.getDigestFunction())),
+            new DigestUtil(HashFunction.get(digestFunction)),
+            actualDigest ->
+                getBlobWrite(
+                    Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata));
       } catch (Exception e) {
         log.log(Level.WARNING, "download attempt failed", e);
-        // ignore?
+        lastException = e;
       }
       urlIndex++;
     }
-    return immediateFailedFuture(new NoSuchFileException(expectedDigest.getHash()));
+    return immediateFailedFuture(
+        lastException == null ? new NoSuchFileException(originDigest.getHash()) : lastException);
   }
 
   private static void stringsUniqueAndSortedPrecondition(

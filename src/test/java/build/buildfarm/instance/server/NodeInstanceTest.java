@@ -25,11 +25,13 @@ import static build.buildfarm.instance.server.NodeInstance.OUTPUT_DIRECTORY_IS_O
 import static build.buildfarm.instance.server.NodeInstance.OUTPUT_FILE_IS_OUTPUT_ANCESTOR;
 import static build.buildfarm.instance.server.NodeInstance.SYMLINK_TARGET_ABSOLUTE;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -40,6 +42,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.GetTreeResponse;
@@ -91,6 +94,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -1049,7 +1053,6 @@ public class NodeInstanceTest {
         .thenReturn(write);
 
     HttpURLConnection httpURLConnection = mock(HttpURLConnection.class);
-    when(httpURLConnection.getContentLengthLong()).thenReturn(contentDigest.getSize());
     when(httpURLConnection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
     when(httpURLConnection.getInputStream()).thenReturn(content.newInput());
     URL url = mock(URL.class);
@@ -1066,6 +1069,7 @@ public class NodeInstanceTest {
                     ImmutableMap.of(
                         authorizationHeader, authorization, customTokenHeader, customToken),
                     expectedDigest,
+                    DigestFunction.Value.SHA256,
                     requestMetadata)
                 .get())
         .isEqualTo(contentDigest);
@@ -1073,7 +1077,6 @@ public class NodeInstanceTest {
         .getWrite(
             eq(Compressor.Value.IDENTITY), eq(contentDigest), any(UUID.class), eq(requestMetadata));
     verify(write, times(1)).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
-    verify(httpURLConnection, times(1)).getContentLengthLong();
     verify(httpURLConnection, times(1)).getResponseCode();
     verify(httpURLConnection, times(1)).setInstanceFollowRedirects(true);
     verify(httpURLConnection, times(1)).getInputStream();
@@ -1081,5 +1084,77 @@ public class NodeInstanceTest {
     verify(httpURLConnection, times(1)).setRequestProperty(customTokenHeader, customToken);
     verifyNoMoreInteractions(httpURLConnection);
     verify(url, times(1)).openConnection();
+  }
+
+  @Test
+  public void fetchBlobUsesCasDigestFunctionAndVerifiesOriginDigest() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
+    Digest originDigest = DIGEST_UTIL.compute(content);
+    Digest casDigest = new DigestUtil(HashFunction.BLAKE3).compute(content);
+    ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
+    NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
+    Write write = mock(Write.class);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(new FeedbackOutputStream() {
+          @Override
+          public void write(int b) {}
+
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+        });
+    when(write.getFuture()).thenReturn(immediateFuture((long) content.size()));
+    when(contentAddressableStorage.getWrite(
+            eq(Compressor.Value.IDENTITY), eq(casDigest), any(UUID.class), any(RequestMetadata.class)))
+        .thenReturn(write);
+    HttpURLConnection connection = mock(HttpURLConnection.class);
+    when(connection.getContentLengthLong()).thenReturn(content.size());
+    when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
+    when(connection.getInputStream()).thenReturn(content.newInput());
+    URL url = mock(URL.class);
+    when(url.openConnection()).thenReturn(connection);
+
+    assertThat(
+            instance
+                .fetchBlobUrls(
+                    ImmutableList.of(url),
+                    ImmutableMap.of(),
+                    originDigest,
+                    DigestFunction.Value.BLAKE3,
+                    RequestMetadata.getDefaultInstance())
+                .get())
+        .isEqualTo(casDigest);
+    verify(contentAddressableStorage)
+        .getWrite(
+            eq(Compressor.Value.IDENTITY), eq(casDigest), any(UUID.class), any(RequestMetadata.class));
+  }
+
+  @Test
+  public void fetchBlobRejectsMismatchedOriginDigest() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
+    Digest wrongOriginDigest =
+        DIGEST_UTIL.compute(ByteString.copyFromUtf8("Different Fetch Blob Content"));
+    ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
+    NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
+    HttpURLConnection connection = mock(HttpURLConnection.class);
+    when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
+    when(connection.getInputStream()).thenReturn(content.newInput());
+    URL url = mock(URL.class);
+    when(url.openConnection()).thenReturn(connection);
+
+    assertThrows(
+        ExecutionException.class,
+        () ->
+            instance
+                .fetchBlobUrls(
+                    ImmutableList.of(url),
+                    ImmutableMap.of(),
+                    wrongOriginDigest,
+                    DigestFunction.Value.BLAKE3,
+                    RequestMetadata.getDefaultInstance())
+                .get());
+    verify(contentAddressableStorage, never())
+        .getWrite(any(Compressor.Value.class), any(Digest.class), any(UUID.class), any());
   }
 }
