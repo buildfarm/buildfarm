@@ -92,6 +92,22 @@ public class BuildfarmConfigsTest {
   }
 
   @Test
+  public void loadConfigs_withRepMaxCdcSettings_shouldLoadValues() throws IOException {
+    Path configFile = tempDir.resolve("repmax.yaml");
+    Files.write(
+        configFile,
+        ("server:\n"
+                + "  repMaxCdcMinChunkSizeBytes: 131072\n"
+                + "  repMaxCdcHorizonSizeBytes: 1048576\n")
+            .getBytes());
+
+    Server server = BuildfarmConfigs.loadConfigs(configFile).getServer();
+
+    assertEquals(131072, server.getRepMaxCdcMinChunkSizeBytes());
+    assertEquals(1048576, server.getRepMaxCdcHorizonSizeBytes());
+  }
+
+  @Test
   public void validateCasStorageSizeConfig_bothSet_throws() {
     Cas cas = new Cas();
     cas.setMaxSizeBytes(1000);

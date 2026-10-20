@@ -50,6 +50,8 @@ import build.bazel.remote.execution.v2.SymlinkNode;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.FastCDCChunker;
+import build.buildfarm.cas.RepMaxCdcChunker;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -1081,5 +1083,109 @@ public class NodeInstanceTest {
     verify(httpURLConnection, times(1)).setRequestProperty(customTokenHeader, customToken);
     verifyNoMoreInteractions(httpURLConnection);
     verify(url, times(1)).openConnection();
+  }
+
+  @Test
+  public void fetchBlobUsesCasDigestFunctionAndVerifiesOriginDigest() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
+    Digest originDigest = DIGEST_UTIL.compute(content);
+    Digest casDigest = new DigestUtil(HashFunction.BLAKE3).compute(content);
+    ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
+    NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
+    Write write = mock(Write.class);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(
+            new FeedbackOutputStream() {
+              @Override
+              public void write(int b) {}
+
+              @Override
+              public boolean isReady() {
+                return true;
+              }
+            });
+    when(write.getFuture()).thenReturn(immediateFuture((long) content.size()));
+    when(contentAddressableStorage.getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(casDigest),
+            any(UUID.class),
+            any(RequestMetadata.class)))
+        .thenReturn(write);
+    HttpURLConnection connection = mock(HttpURLConnection.class);
+    when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
+    when(connection.getInputStream()).thenReturn(content.newInput());
+    URL url = mock(URL.class);
+    when(url.openConnection()).thenReturn(connection);
+
+    assertThat(
+            instance
+                .fetchBlobUrls(
+                    ImmutableList.of(url),
+                    ImmutableMap.of(),
+                    originDigest,
+                    DigestFunction.Value.BLAKE3,
+                    RequestMetadata.getDefaultInstance())
+                .get())
+        .isEqualTo(casDigest);
+    verify(contentAddressableStorage)
+        .getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(casDigest),
+            any(UUID.class),
+            any(RequestMetadata.class));
+  }
+
+  @Test
+  public void fetchBlobRejectsMismatchedOriginDigest() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
+    Digest wrongOriginDigest =
+        DIGEST_UTIL.compute(ByteString.copyFromUtf8("Different Fetch Blob Content"));
+    ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
+    NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
+    HttpURLConnection connection = mock(HttpURLConnection.class);
+    when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
+    when(connection.getInputStream()).thenReturn(content.newInput());
+    URL url = mock(URL.class);
+    when(url.openConnection()).thenReturn(connection);
+
+    assertThrows(
+        ExecutionException.class,
+        () ->
+            instance
+                .fetchBlobUrls(
+                    ImmutableList.of(url),
+                    ImmutableMap.of(),
+                    wrongOriginDigest,
+                    DigestFunction.Value.BLAKE3,
+                    RequestMetadata.getDefaultInstance())
+                .get());
+    verify(contentAddressableStorage, never())
+        .getWrite(any(Compressor.Value.class), any(Digest.class), any(UUID.class), any());
+  }
+
+  @Test
+  public void repMaxCdcUsesConfiguredChunkerAndMinimumBlobSize() {
+    NodeInstance instance = new DummyServerInstance();
+
+    assertThat(
+            instance.createBlobChunker(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.REP_MAX_CDC,
+                DIGEST_UTIL,
+                ByteString.EMPTY.newInput()))
+        .isInstanceOf(RepMaxCdcChunker.class);
+    assertThat(
+            instance.createBlobChunker(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.FAST_CDC_2020,
+                DIGEST_UTIL,
+                ByteString.EMPTY.newInput()))
+        .isInstanceOf(FastCDCChunker.class);
+    assertThat(
+            instance.getMinimumBlobSize(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.REP_MAX_CDC))
+        .isEqualTo(512 * 1024L);
+    assertThat(
+            instance.getMinimumBlobSize(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.FAST_CDC_2020))
+        .isEqualTo(2 * 1024 * 1024L);
   }
 }
