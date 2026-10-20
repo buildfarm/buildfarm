@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import redis.clients.jedis.exceptions.JedisDataException;
 
 @RunWith(JUnit4.class)
 public class WorkerRegistrationRetryTest {
@@ -47,12 +46,6 @@ public class WorkerRegistrationRetryTest {
                     .withDescription("redis request timed out")
                     .asRuntimeException()))
         .isTrue();
-
-    for (String prefix :
-        new String[] {"READONLY", "LOADING", "MASTERDOWN", "TRYAGAIN", "CLUSTERDOWN"}) {
-      assertThat(Worker.isRetriableRegistrationException(new JedisDataException(prefix + " test")))
-          .isTrue();
-    }
   }
 
   @Test
@@ -60,10 +53,6 @@ public class WorkerRegistrationRetryTest {
     assertThat(
             Worker.isRetriableRegistrationException(
                 Status.INTERNAL.withDescription("bad worker registration").asRuntimeException()))
-        .isFalse();
-    assertThat(
-            Worker.isRetriableRegistrationException(
-                new JedisDataException("WRONGTYPE Operation against a key holding wrong value")))
         .isFalse();
     assertThat(Worker.isRetriableRegistrationException(new IllegalStateException("bad state")))
         .isFalse();
@@ -88,7 +77,8 @@ public class WorkerRegistrationRetryTest {
             invocation -> {
               registrations.add(invocation.getArgument(0));
               if (registrations.size() <= 2) {
-                throw Status.UNAVAILABLE.withDescription("redis unavailable").asRuntimeException();
+                throw new IOException(
+                  Status.UNAVAILABLE.withDescription("redis unavailable").asException());
               }
               return null;
             })
@@ -125,7 +115,8 @@ public class WorkerRegistrationRetryTest {
     doAnswer(
             invocation -> {
               registrations.add(invocation.getArgument(0));
-              throw Status.UNAVAILABLE.withDescription("redis unavailable").asRuntimeException();
+              throw new IOException(
+                  Status.UNAVAILABLE.withDescription("redis unavailable").asException());
             })
         .when(backplane)
         .addWorker(any(ShardWorker.class));

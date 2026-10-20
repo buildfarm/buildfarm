@@ -15,6 +15,7 @@
 package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 
 import io.grpc.Status;
@@ -28,6 +29,7 @@ import org.junit.runners.JUnit4;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.exceptions.JedisClusterOperationException;
 import redis.clients.jedis.exceptions.JedisConnectionException;
+import redis.clients.jedis.exceptions.JedisDataException;
 
 @RunWith(JUnit4.class)
 public class RedisClientTest {
@@ -93,5 +95,35 @@ public class RedisClientTest {
       status = Status.fromThrowable(e);
     }
     assertThat(status.getCode()).isEqualTo(Code.UNAVAILABLE);
+  }
+
+  @Test
+  public void callTransientDataExceptionsAreUnavailable() {
+    RedisClient client = new RedisClient(mock(JedisCluster.class));
+    for (String prefix :
+        new String[] {"READONLY", "LOADING", "MASTERDOWN", "TRYAGAIN", "CLUSTERDOWN"}) {
+      IOException e =
+          assertThrows(
+              IOException.class,
+              () ->
+                  client.call(
+                      jedis -> {
+                        throw new JedisDataException(prefix + " test");
+                      }));
+      assertThat(Status.fromThrowable(e).getCode()).isEqualTo(Code.UNAVAILABLE);
+    }
+  }
+
+  @Test
+  public void callOtherDataExceptionsPropagate() {
+    RedisClient client = new RedisClient(mock(JedisCluster.class));
+    assertThrows(
+        JedisDataException.class,
+        () ->
+            client.call(
+                jedis -> {
+                  throw new JedisDataException(
+                      "WRONGTYPE Operation against a key holding the wrong kind of value");
+                }));
   }
 }

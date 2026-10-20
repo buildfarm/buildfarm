@@ -155,7 +155,6 @@ import java.util.logging.Level;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
 import org.jspecify.annotations.Nullable;
-import redis.clients.jedis.exceptions.JedisDataException;
 
 @Log
 public final class Worker extends LoggingMain {
@@ -641,15 +640,6 @@ public final class Worker extends LoggingMain {
   }
 
   static boolean isRetriableRegistrationException(RuntimeException e) {
-    if (e instanceof JedisDataException) {
-      String message = e.getMessage();
-      return message != null
-          && (message.startsWith("READONLY")
-              || message.startsWith("LOADING")
-              || message.startsWith("MASTERDOWN")
-              || message.startsWith("TRYAGAIN")
-              || message.startsWith("CLUSTERDOWN"));
-    }
     if (e instanceof StatusRuntimeException) {
       Code code = Status.fromThrowable(e).getCode();
       return code == Code.UNAVAILABLE || code == Code.DEADLINE_EXCEEDED;
