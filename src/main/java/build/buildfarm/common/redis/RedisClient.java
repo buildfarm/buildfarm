@@ -22,6 +22,7 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.exceptions.JedisClusterOperationException;
 import redis.clients.jedis.exceptions.JedisConnectionException;
@@ -30,6 +31,22 @@ import redis.clients.jedis.exceptions.JedisException;
 
 public class RedisClient implements Closeable {
   private static final String MISCONF_RESPONSE = "MISCONF";
+
+  // error replies which indicate redis is temporarily unable to serve the request
+  private static final String[] TRANSIENT_RESPONSES = {
+    "READONLY", "LOADING", "MASTERDOWN", "TRYAGAIN", "CLUSTERDOWN"
+  };
+
+  private static boolean isTransientResponse(@Nullable String message) {
+    if (message != null) {
+      for (String response : TRANSIENT_RESPONSES) {
+        if (message.startsWith(response)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
   @FunctionalInterface
   public interface JedisContext<T> {
@@ -116,6 +133,13 @@ public class RedisClient implements Closeable {
       } catch (JedisDataException e) {
         if (e.getMessage().startsWith(MISCONF_RESPONSE)) {
           throw new JedisMisconfigurationException(e.getMessage());
+        }
+        if (isTransientResponse(e.getMessage())) {
+          throw new IOException(
+              Status.UNAVAILABLE
+                  .withDescription("RedisClient: " + e.getMessage())
+                  .withCause(e)
+                  .asException());
         }
         throw e;
       }
