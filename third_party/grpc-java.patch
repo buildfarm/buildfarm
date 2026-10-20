@@ -78,7 +78,7 @@ new file mode 100644
 +    srcs = [\"plugin_source\"],
 +    outs = [\"protoc-gen-grpc-java.exe\"],
 +    cmd = \"cp $(location plugin_source) $@ && chmod +x $@\",
-+    cmd_bat = \"copy /Y $(location plugin_source) $@\",
++    cmd_bat = \"copy /Y \\\"$(location plugin_source)\\\" \\\"$@\\\"\",
 +    executable = True,
 +    visibility = [\"//visibility:public\"],
 +)
