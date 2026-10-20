@@ -108,6 +108,8 @@ public class RepMaxCdcChunker implements Iterator<Blob> {
     return Math.min(size, available);
   }
 
+  // This compatibility port intentionally keeps Buildbarn's state-machine structure.
+  @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.ForLoopVariableCount"})
   private int nextChunkSize() {
     bufferStart += previousChunkSize;
     previousChunkSize = 0;
@@ -259,7 +261,7 @@ public class RepMaxCdcChunker implements Iterator<Blob> {
     return firstChunk;
   }
 
-  private static class IntList {
+  private static final class IntList {
     private int[] values = new int[32];
     private int size;
 
@@ -312,6 +314,7 @@ public class RepMaxCdcChunker implements Iterator<Blob> {
       size -= to - from;
     }
 
+    @SuppressWarnings("PMD.ForLoopVariableCount")
     void reverse(int from, int to) {
       for (int i = from, j = to - 1; i < j; i++, j--) {
         int value = values[i];
