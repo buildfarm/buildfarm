@@ -59,6 +59,7 @@ new file mode 100644
 +    "amd64-darwin": ("osx-x86_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
 +    "amd64-mac os x": ("osx-x86_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
 +    "amd64-windows": ("windows-x86_64", "c31e6e40033800789ba779e261703d2a5909fbd8dcff2cf115f00bec2863c21d"),
++    "amd64-windows server 2022": ("windows-x86_64", "c31e6e40033800789ba779e261703d2a5909fbd8dcff2cf115f00bec2863c21d"),
 +}
 +
 +def _grpc_java_plugin_repo_impl(rctx):
@@ -66,7 +67,6 @@ new file mode 100644
 +    artifact, sha256 = _ARTIFACTS.get(platform, (None, None))
 +    if not artifact:
 +        fail("unsupported protoc-gen-grpc-java execution platform: {}".format(platform))
-+    print("grpc_java_plugin: platform={}, artifact={}".format(platform, artifact))
 +    rctx.download(
 +        url = "https://repo.maven.apache.org/maven2/io/grpc/protoc-gen-grpc-java/{0}/protoc-gen-grpc-java-{0}-{1}.exe".format(_VERSION, artifact),
 +        output = "plugin_source",
@@ -79,7 +79,7 @@ new file mode 100644
 +    srcs = [\"plugin_source\"],
 +    outs = [\"protoc-gen-grpc-java.exe\"],
 +    cmd = \"cp $(location plugin_source) $@ && chmod +x $@\",
-+    cmd_bat = \"echo Copying $(location plugin_source) to $@ && copy /Y \\\"$(location plugin_source)\\\" \\\"$@\\\"\",
++    cmd_bat = \"copy /Y \\\"$(location plugin_source)\\\" \\\"$@\\\"\",
 +    executable = True,
 +    visibility = [\"//visibility:public\"],
 +)
