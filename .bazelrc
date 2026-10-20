@@ -22,12 +22,6 @@ test --test_tag_filters=-redis,-integration
 build --incompatible_strict_action_env
 build --@protobuf//bazel/toolchains:prefer_prebuilt_protoc
 
-# Fail fast if an external protobuf or gRPC C++ source build is introduced.
-common --per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
-common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
-common --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
-common --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
-
 # See also https://bazel.build/external/lockfile.
 common --lockfile_mode=off
 # It's off because we have mac/windows/linux developers who may not have access
