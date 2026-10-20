@@ -35,7 +35,7 @@ diff --git a/grpc_java_plugin_extension.bzl b/grpc_java_plugin_extension.bzl
 new file mode 100644
 --- /dev/null
 +++ b/grpc_java_plugin_extension.bzl
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,57 @@
 +"""Fetch the published protoc-gen-grpc-java executable for the execution host."""
 +
 +_VERSION = "1.85.0"
@@ -66,6 +66,7 @@ new file mode 100644
 +    artifact, sha256 = _ARTIFACTS.get(platform, (None, None))
 +    if not artifact:
 +        fail("unsupported protoc-gen-grpc-java execution platform: {}".format(platform))
++    print("grpc_java_plugin: platform={}, artifact={}".format(platform, artifact))
 +    rctx.download(
 +        url = "https://repo.maven.apache.org/maven2/io/grpc/protoc-gen-grpc-java/{0}/protoc-gen-grpc-java-{0}-{1}.exe".format(_VERSION, artifact),
 +        output = "plugin_source",
@@ -78,7 +79,7 @@ new file mode 100644
 +    srcs = [\"plugin_source\"],
 +    outs = [\"protoc-gen-grpc-java.exe\"],
 +    cmd = \"cp $(location plugin_source) $@ && chmod +x $@\",
-+    cmd_bat = \"copy /Y \\\"$(location plugin_source)\\\" \\\"$@\\\"\",
++    cmd_bat = \"echo Copying $(location plugin_source) to $@ && copy /Y \\\"$(location plugin_source)\\\" \\\"$@\\\"\",
 +    executable = True,
 +    visibility = [\"//visibility:public\"],
 +)
