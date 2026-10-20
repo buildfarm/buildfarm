@@ -97,7 +97,7 @@
     "org.projectlombok:lombok": 801552971,
     "org.slf4j:slf4j-simple": -917181919,
     "org.threeten:threetenbp": 325729658,
-    "org.xerial:sqlite-jdbc": -44491217,
+    "org.xerial:sqlite-jdbc": 1866718706,
     "org.yaml:snakeyaml": -1448162181,
     "redis.clients:jedis": 530298870,
     "repositories": 514854214
@@ -289,7 +289,7 @@
     "org.slf4j:slf4j-api": -2086218377,
     "org.slf4j:slf4j-simple": -1138098493,
     "org.threeten:threetenbp": -1128949586,
-    "org.xerial:sqlite-jdbc": 240089128,
+    "org.xerial:sqlite-jdbc": -522066959,
     "org.yaml:snakeyaml": 534683159,
     "redis.clients.authentication:redis-authx-core": -1262953137,
     "redis.clients:jedis": 2143768494,
@@ -1399,9 +1399,9 @@
     },
     "org.xerial:sqlite-jdbc": {
       "shasums": {
-        "jar": "3684ac5e9bd893cbe68eb0ac1708343f66be829b1d2b5ab317e783d05acd5aef"
+        "jar": "bcb1f51e36f940867e83342f9efbf5968ac44a6bef4d397bb4af7b17b45cd2fb"
       },
-      "version": "3.51.3.0"
+      "version": "3.53.4.0"
     },
     "org.yaml:snakeyaml": {
       "shasums": {
