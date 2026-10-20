@@ -21,17 +21,32 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
-/** Splits a stream using the RepMax content-defined chunking algorithm. */
+/**
+ * Splits a stream using RepMax content-defined chunking.
+ *
+ * <p>This is a port of Buildbarn's optimized implementation. It preserves rolling-hash and cut
+ * candidate state across chunks, so every input byte is hashed only once.
+ */
 public class RepMaxCdcChunker implements Iterator<Blob> {
   private static final int GEAR_HASH_WINDOW_SIZE = 64;
+  private static final long[] GEAR =
+      java.util.Arrays.stream(FastCDCChunker.GEAR).mapToLong(Long::longValue).toArray();
 
   private final int minSize;
   private final int peekSize;
   private final DigestUtil digestUtil;
   private final InputStream in;
   private final byte[] buffer;
-  private int length;
+  private final IntList completeChunks = new IntList();
+  private final IntList incompleteChunks = new IntList();
+  private int bufferStart;
+  private int bufferEnd;
+  private int pendingChunkSize = -1;
+  private int previousChunkSize;
+  private long currentHash;
+  private long bestHash;
   private boolean eof;
 
   public RepMaxCdcChunker(DigestUtil digestUtil, InputStream in, int minSize, int horizonSize) {
@@ -43,72 +58,266 @@ public class RepMaxCdcChunker implements Iterator<Blob> {
     peekSize = 2 * minSize + horizonSize;
     this.digestUtil = digestUtil;
     this.in = in;
-    buffer = new byte[peekSize];
+    buffer = new byte[peekSize * 2];
   }
 
   @Override
   public boolean hasNext() {
-    fill();
-    return length > 0;
+    if (pendingChunkSize == -1) {
+      pendingChunkSize = nextChunkSize();
+    }
+    return pendingChunkSize != 0;
   }
 
   @Override
   public Blob next() {
     if (!hasNext()) {
-      throw new java.util.NoSuchElementException();
+      throw new NoSuchElementException();
     }
-    int chunkSize = findChunkBoundary();
-    Blob blob = new Blob(ByteString.copyFrom(buffer, 0, chunkSize), digestUtil);
-    System.arraycopy(buffer, chunkSize, buffer, 0, length - chunkSize);
-    length -= chunkSize;
+    int chunkSize = pendingChunkSize;
+    pendingChunkSize = -1;
+    Blob blob = new Blob(ByteString.copyFrom(buffer, bufferStart, chunkSize), digestUtil);
+    previousChunkSize = chunkSize;
     return blob;
   }
 
-  private void fill() {
-    while (!eof && length < peekSize) {
-      try {
-        int read = in.read(buffer, length, peekSize - length);
-        if (read == -1) {
-          eof = true;
-        } else if (read > 0) {
-          length += read;
-        } else {
-          // InputStream is permitted to return zero; retry without treating it as EOF.
-          continue;
-        }
-      } catch (IOException e) {
-        throw new RuntimeException(e);
+  private int peek(int size) {
+    int available = bufferEnd - bufferStart;
+    if (available < size && !eof) {
+      if (bufferStart > 0 && available > 0) {
+        System.arraycopy(buffer, bufferStart, buffer, 0, available);
       }
+      bufferStart = 0;
+      bufferEnd = available;
+      while (bufferEnd < buffer.length) {
+        try {
+          int read = in.read(buffer, bufferEnd, buffer.length - bufferEnd);
+          if (read == -1) {
+            eof = true;
+            break;
+          }
+          if (read > 0) {
+            bufferEnd += read;
+          }
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      available = bufferEnd - bufferStart;
     }
+    return Math.min(size, available);
   }
 
-  // This is the reference selection algorithm. The lookahead is deliberately bounded by peekSize
-  // so stream refill boundaries cannot affect chunk boundaries.
-  private int findChunkBoundary() {
-    if (length < 2 * minSize) {
-      return length;
+  private int nextChunkSize() {
+    bufferStart += previousChunkSize;
+    previousChunkSize = 0;
+
+    if (!completeChunks.isEmpty()) {
+      return completeChunks.popLast();
     }
 
-    int limit = length - minSize;
-    long initialHash = 0;
-    for (int i = minSize - GEAR_HASH_WINDOW_SIZE; i < minSize; i++) {
-      initialHash = (initialHash << 1) + FastCDCChunker.GEAR[buffer[i] & 0xff];
+    int dataLength = peek(peekSize);
+    if (dataLength < 2 * minSize) {
+      return dataLength;
     }
+    dataLength -= minSize;
+    int base = bufferStart;
+
+    int currentChunk;
+    long hash;
+    long best;
+    if (incompleteChunks.size() >= 2) {
+      currentChunk = incompleteChunks.popLast();
+      hash = currentHash;
+      best = bestHash;
+    } else {
+      incompleteChunks.clear();
+      incompleteChunks.add(0);
+      hash = 0;
+      for (int i = minSize - GEAR_HASH_WINDOW_SIZE; i < minSize; i++) {
+        hash = (hash << 1) + GEAR[buffer[base + i] & 0xff];
+      }
+      best = hash;
+      currentChunk = 0;
+    }
+
+    int position = minSize + currentChunk;
     while (true) {
-      long hash = initialHash;
-      long bestHash = hash;
-      int bestEnd = minSize;
-      for (int i = minSize; i < limit; i++) {
-        hash = (hash << 1) + FastCDCChunker.GEAR[buffer[i] & 0xff];
-        if (Long.compareUnsigned(bestHash, hash) < 0) {
-          bestHash = hash;
-          bestEnd = i + 1;
+      int hashLength = dataLength - position;
+      int originalChunkCount = -1;
+      int bytesBeforeMinimum = incompleteChunks.last() + minSize - 1 - currentChunk;
+      if (hashLength > bytesBeforeMinimum) {
+        hashLength = bytesBeforeMinimum;
+        originalChunkCount = incompleteChunks.size();
+      } else if (hashLength == 0) {
+        break;
+      }
+
+      for (int i = 0; i < hashLength; i++) {
+        hash = (hash << 1) + GEAR[buffer[base + position + i] & 0xff];
+        if (Long.compareUnsigned(best, hash) < 0) {
+          best = hash;
+          incompleteChunks.add(currentChunk + i + 1);
         }
       }
-      if (bestEnd < 2 * minSize) {
-        return bestEnd;
+
+      if (incompleteChunks.size() == originalChunkCount) {
+        int completedBefore = completeChunks.size();
+        int nextChunk = incompleteChunks.last();
+        for (int i = incompleteChunks.size() - 3; nextChunk >= minSize; i--) {
+          int chunk = incompleteChunks.get(i);
+          if (nextChunk - chunk >= minSize) {
+            completeChunks.add(nextChunk - chunk);
+            nextChunk = chunk;
+            i--;
+          }
+        }
+        completeChunks.add(minSize + nextChunk);
+        completeChunks.reverse(completedBefore, completeChunks.size());
+
+        incompleteChunks.truncate(1);
+        currentChunk = 0;
+        hash = (hash << 1) + GEAR[buffer[base + position + hashLength] & 0xff];
+        best = hash;
+        position += hashLength + 1;
+      } else {
+        currentChunk += hashLength;
+        position += hashLength;
       }
-      limit = bestEnd - minSize;
+    }
+
+    incompleteChunks.add(currentChunk);
+    int firstChunk;
+    if (!completeChunks.isEmpty()) {
+      completeChunks.reverse(0, completeChunks.size());
+      firstChunk = completeChunks.popLast();
+    } else {
+      int firstChunkIndex = incompleteChunks.size() - 2;
+      for (int maxChunk = incompleteChunks.get(firstChunkIndex) - minSize, i = firstChunkIndex - 2;
+          maxChunk >= 0;
+          i--) {
+        int chunk = incompleteChunks.get(i);
+        if (chunk <= maxChunk) {
+          firstChunkIndex = i;
+          maxChunk = chunk - minSize;
+          i--;
+        }
+      }
+      firstChunk = minSize + incompleteChunks.get(firstChunkIndex);
+
+      int reusableChunkIndex = firstChunkIndex + 1;
+      while (true) {
+        int offsetInSecondChunk = incompleteChunks.get(reusableChunkIndex) - firstChunk;
+        if (offsetInSecondChunk >= 0) {
+          for (int i = reusableChunkIndex; i < incompleteChunks.size(); i++) {
+            incompleteChunks.set(i, incompleteChunks.get(i) - firstChunk);
+          }
+
+          if (offsetInSecondChunk == 0) {
+            incompleteChunks.removePrefix(reusableChunkIndex);
+          } else {
+            int regionStart = base + firstChunk;
+            long recomputedHash = 0;
+            for (int i = minSize - GEAR_HASH_WINDOW_SIZE; i < minSize; i++) {
+              recomputedHash = (recomputedHash << 1) + GEAR[buffer[regionStart + i] & 0xff];
+            }
+            incompleteChunks.set(0, 0);
+            long bestRecomputedHash = recomputedHash;
+            int recomputedChunkIndex = 1;
+            int originalChunksCount = incompleteChunks.size();
+            for (int i = 0; i < offsetInSecondChunk - 1; i++) {
+              recomputedHash =
+                  (recomputedHash << 1) + GEAR[buffer[regionStart + minSize + i] & 0xff];
+              if (Long.compareUnsigned(bestRecomputedHash, recomputedHash) < 0) {
+                bestRecomputedHash = recomputedHash;
+                int recomputedChunk = i + 1;
+                if (recomputedChunkIndex < reusableChunkIndex) {
+                  incompleteChunks.set(recomputedChunkIndex++, recomputedChunk);
+                } else {
+                  incompleteChunks.add(recomputedChunk);
+                }
+              }
+            }
+            if (recomputedChunkIndex < reusableChunkIndex) {
+              incompleteChunks.removeRange(recomputedChunkIndex, reusableChunkIndex);
+            } else if (incompleteChunks.size() > originalChunksCount) {
+              incompleteChunks.reverse(reusableChunkIndex, originalChunksCount);
+              incompleteChunks.reverse(originalChunksCount, incompleteChunks.size());
+              incompleteChunks.reverse(reusableChunkIndex, incompleteChunks.size());
+            }
+          }
+          break;
+        }
+        if (++reusableChunkIndex == incompleteChunks.size()) {
+          incompleteChunks.truncate(1);
+          break;
+        }
+      }
+    }
+    currentHash = hash;
+    bestHash = best;
+    return firstChunk;
+  }
+
+  private static class IntList {
+    private int[] values = new int[32];
+    private int size;
+
+    int size() {
+      return size;
+    }
+
+    boolean isEmpty() {
+      return size == 0;
+    }
+
+    int get(int index) {
+      return values[index];
+    }
+
+    void set(int index, int value) {
+      values[index] = value;
+    }
+
+    int last() {
+      return values[size - 1];
+    }
+
+    void add(int value) {
+      if (size == values.length) {
+        values = java.util.Arrays.copyOf(values, size * 2);
+      }
+      values[size++] = value;
+    }
+
+    int popLast() {
+      return values[--size];
+    }
+
+    void clear() {
+      size = 0;
+    }
+
+    void truncate(int newSize) {
+      size = newSize;
+    }
+
+    void removePrefix(int count) {
+      System.arraycopy(values, count, values, 0, size - count);
+      size -= count;
+    }
+
+    void removeRange(int from, int to) {
+      System.arraycopy(values, to, values, from, size - to);
+      size -= to - from;
+    }
+
+    void reverse(int from, int to) {
+      for (int i = from, j = to - 1; i < j; i++, j--) {
+        int value = values[i];
+        values[i] = values[j];
+        values[j] = value;
+      }
     }
   }
 }
