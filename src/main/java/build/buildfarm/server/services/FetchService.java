@@ -139,7 +139,7 @@ public class FetchService extends FetchImplBase {
             request.getUrisList(),
             qualifiers.getHeadersMap(),
             originDigest,
-            digestFunction,
+            Digest.newBuilder().setDigestFunction(digestFunction).build(),
             requestMetadata),
         new FutureCallback<>() {
           @Override

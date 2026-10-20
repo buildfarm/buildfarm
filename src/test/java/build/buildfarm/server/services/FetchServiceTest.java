@@ -102,7 +102,7 @@ public class FetchServiceTest {
             eq(uris),
             eq(ImmutableMap.of(authorizationHeader, authorization, customTokenHeader, customToken)),
             eq(contentDigest),
-            eq(DigestFunction.Value.SHA256),
+            eq(Digest.newBuilder().setDigestFunction(DigestFunction.Value.SHA256).build()),
             any(RequestMetadata.class));
     verify(response, times(1)).onCompleted();
     verify(response, times(1))
@@ -131,8 +131,9 @@ public class FetchServiceTest {
             .setDigestFunction(DigestFunction.Value.BLAKE3)
             .build();
     Digest parsedOriginDigest = originDigest.toBuilder().setSize(-1).build();
-    when(instance.fetchBlob(
-            any(), any(), eq(parsedOriginDigest), eq(DigestFunction.Value.BLAKE3), any()))
+    Digest expectedCasDigest =
+        Digest.newBuilder().setDigestFunction(DigestFunction.Value.BLAKE3).build();
+    when(instance.fetchBlob(any(), any(), eq(parsedOriginDigest), eq(expectedCasDigest), any()))
         .thenReturn(Futures.immediateFuture(casDigest));
     StreamObserver<FetchBlobResponse> response = mock(StreamObserver.class);
 
@@ -143,7 +144,7 @@ public class FetchServiceTest {
             eq(ImmutableList.of("http://example.com/a")),
             eq(ImmutableMap.of()),
             eq(parsedOriginDigest),
-            eq(DigestFunction.Value.BLAKE3),
+            eq(expectedCasDigest),
             any(RequestMetadata.class));
     verify(response)
         .onNext(

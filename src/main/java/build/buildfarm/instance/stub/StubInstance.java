@@ -525,10 +525,12 @@ public class StubInstance extends InstanceBase {
       Iterable<String> uris,
       Map<String, String> headers,
       build.buildfarm.v1test.Digest originDigest,
-      DigestFunction.Value digestFunction,
+      build.buildfarm.v1test.Digest casDigest,
       RequestMetadata requestMetadata) {
     FetchBlobRequest.Builder request =
-        FetchBlobRequest.newBuilder().addAllUris(uris).setDigestFunction(digestFunction);
+        FetchBlobRequest.newBuilder()
+            .addAllUris(uris)
+            .setDigestFunction(casDigest.getDigestFunction());
     if (!originDigest.getHash().isEmpty()) {
       request
           .addQualifiersBuilder()
@@ -549,7 +551,7 @@ public class StubInstance extends InstanceBase {
             throw StatusProto.toStatusRuntimeException(response.getStatus());
           }
           // other responses, uris, expirations, etc
-          return DigestUtil.fromDigest(response.getBlobDigest(), digestFunction);
+          return DigestUtil.fromDigest(response.getBlobDigest(), casDigest.getDigestFunction());
         },
         directExecutor());
   }

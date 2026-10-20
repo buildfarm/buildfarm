@@ -1069,7 +1069,7 @@ public class NodeInstanceTest {
                     ImmutableMap.of(
                         authorizationHeader, authorization, customTokenHeader, customToken),
                     expectedDigest,
-                    DigestFunction.Value.SHA256,
+                    Digest.newBuilder().setDigestFunction(DigestFunction.Value.SHA256).build(),
                     requestMetadata)
                 .get())
         .isEqualTo(contentDigest);
@@ -1124,7 +1124,7 @@ public class NodeInstanceTest {
                     ImmutableList.of(url),
                     ImmutableMap.of(),
                     originDigest,
-                    DigestFunction.Value.BLAKE3,
+                    Digest.newBuilder().setDigestFunction(DigestFunction.Value.BLAKE3).build(),
                     RequestMetadata.getDefaultInstance())
                 .get())
         .isEqualTo(casDigest);
@@ -1157,7 +1157,7 @@ public class NodeInstanceTest {
                     ImmutableList.of(url),
                     ImmutableMap.of(),
                     wrongOriginDigest,
-                    DigestFunction.Value.BLAKE3,
+                    Digest.newBuilder().setDigestFunction(DigestFunction.Value.BLAKE3).build(),
                     RequestMetadata.getDefaultInstance())
                 .get());
     verify(contentAddressableStorage, never())

@@ -120,7 +120,7 @@ public interface Instance {
       Iterable<String> uris,
       Map<String, String> headers,
       build.buildfarm.v1test.Digest originDigest,
-      DigestFunction.Value digestFunction,
+      build.buildfarm.v1test.Digest casDigest,
       RequestMetadata requestMetadata);
 
   Write getOperationStreamWrite(String name);

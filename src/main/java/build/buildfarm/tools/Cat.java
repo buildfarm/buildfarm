@@ -816,7 +816,7 @@ class Cat implements Callable<Integer> {
             uris,
             ImmutableMap.of(),
             /* originDigest= */ Digest.getDefaultInstance(),
-            DigestFunction.Value.SHA256,
+            Digest.newBuilder().setDigestFunction(DigestFunction.Value.SHA256).build(),
             RequestMetadata.getDefaultInstance());
     System.out.println(DigestUtil.toString(digest.get()));
   }
