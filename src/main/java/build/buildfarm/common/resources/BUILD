@@ -9,11 +9,11 @@ proto_library(
     srcs = ["resource.proto"],
     deps = [
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_proto",
-        "@protobuf//:duration_proto",
-        "@protobuf//:timestamp_proto",
         "@googleapis//google/api:annotations_proto",
         "@googleapis//google/longrunning:operations_proto",
         "@googleapis//google/rpc:status_proto",
+        "@protobuf//:duration_proto",
+        "@protobuf//:timestamp_proto",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_proto",
     ],
 )
