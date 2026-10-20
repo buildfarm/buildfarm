@@ -80,13 +80,63 @@ public class RepMaxCdcChunkerTest {
   public void outputIsDeterministicBoundedAndIndependentOfReads() {
     byte[] data = new byte[10 * MIN_SIZE + 123];
     new Random(123).nextBytes(data);
-    List<Blob> direct = chunks(new ByteArrayInputStream(data));
-    List<Blob> refilled = chunks(new OneByteInputStream(data));
+    List<Blob> direct = chunks(new ByteArrayInputStream(data), MIN_SIZE, HORIZON_SIZE);
+    List<Blob> refilled = chunks(new OneByteInputStream(data), MIN_SIZE, HORIZON_SIZE);
     assertThat(digests(direct)).isEqualTo(digests(refilled));
     assertThat(ByteString.copyFrom(data)).isEqualTo(join(direct));
     for (Blob blob : direct) {
       assertThat(blob.getDigest().getSize()).isAtLeast((long) MIN_SIZE);
       assertThat(blob.getDigest().getSize()).isLessThan((long) 2 * MIN_SIZE);
+    }
+  }
+
+  @Test
+  public void zeroHorizonProducesUniformChunks() {
+    int minSize = 1024;
+    byte[] data = new byte[5 * minSize + 23];
+    new Random(42).nextBytes(data);
+
+    List<Blob> chunks = chunks(new ByteArrayInputStream(data), minSize, 0);
+
+    assertThat(chunks.stream().map(blob -> blob.getDigest().getSize()).toList())
+        .containsExactly(1024L, 1024L, 1024L, 1024L, 1047L)
+        .inOrder();
+    assertThat(join(chunks)).isEqualTo(ByteString.copyFrom(data));
+  }
+
+  @Test
+  public void handlesTerminalChunkSizes() {
+    int minSize = 1024;
+    for (int inputSize : List.of(0, 1, minSize - 1, minSize, 2 * minSize - 1, 2 * minSize)) {
+      byte[] data = new byte[inputSize];
+      new Random(inputSize).nextBytes(data);
+
+      List<Blob> chunks = chunks(new ByteArrayInputStream(data), minSize, 8 * minSize);
+
+      assertThat(join(chunks)).isEqualTo(ByteString.copyFrom(data));
+      for (Blob chunk : chunks) {
+        assertThat(chunk.getDigest().getSize()).isLessThan(2L * minSize);
+      }
+    }
+  }
+
+  @Test
+  public void handlesLowEntropyAndRefills() {
+    int minSize = 64;
+    int horizonSize = 8 * minSize;
+    byte[] data = new byte[20 * (2 * minSize + horizonSize) + 17];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) (i % 7);
+    }
+
+    List<Blob> chunks = chunks(new OneByteInputStream(data), minSize, horizonSize);
+
+    assertThat(join(chunks)).isEqualTo(ByteString.copyFrom(data));
+    assertThat(chunks.stream().map(blob -> blob.getDigest().getSize()).reduce(0L, Long::sum))
+        .isEqualTo((long) data.length);
+    for (Blob chunk : chunks) {
+      assertThat(chunk.getDigest().getSize()).isAtLeast((long) minSize);
+      assertThat(chunk.getDigest().getSize()).isLessThan(2L * minSize);
     }
   }
 
@@ -98,7 +148,11 @@ public class RepMaxCdcChunkerTest {
   }
 
   private static List<Blob> chunks(InputStream input) {
-    Iterator<Blob> iterator = new RepMaxCdcChunker(DIGEST_UTIL, input, MIN_SIZE, HORIZON_SIZE);
+    return chunks(input, MIN_SIZE, HORIZON_SIZE);
+  }
+
+  private static List<Blob> chunks(InputStream input, int minSize, int horizonSize) {
+    Iterator<Blob> iterator = new RepMaxCdcChunker(DIGEST_UTIL, input, minSize, horizonSize);
     List<Blob> chunks = new ArrayList<>();
     while (iterator.hasNext()) chunks.add(iterator.next());
     return chunks;
