@@ -35,7 +35,7 @@ diff --git a/grpc_java_plugin_extension.bzl b/grpc_java_plugin_extension.bzl
 new file mode 100644
 --- /dev/null
 +++ b/grpc_java_plugin_extension.bzl
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,56 @@
 +"""Fetch the published protoc-gen-grpc-java executable for the execution host."""
 +
 +_VERSION = "1.85.0"
@@ -48,11 +48,16 @@ new file mode 100644
 +    "powerpc64le-unknown-linux-gnu": ("linux-ppcle_64", "55185f0cea2df697b4be7ff108df2846ff3b6969387ea359e70edf206d1b96d2"),
 +    "s390x-unknown-linux-gnu": ("linux-s390_64", "50a6fa1d9932f14caaa2ae33f6418c9dffa91eebd3e1896687ec4384bd041fa9"),
 +    "x86_64-apple-darwin": ("osx-x86_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
++    "x86_64-mac os x": ("osx-x86_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
 +    "x86_64-pc-windows-msvc": ("windows-x86_64", "c31e6e40033800789ba779e261703d2a5909fbd8dcff2cf115f00bec2863c21d"),
++    "x86_64-windows": ("windows-x86_64", "c31e6e40033800789ba779e261703d2a5909fbd8dcff2cf115f00bec2863c21d"),
 +    "amd64-linux": ("linux-x86_64", "9b44d03a2e9b3556a5077bd13a8a1fb06c67ced0495c930a678401fa19e297c0"),
 +    "aarch64-darwin": ("osx-aarch_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
 +    "aarch64-linux": ("linux-aarch_64", "44a64c742b4474841d6b41deef881a63936c1515600d2cb9c5f330f2926bd2ab"),
++    "arm64-darwin": ("osx-aarch_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
++    "arm64-mac os x": ("osx-aarch_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
 +    "amd64-darwin": ("osx-x86_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
++    "amd64-mac os x": ("osx-x86_64", "09a50d9c4b1415e53737ccee5e3fbba4ba3656d3b986a883ef6c7381264d2019"),
 +    "amd64-windows": ("windows-x86_64", "c31e6e40033800789ba779e261703d2a5909fbd8dcff2cf115f00bec2863c21d"),
 +}
 +
