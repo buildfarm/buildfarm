@@ -78,7 +78,7 @@ public class WorkerRegistrationRetryTest {
               registrations.add(invocation.getArgument(0));
               if (registrations.size() <= 2) {
                 throw new IOException(
-                  Status.UNAVAILABLE.withDescription("redis unavailable").asException());
+                    Status.UNAVAILABLE.withDescription("redis unavailable").asException());
               }
               return null;
             })
