@@ -2,9 +2,9 @@ module(name = "buildfarm_abseil_integration")
 
 single_version_override(
     module_name = "abseil-cpp",
-    version = "20240116.1",
-    patches = ["//:abseil_benchmark.patch"],
     patch_strip = 0,
+    patches = ["//:abseil_benchmark.patch"],
+    version = "20240116.1",
 )
 
 bazel_dep(
