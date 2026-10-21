@@ -23,12 +23,12 @@ USE_BAZEL_QUERY_TO_REBUILD=False
 
 def worker_deps():
   if USE_BAZEL_QUERY_TO_REBUILD:
-    return bazel_sourcefile_deps('//:buildfarm-shard-worker.tar')
+    return bazel_sourcefile_deps('//container:buildfarm-worker.load')
   return ()
 
 def server_deps():
   if USE_BAZEL_QUERY_TO_REBUILD:
-    return bazel_sourcefile_deps('//:buildfarm-shard-worker.tar')
+    return bazel_sourcefile_deps('//container:buildfarm-server.load')
   return ()
 
 # Inform tilt about the custom images built within the repository.
@@ -36,20 +36,16 @@ def server_deps():
 custom_build(
   ref='bazelbuild/buildfarm-worker',
   command=(
-    'bazelisk build --javabase=@bazel_tools//tools/jdk:remote_jdk11 //:buildfarm-shard-worker.tar && ' +
-    'docker load < bazel-bin/buildfarm-shard-worker.tar && ' +
-    'docker tag bazel:buildfarm-shard-worker $EXPECTED_REF'
-
+    'bazelisk run //container:buildfarm-worker.load && ' +
+    'docker tag bazel:buildfarm-worker $EXPECTED_REF'
     ),
     deps = worker_deps()
 )
 custom_build(
   ref='bazelbuild/buildfarm-server',
   command=(
-    'bazelisk build --javabase=@bazel_tools//tools/jdk:remote_jdk11 //:buildfarm-server.tar && ' +
-    'docker load < bazel-bin/buildfarm-server.tar && ' +
+    'bazelisk run //container:buildfarm-server.load && ' +
     'docker tag bazel:buildfarm-server $EXPECTED_REF'
-
     ),
     deps = server_deps()
 )
