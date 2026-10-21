@@ -1,0 +1,31 @@
+module(name = "buildfarm_abseil_integration")
+
+single_version_override(
+    module_name = "abseil-cpp",
+    version = "20240116.1",
+    patches = ["//:abseil_benchmark.patch"],
+    patch_strip = 0,
+)
+
+bazel_dep(
+    name = "abseil-cpp",
+    version = "20240116.1",
+    repo_name = "com_google_absl",
+)
+bazel_dep(
+    name = "googletest",
+    version = "1.14.0.bcr.1",
+    repo_name = "com_google_googletest",
+)
+bazel_dep(
+    name = "re2",
+    version = "2023-11-01",
+    repo_name = "com_googlesource_code_re2",
+)
+bazel_dep(
+    name = "google_benchmark",
+    version = "1.8.3",
+    repo_name = "com_github_google_benchmark",
+)
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "platforms", version = "0.0.11")
