@@ -131,16 +131,16 @@ start_server_and_worker(){
   echo "Testing with Shard Instances."
 
   # Build first to create more predictable run time.
-  ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
+  ./bazel build --config=strict $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
 
   # Start the server.
-  ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
+  ./bazel run --config=strict $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
   SERVER_PID=$!
 
   ensure_server_is_up
 
   # Start the worker.
-  ./bazel run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
+  ./bazel run --config=strict $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
   WORKER_PID=$!
 
   ensure_worker_is_up
