@@ -96,7 +96,7 @@
     "org.openjdk.jmh:jmh-generator-annprocess": -1162360421,
     "org.projectlombok:lombok": 801552971,
     "org.slf4j:slf4j-simple": -917181919,
-    "org.threeten:threetenbp": 325729658,
+    "org.threeten:threetenbp": -801666435,
     "org.xerial:sqlite-jdbc": 1866718706,
     "org.yaml:snakeyaml": -1448162181,
     "redis.clients:jedis": 530298870,
@@ -288,7 +288,7 @@
     "org.slf4j:jcl-over-slf4j": 265084709,
     "org.slf4j:slf4j-api": -2086218377,
     "org.slf4j:slf4j-simple": -1138098493,
-    "org.threeten:threetenbp": -1128949586,
+    "org.threeten:threetenbp": 1447859005,
     "org.xerial:sqlite-jdbc": -522066959,
     "org.yaml:snakeyaml": 534683159,
     "redis.clients.authentication:redis-authx-core": -1262953137,
@@ -1393,9 +1393,9 @@
     },
     "org.threeten:threetenbp": {
       "shasums": {
-        "jar": "541c224d8dcf76271e538416575bb81b933deffd69e17e2314142786e481ecb8"
+        "jar": "58c5593452f871ebf736dfda3bf8f3bc0de4e92cec61bc19c8ad81f9dfb70d72"
       },
-      "version": "1.7.2"
+      "version": "1.7.5"
     },
     "org.xerial:sqlite-jdbc": {
       "shasums": {
