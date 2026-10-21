@@ -1932,15 +1932,15 @@ public abstract class NodeInstance extends InstanceBase {
   @VisibleForTesting
   Iterator<Blob> createBlobChunker(
       ChunkingFunction.Value chunkingFunction, DigestUtil digestUtil, InputStream in) {
-    switch (chunkingFunction) {
-      case FAST_CDC_2020:
-        return new FastCDCChunker(
-            digestUtil,
-            in,
-            configs.getServer().getFastCdc2020AvgChunkSizeBytes(),
-            configs.getServer().getFastCdc2020Normalization());
-      case REP_MAX_CDC:
-        return new RepMaxCDCChunker(digestUtil, in);
+    if (chunkingFunction == ChunkingFunction.Value.FAST_CDC_2020) {
+      return new FastCDCChunker(
+          digestUtil,
+          in,
+          configs.getServer().getFastCdc2020AvgChunkSizeBytes(),
+          configs.getServer().getFastCdc2020Normalization());
+    }
+    if (chunkingFunction == ChunkingFunction.Value.REP_MAX_CDC) {
+      return new RepMaxCDCChunker(digestUtil, in);
     }
     throw new UnsupportedOperationException(
         format("chunking_function '%s' is not supported", chunkingFunction));
