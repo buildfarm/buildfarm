@@ -36,7 +36,7 @@
     "com.google.protobuf:protobuf-java-util": 1298272668,
     "com.google.truth:truth": 874936572,
     "com.owteam.engUtils:netrc": -564438396,
-    "com.uber.nullaway:nullaway": -99678960,
+    "com.uber.nullaway:nullaway": 590882514,
     "commons-io:commons-io": 1305681826,
     "info.picocli:picocli": 600678140,
     "io.grpc:grpc-api": -623437235,
@@ -167,7 +167,7 @@
     "com.squareup.okhttp3:okhttp-jvm": -1381393640,
     "com.squareup.okio:okio-jvm": 955803116,
     "com.sun.activation:jakarta.activation": -1649101522,
-    "com.uber.nullaway:nullaway": -1584900173,
+    "com.uber.nullaway:nullaway": 466947784,
     "commons-codec:commons-codec": -530511410,
     "commons-io:commons-io": 425603363,
     "commons-logging:commons-logging": 1022368238,
@@ -257,7 +257,7 @@
     "org.bouncycastle:bcprov-jdk18on": 775163066,
     "org.bouncycastle:bcutil-jdk18on": 1223385985,
     "org.checkerframework:checker-qual": -1467660257,
-    "org.checkerframework:dataflow-nullaway": 170958397,
+    "org.checkerframework:dataflow-nullaway": -2002520212,
     "org.codehaus.mojo:animal-sniffer-annotations": -1570976252,
     "org.glassfish.hk2.external:aopalliance-repackaged": -618564429,
     "org.glassfish.hk2.external:jakarta.inject": -764746588,
@@ -674,9 +674,9 @@
     },
     "com.uber.nullaway:nullaway": {
       "shasums": {
-        "jar": "be9ad201b92de86c3e493a45b0861b1b3dd955d8e7dcb11f8d80d18d7425d164"
+        "jar": "eb02eb2da5ee30bcac4621a259a84153b20690078dc47ef920589b8371f456ed"
       },
-      "version": "0.13.1"
+      "version": "0.14.2"
     },
     "commons-codec:commons-codec": {
       "shasums": {
@@ -1204,9 +1204,9 @@
     },
     "org.checkerframework:dataflow-nullaway": {
       "shasums": {
-        "jar": "d0bc6e121f27a803e09404ae2f247f0e2b1f6022897f801cd792ebf375edec27"
+        "jar": "0524cc55673ac10f08d74ca659f7a12c9ce74fba1120a61950c5011b843fb25e"
       },
-      "version": "3.53.0"
+      "version": "4.2.3"
     },
     "org.codehaus.mojo:animal-sniffer-annotations": {
       "shasums": {
@@ -2762,6 +2762,7 @@
       "com.uber.nullaway.fixserialization.adapters",
       "com.uber.nullaway.fixserialization.location",
       "com.uber.nullaway.fixserialization.out",
+      "com.uber.nullaway.fixserialization.scanners",
       "com.uber.nullaway.generics",
       "com.uber.nullaway.handlers",
       "com.uber.nullaway.handlers.contract",
@@ -2769,6 +2770,7 @@
       "com.uber.nullaway.handlers.stream",
       "com.uber.nullaway.handlers.temporary",
       "com.uber.nullaway.jarinfer",
+      "com.uber.nullaway.libmodel",
       "com.uber.nullaway.librarymodel"
     ],
     "commons-codec:commons-codec": [
@@ -4076,8 +4078,8 @@
       "org.checkerframework.nullaway.dataflow.reachingdef",
       "org.checkerframework.nullaway.dataflow.util",
       "org.checkerframework.nullaway.javacutil",
-      "org.checkerframework.nullaway.javacutil.javacparse",
       "org.checkerframework.nullaway.javacutil.trees",
+      "org.checkerframework.nullaway.org.plumelib.javacparse",
       "org.checkerframework.nullaway.org.plumelib.reflection",
       "org.checkerframework.nullaway.org.plumelib.util"
     ],
@@ -4735,6 +4737,7 @@
     },
     "com.uber.nullaway:nullaway": {
       "com.google.errorprone.bugpatterns.BugChecker": [
+        "com.uber.nullaway.JSpecifyUnrecognizedAnnotationLocation",
         "com.uber.nullaway.NullAway",
         "com.uber.nullaway.RequireExplicitNullMarking"
       ]
