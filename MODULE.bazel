@@ -171,7 +171,7 @@ maven.install(
         "org.openjdk.jmh:jmh-generator-annprocess:1.37",
         "org.projectlombok:lombok:1.18.48",
         "org.slf4j:slf4j-simple:2.0.20",
-        "org.threeten:threetenbp:1.7.2",
+        "org.threeten:threetenbp:1.7.5",
         "org.xerial:sqlite-jdbc:3.53.4.0",
         "org.yaml:snakeyaml:2.7",
         "redis.clients:jedis:8.0.2",
