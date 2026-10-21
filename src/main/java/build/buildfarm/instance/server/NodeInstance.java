@@ -2010,7 +2010,7 @@ public abstract class NodeInstance extends InstanceBase {
       return configs.getServer().getFastCdc2020AvgChunkSizeBytes() * 4L;
     }
     if (chunkingFunction == ChunkingFunction.Value.REP_MAX_CDC) {
-      return configs.getServer().getRepMaxCdcMinChunkSizeBytes() * 2L;
+      return 512 * 1024L;
     }
     throw new UnsupportedOperationException(
         format("chunking_function '%s' is not supported", chunkingFunction));

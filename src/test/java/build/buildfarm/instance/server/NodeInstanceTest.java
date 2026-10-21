@@ -51,7 +51,7 @@ import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.FastCDCChunker;
-import build.buildfarm.cas.RepMaxCdcChunker;
+import build.buildfarm.cas.RepMaxCDCChunker;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -1164,7 +1164,7 @@ public class NodeInstanceTest {
   }
 
   @Test
-  public void repMaxCdcUsesConfiguredChunkerAndMinimumBlobSize() {
+  public void repMaxCdcUsesRepMaxCDCChunkerAndMinimumBlobSize() {
     NodeInstance instance = new DummyServerInstance();
 
     assertThat(
@@ -1172,7 +1172,7 @@ public class NodeInstanceTest {
                 build.bazel.remote.execution.v2.ChunkingFunction.Value.REP_MAX_CDC,
                 DIGEST_UTIL,
                 ByteString.EMPTY.newInput()))
-        .isInstanceOf(RepMaxCdcChunker.class);
+        .isInstanceOf(RepMaxCDCChunker.class);
     assertThat(
             instance.createBlobChunker(
                 build.bazel.remote.execution.v2.ChunkingFunction.Value.FAST_CDC_2020,

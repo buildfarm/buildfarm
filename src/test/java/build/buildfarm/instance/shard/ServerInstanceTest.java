@@ -216,15 +216,10 @@ public class ServerInstanceTest {
 
   @Test
   public void advertisesRepMaxCdcParameters() {
-    BuildfarmConfigs configs = instance.getBuildFarmConfigs();
-    configs.getServer().setRepMaxCdcMinChunkSizeBytes(128 * 1024);
-    configs.getServer().setRepMaxCdcHorizonSizeBytes(1024 * 1024);
     CacheCapabilities capabilities = instance.getCapabilities().getCacheCapabilities();
 
-    assertThat(capabilities.getRepMaxCdcParams().getMinChunkSizeBytes()).isEqualTo(128 * 1024);
-    assertThat(capabilities.getRepMaxCdcParams().getHorizonSizeBytes()).isEqualTo(1024 * 1024);
-    configs.getServer().setRepMaxCdcMinChunkSizeBytes(256 * 1024);
-    configs.getServer().setRepMaxCdcHorizonSizeBytes(2 * 1024 * 1024);
+    assertThat(capabilities.getRepMaxCdcParams().getMinChunkSizeBytes()).isEqualTo(256 * 1024);
+    assertThat(capabilities.getRepMaxCdcParams().getHorizonSizeBytes()).isEqualTo(2 * 1024 * 1024);
   }
 
   @SuppressWarnings("unchecked")

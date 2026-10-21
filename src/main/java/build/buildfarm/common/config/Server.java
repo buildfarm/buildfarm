@@ -71,8 +71,6 @@ public class Server {
   private int fastCdc2020AvgChunkSizeBytes = 512 * 1024;
   private int fastCdc2020Seed = 0;
   private int fastCdc2020Normalization = 2;
-  private int repMaxCdcMinChunkSizeBytes = 256 * 1024;
-  private int repMaxCdcHorizonSizeBytes = 2 * 1024 * 1024;
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);
