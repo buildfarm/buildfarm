@@ -1151,11 +1151,9 @@ public class RedisShardBackplane implements Backplane {
   boolean pollExecution(
       UnifiedJedis jedis, String executionName, DispatchedOperation dispatchedOperation) {
     if (state.dispatchedExecutions.exists(jedis, executionName)) {
-      /* someone else beat us to the punch, delete our incorrectly added key */
-      state.dispatchedExecutions.remove(jedis, executionName);
-      return false;
+      return !state.dispatchedExecutions.insert(jedis, executionName, dispatchedOperation);
     }
-    return state.dispatchedExecutions.insert(jedis, executionName, dispatchedOperation);
+    return false;
   }
 
   @Override

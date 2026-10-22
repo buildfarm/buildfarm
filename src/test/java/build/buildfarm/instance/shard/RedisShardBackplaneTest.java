@@ -212,6 +212,45 @@ public class RedisShardBackplaneTest {
   }
 
   @Test
+  public void pollExecutionUpdatesDispatchedExecution() throws IOException {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    RedisClient client = new RedisClient(jedis);
+    DistributedState state = new DistributedState();
+    state.dispatchedExecutions = mock(RedisHashMap.class);
+    RedisShardBackplane backplane = createBackplane("poll-execution-test");
+    backplane.start(client, state, "startTime/test:0000", name -> {});
+    String executionName = "op";
+    DispatchedOperation dispatchedOperation = DispatchedOperation.getDefaultInstance();
+    when(state.dispatchedExecutions.exists(jedis, executionName)).thenReturn(true);
+    when(state.dispatchedExecutions.insert(jedis, executionName, dispatchedOperation))
+        .thenReturn(false);
+
+    assertThat(backplane.pollExecution(jedis, executionName, dispatchedOperation)).isTrue();
+
+    verify(state.dispatchedExecutions).exists(jedis, executionName);
+    verify(state.dispatchedExecutions).insert(jedis, executionName, dispatchedOperation);
+    verify(state.dispatchedExecutions, times(0)).remove(any(UnifiedJedis.class), anyString());
+  }
+
+  @Test
+  public void pollExecutionDoesNotCreateMissingDispatchedExecution() throws IOException {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    RedisClient client = new RedisClient(jedis);
+    DistributedState state = new DistributedState();
+    state.dispatchedExecutions = mock(RedisHashMap.class);
+    RedisShardBackplane backplane = createBackplane("poll-execution-test");
+    backplane.start(client, state, "startTime/test:0000", name -> {});
+    String executionName = "op";
+    DispatchedOperation dispatchedOperation = DispatchedOperation.getDefaultInstance();
+    when(state.dispatchedExecutions.exists(jedis, executionName)).thenReturn(false);
+
+    assertThat(backplane.pollExecution(jedis, executionName, dispatchedOperation)).isFalse();
+
+    verify(state.dispatchedExecutions).exists(jedis, executionName);
+    verifyNoMoreInteractions(state.dispatchedExecutions);
+  }
+
+  @Test
   public void dispatchedOperationsShowProperRequeueAmount0to1()
       throws IOException, InterruptedException {
     // ARRANGE
