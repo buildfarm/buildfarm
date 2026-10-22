@@ -759,7 +759,7 @@ public abstract class NodeInstance extends InstanceBase {
       long size;
       try (InputStream in = connection.getInputStream();
           OutputStream out = originOut) {
-        size = ByteStreams.copy(in, originOut);
+        size = ByteStreams.copy(in, out);
       }
       Digest actualOriginDigest = originDigestUtil.build(originOut.hash().toString(), size);
       checkOriginDigest(originDigest, actualOriginDigest);
