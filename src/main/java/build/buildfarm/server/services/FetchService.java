@@ -72,14 +72,10 @@ public class FetchService extends FetchImplBase {
   }
 
   private static void parseQualifier(
-      String name,
-      String value,
-      DigestFunction.Value digestFunction,
-      FetchQualifiers.Builder fetchQualifiers) {
+      String name, String value, FetchQualifiers.Builder fetchQualifiers) {
     switch (name) {
       case QUALIFIER_CANONICAL_ID -> fetchQualifiers.setCanonicalId(value);
-      case QUALIFIER_CHECKSUM_SRI ->
-          fetchQualifiers.setDigest(parseChecksumSRI(value, digestFunction));
+      case QUALIFIER_CHECKSUM_SRI -> fetchQualifiers.setDigest(parseChecksumSRI(value));
       case String s when s.startsWith(QUALIFIER_HTTP_HEADER_PREFIX) ->
           fetchQualifiers.putHeaders(s.substring(QUALIFIER_HTTP_HEADER_PREFIX.length()), value);
       case String s when s.startsWith(QUALIFIER_HTTP_HEADER_URL_PREFIX) ->
@@ -90,11 +86,10 @@ public class FetchService extends FetchImplBase {
     }
   }
 
-  private static FetchQualifiers parseQualifiers(
-      Iterable<Qualifier> qualifiers, DigestFunction.Value digestFunction) {
+  private static FetchQualifiers parseQualifiers(Iterable<Qualifier> qualifiers) {
     FetchQualifiers.Builder fetchQualifiers = FetchQualifiers.newBuilder();
     for (Qualifier qualifier : qualifiers) {
-      parseQualifier(qualifier.getName(), qualifier.getValue(), digestFunction, fetchQualifiers);
+      parseQualifier(qualifier.getName(), qualifier.getValue(), fetchQualifiers);
     }
     return fetchQualifiers.build();
   }
@@ -112,10 +107,17 @@ public class FetchService extends FetchImplBase {
       return;
     }
 
-    FetchQualifiers qualifiers =
-        parseQualifiers(request.getQualifiersList(), request.getDigestFunction());
+    FetchQualifiers qualifiers = parseQualifiers(request.getQualifiersList());
 
-    Digest expectedDigest = qualifiers.getDigest();
+    Digest originDigest = qualifiers.getDigest();
+    DigestFunction.Value digestFunction =
+        request.getDigestFunction() == DigestFunction.Value.UNKNOWN
+            ? DigestFunction.Value.SHA256
+            : request.getDigestFunction();
+    Digest expectedDigest =
+        !originDigest.getHash().isEmpty() && originDigest.getDigestFunction() == digestFunction
+            ? originDigest
+            : Digest.getDefaultInstance();
 
     // TODO consider doing something with QUALIFIER_CANONICAL_ID
 
@@ -123,14 +125,22 @@ public class FetchService extends FetchImplBase {
         build.bazel.remote.execution.v2.Digest.newBuilder();
     if (!expectedDigest.equals(Digest.getDefaultInstance())
         && instance.containsBlob(expectedDigest, result, requestMetadata)) {
-      responseObserver.onNext(FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
+      responseObserver.onNext(
+          FetchBlobResponse.newBuilder()
+              .setBlobDigest(result.build())
+              .setDigestFunction(digestFunction)
+              .build());
       responseObserver.onCompleted();
       return;
     }
 
     addCallback(
         instance.fetchBlob(
-            request.getUrisList(), qualifiers.getHeadersMap(), expectedDigest, requestMetadata),
+            request.getUrisList(),
+            qualifiers.getHeadersMap(),
+            originDigest,
+            Digest.newBuilder().setDigestFunction(digestFunction).build(),
+            requestMetadata),
         new FutureCallback<>() {
           @Override
           public void onSuccess(Digest actualDigest) {
@@ -158,8 +168,7 @@ public class FetchService extends FetchImplBase {
         directExecutor());
   }
 
-  private static build.buildfarm.v1test.Digest parseChecksumSRI(
-      String checksum, DigestFunction.Value digestFunction) {
+  private static build.buildfarm.v1test.Digest parseChecksumSRI(String checksum) {
     String[] components = checksum.split("-");
     if (components.length != 2) {
       throw Status.INVALID_ARGUMENT
@@ -172,15 +181,6 @@ public class FetchService extends FetchImplBase {
     if (digestUtil == null) {
       throw Status.INVALID_ARGUMENT
           .withDescription(format("Unrecognized digest function '%s'", hashFunction))
-          .asRuntimeException();
-    }
-    if (digestFunction != DigestFunction.Value.UNKNOWN
-        && digestFunction != digestUtil.getDigestFunction()) {
-      throw Status.INVALID_ARGUMENT
-          .withDescription(
-              format(
-                  "Mismatched digest function '%s' and checksum.sri '%s'",
-                  digestFunction, hashFunction))
           .asRuntimeException();
     }
     byte[] hash = BaseEncoding.base64().decode(encodedDigest);
