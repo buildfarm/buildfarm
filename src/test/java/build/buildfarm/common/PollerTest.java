@@ -64,7 +64,6 @@ public class PollerTest {
   public void pollUntilFalse() throws InterruptedException {
     Executor executor = Executors.newSingleThreadExecutor();
     Poller poller = new Poller(Durations.fromMillis(10));
-    AtomicBoolean polledCount = new AtomicBoolean(false);
     int[] count = {0};
     Deadline deadline = Deadline.after(5, TimeUnit.SECONDS);
 
