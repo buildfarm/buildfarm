@@ -15,8 +15,6 @@
 package build.buildfarm.worker;
 
 import static build.buildfarm.common.Claim.Stage.EXECUTE_ACTION_STAGE;
-import static com.google.common.collect.Maps.transformValues;
-import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.protobuf.util.Durations.add;
 import static com.google.protobuf.util.Durations.compare;
 import static com.google.protobuf.util.Durations.fromSeconds;
@@ -79,8 +77,6 @@ import lombok.extern.java.Log;
 @Log
 public class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
-  private static final String CGROUP_INTERPOLATION = "cgroup";
-  private static final String EXECUTION_CGROUP_PREFIX = "executions/operations/";
   private static final long SAMPLE_NANOS = 100_000_000;
   private static final String SAMPLE_CPU_USAGE_USEC = "cpu.usage_usec";
   private static final String SAMPLE_CPU_THROTTLED_USEC = "cpu.throttled_usec";
@@ -265,25 +261,35 @@ public class Executor {
   }
 
   static Map<String, Interpolator> createInterpolations(
-      Claim claim, Iterable<Property> properties, String executionName) {
+      Claim claim, Iterable<Property> properties, Map<String, String> workerInterpolations) {
     Map<String, Interpolator> interpolations = new HashMap<>();
     if (claim != null) {
       for (Map.Entry<String, List<Object>> pool : claim.getPools()) {
         List<Object> ids = pool.getValue();
-        interpolations.put(pool.getKey(), new Interpolator(ids));
+        putInterpolation(interpolations, pool.getKey(), new Interpolator(ids));
         for (int i = 0; i < ids.size(); i++) {
-          interpolations.put(pool.getKey() + "-" + i, new Interpolator(String.valueOf(ids.get(i))));
+          putInterpolation(
+              interpolations,
+              pool.getKey() + "-" + i,
+              new Interpolator(String.valueOf(ids.get(i))));
         }
       }
     }
-    interpolations.putAll(
-        transformValues(
-            uniqueIndex(properties, Property::getName),
-            property -> new Interpolator(property.getValue())));
-    String operationId = executionName.substring(executionName.lastIndexOf('/') + 1);
-    interpolations.put(
-        CGROUP_INTERPOLATION, new Interpolator(EXECUTION_CGROUP_PREFIX + operationId));
+    for (Property property : properties) {
+      putInterpolation(interpolations, property.getName(), new Interpolator(property.getValue()));
+    }
+    for (Map.Entry<String, String> interpolation : workerInterpolations.entrySet()) {
+      putInterpolation(
+          interpolations, interpolation.getKey(), new Interpolator(interpolation.getValue()));
+    }
     return interpolations;
+  }
+
+  private static void putInterpolation(
+      Map<String, Interpolator> interpolations, String name, Interpolator interpolation) {
+    if (interpolations.putIfAbsent(name, interpolation) != null) {
+      throw new IllegalStateException("duplicate execution policy interpolation: " + name);
+    }
   }
 
   static Iterable<String> transformWrapper(
@@ -338,7 +344,7 @@ public class Executor {
         createInterpolations(
             executionContext.claim,
             executionContext.queueEntry.getPlatform().getPropertiesList(),
-            executionName);
+            executionContext.executionPolicyInterpolations);
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
