@@ -36,6 +36,7 @@
     "com.google.protobuf:protobuf-java-util": 1298272668,
     "com.google.truth:truth": 874936572,
     "com.owteam.engUtils:netrc": -564438396,
+    "com.uber.nullaway:nullaway": 590882514,
     "commons-io:commons-io": 1305681826,
     "info.picocli:picocli": 600678140,
     "io.grpc:grpc-api": -623437235,
@@ -166,6 +167,7 @@
     "com.squareup.okhttp3:okhttp-jvm": -1381393640,
     "com.squareup.okio:okio-jvm": 955803116,
     "com.sun.activation:jakarta.activation": -1649101522,
+    "com.uber.nullaway:nullaway": 466947784,
     "commons-codec:commons-codec": -530511410,
     "commons-io:commons-io": 425603363,
     "commons-logging:commons-logging": 1022368238,
@@ -255,6 +257,7 @@
     "org.bouncycastle:bcprov-jdk18on": 775163066,
     "org.bouncycastle:bcutil-jdk18on": 1223385985,
     "org.checkerframework:checker-qual": -1467660257,
+    "org.checkerframework:dataflow-nullaway": -2002520212,
     "org.codehaus.mojo:animal-sniffer-annotations": -1570976252,
     "org.glassfish.hk2.external:aopalliance-repackaged": -618564429,
     "org.glassfish.hk2.external:jakarta.inject": -764746588,
@@ -668,6 +671,12 @@
         "jar": "d84d4ba8b55cdb7fdcbb885e6939386367433f56f5ab8cfdc302a7c3587fa92b"
       },
       "version": "1.2.1"
+    },
+    "com.uber.nullaway:nullaway": {
+      "shasums": {
+        "jar": "eb02eb2da5ee30bcac4621a259a84153b20690078dc47ef920589b8371f456ed"
+      },
+      "version": "0.14.2"
     },
     "commons-codec:commons-codec": {
       "shasums": {
@@ -1193,6 +1202,12 @@
       },
       "version": "4.3.1"
     },
+    "org.checkerframework:dataflow-nullaway": {
+      "shasums": {
+        "jar": "0524cc55673ac10f08d74ca659f7a12c9ce74fba1120a61950c5011b843fb25e"
+      },
+      "version": "4.2.3"
+    },
     "org.codehaus.mojo:animal-sniffer-annotations": {
       "shasums": {
         "jar": "cfd7e51a828fe6b98bc0dbb99e34900c9e9012322cb9ddd57fd8dd0b02da5e27"
@@ -1676,6 +1691,11 @@
     "com.squareup.okio:okio-jvm": [
       "org.jetbrains.kotlin:kotlin-stdlib"
     ],
+    "com.uber.nullaway:nullaway": [
+      "com.google.guava:guava",
+      "org.checkerframework:dataflow-nullaway",
+      "org.jspecify:jspecify"
+    ],
     "io.grpc:grpc-api": [
       "com.google.code.findbugs:jsr305",
       "com.google.errorprone:error_prone_annotations",
@@ -1983,6 +2003,9 @@
     ],
     "org.bouncycastle:bcutil-jdk18on": [
       "org.bouncycastle:bcprov-jdk18on"
+    ],
+    "org.checkerframework:dataflow-nullaway": [
+      "org.checkerframework:checker-qual"
     ],
     "org.glassfish.hk2:hk2-api": [
       "org.glassfish.hk2.external:aopalliance-repackaged",
@@ -2729,6 +2752,26 @@
       "com.sun.activation.registries",
       "com.sun.activation.viewers",
       "javax.activation"
+    ],
+    "com.uber.nullaway:nullaway": [
+      "com.uber.nullaway",
+      "com.uber.nullaway.annotations",
+      "com.uber.nullaway.dataflow",
+      "com.uber.nullaway.dataflow.cfg",
+      "com.uber.nullaway.fixserialization",
+      "com.uber.nullaway.fixserialization.adapters",
+      "com.uber.nullaway.fixserialization.location",
+      "com.uber.nullaway.fixserialization.out",
+      "com.uber.nullaway.fixserialization.scanners",
+      "com.uber.nullaway.generics",
+      "com.uber.nullaway.handlers",
+      "com.uber.nullaway.handlers.contract",
+      "com.uber.nullaway.handlers.contract.fieldcontract",
+      "com.uber.nullaway.handlers.stream",
+      "com.uber.nullaway.handlers.temporary",
+      "com.uber.nullaway.jarinfer",
+      "com.uber.nullaway.libmodel",
+      "com.uber.nullaway.librarymodel"
     ],
     "commons-codec:commons-codec": [
       "org.apache.commons.codec",
@@ -3995,6 +4038,51 @@
       "org.checkerframework.dataflow.qual",
       "org.checkerframework.framework.qual"
     ],
+    "org.checkerframework:dataflow-nullaway": [
+      "javax.annotation",
+      "javax.annotation.concurrent",
+      "javax.annotation.meta",
+      "org.checkerframework.nullaway.com.google.common.annotations",
+      "org.checkerframework.nullaway.com.google.common.base",
+      "org.checkerframework.nullaway.com.google.common.base.internal",
+      "org.checkerframework.nullaway.com.google.common.cache",
+      "org.checkerframework.nullaway.com.google.common.collect",
+      "org.checkerframework.nullaway.com.google.common.escape",
+      "org.checkerframework.nullaway.com.google.common.eventbus",
+      "org.checkerframework.nullaway.com.google.common.graph",
+      "org.checkerframework.nullaway.com.google.common.hash",
+      "org.checkerframework.nullaway.com.google.common.html",
+      "org.checkerframework.nullaway.com.google.common.io",
+      "org.checkerframework.nullaway.com.google.common.math",
+      "org.checkerframework.nullaway.com.google.common.net",
+      "org.checkerframework.nullaway.com.google.common.primitives",
+      "org.checkerframework.nullaway.com.google.common.reflect",
+      "org.checkerframework.nullaway.com.google.common.util.concurrent",
+      "org.checkerframework.nullaway.com.google.common.util.concurrent.internal",
+      "org.checkerframework.nullaway.com.google.common.xml",
+      "org.checkerframework.nullaway.com.google.errorprone.annotations",
+      "org.checkerframework.nullaway.com.google.errorprone.annotations.concurrent",
+      "org.checkerframework.nullaway.com.google.j2objc.annotations",
+      "org.checkerframework.nullaway.com.google.thirdparty.publicsuffix",
+      "org.checkerframework.nullaway.dataflow.analysis",
+      "org.checkerframework.nullaway.dataflow.busyexpr",
+      "org.checkerframework.nullaway.dataflow.cfg",
+      "org.checkerframework.nullaway.dataflow.cfg.block",
+      "org.checkerframework.nullaway.dataflow.cfg.builder",
+      "org.checkerframework.nullaway.dataflow.cfg.node",
+      "org.checkerframework.nullaway.dataflow.cfg.playground",
+      "org.checkerframework.nullaway.dataflow.cfg.visualize",
+      "org.checkerframework.nullaway.dataflow.constantpropagation",
+      "org.checkerframework.nullaway.dataflow.expression",
+      "org.checkerframework.nullaway.dataflow.livevariable",
+      "org.checkerframework.nullaway.dataflow.reachingdef",
+      "org.checkerframework.nullaway.dataflow.util",
+      "org.checkerframework.nullaway.javacutil",
+      "org.checkerframework.nullaway.javacutil.trees",
+      "org.checkerframework.nullaway.org.plumelib.javacparse",
+      "org.checkerframework.nullaway.org.plumelib.reflection",
+      "org.checkerframework.nullaway.org.plumelib.util"
+    ],
     "org.codehaus.mojo:animal-sniffer-annotations": [
       "org.codehaus.mojo.animal_sniffer"
     ],
@@ -4468,6 +4556,7 @@
       "com.squareup.okhttp3:okhttp-jvm",
       "com.squareup.okio:okio-jvm",
       "com.sun.activation:jakarta.activation",
+      "com.uber.nullaway:nullaway",
       "commons-codec:commons-codec",
       "commons-io:commons-io",
       "commons-logging:commons-logging",
@@ -4557,6 +4646,7 @@
       "org.bouncycastle:bcprov-jdk18on",
       "org.bouncycastle:bcutil-jdk18on",
       "org.checkerframework:checker-qual",
+      "org.checkerframework:dataflow-nullaway",
       "org.codehaus.mojo:animal-sniffer-annotations",
       "org.glassfish.hk2.external:aopalliance-repackaged",
       "org.glassfish.hk2.external:jakarta.inject",
@@ -4643,6 +4733,13 @@
     "com.google.jimfs:jimfs": {
       "java.nio.file.spi.FileSystemProvider": [
         "com.google.common.jimfs.SystemJimfsFileSystemProvider"
+      ]
+    },
+    "com.uber.nullaway:nullaway": {
+      "com.google.errorprone.bugpatterns.BugChecker": [
+        "com.uber.nullaway.JSpecifyUnrecognizedAnnotationLocation",
+        "com.uber.nullaway.NullAway",
+        "com.uber.nullaway.RequireExplicitNullMarking"
       ]
     },
     "io.grpc:grpc-core": {

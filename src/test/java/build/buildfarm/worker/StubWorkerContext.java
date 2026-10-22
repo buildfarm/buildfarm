@@ -103,6 +103,11 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
+  public int getReportResultDeadline() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public boolean hasDefaultActionTimeout() {
     throw new UnsupportedOperationException();
   }

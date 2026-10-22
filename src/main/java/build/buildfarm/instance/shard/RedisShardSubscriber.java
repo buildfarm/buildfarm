@@ -278,12 +278,12 @@ class RedisShardSubscriber extends JedisPubSub {
     // FIXME indicate lag/clock skew for OOB timestamps
     switch (operationChange.getTypeCase()) {
       case TYPE_NOT_SET:
-        // FIXME present nice timestamp
         log.log(
             Level.SEVERE,
             format(
                 "OperationChange oneof type is not set from %s at %s",
-                operationChange.getSource(), operationChange.getEffectiveAt()));
+                operationChange.getSource(),
+                Timestamps.toString(operationChange.getEffectiveAt())));
         break;
       case RESET:
         resetOperation(channel, operationChange.getReset());

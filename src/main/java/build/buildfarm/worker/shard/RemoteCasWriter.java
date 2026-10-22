@@ -98,6 +98,7 @@ public class RemoteCasWriter implements CasWriter {
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       Throwables.throwIfInstanceOf(cause, IOException.class);
+      log.log(Level.SEVERE, "CAS write failed with non-IOException", cause);
       // prevent a discard of this frame
       Status status = Status.fromThrowable(cause);
       throw new IOException(status.asException());
