@@ -42,7 +42,7 @@ build:windows --sandbox_add_mount_pair=C:\Temp
 # To continue using it until then, use the flag --define=protobuf_allow_msvc=true.
 # For feedback or discussion, see github.com/protocolbuffers/protobuf/issues/20085.
 build:windows --define=protobuf_allow_msvc=true
-# NullAway: plugin is always loaded via //bazel/rules:java.bzl wrapper,
+# NullAway: plugin is always loaded via //build_rules/rules:java.bzl wrapper,
 # but disabled by default. Enable with: bazel build --config=nullaway //...
 # In JSpecifyMode, only @NullMarked classes/packages are checked.
 # AnnotatedPackages uses a placeholder; actual checking scope comes from @NullMarked.
