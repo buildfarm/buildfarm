@@ -1,4 +1,4 @@
-load("//bazel/rules:java.bzl", "java_binary", "java_library", "java_plugin")
+load("//build_rules/rules:java.bzl", "java_binary", "java_library", "java_plugin")
 
 java_binary(
     name = "bf-mount",

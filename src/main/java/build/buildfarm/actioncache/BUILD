@@ -1,4 +1,4 @@
-load("//bazel/rules:java.bzl", "java_library")
+load("//build_rules/rules:java.bzl", "java_library")
 
 java_library(
     name = "actioncache",

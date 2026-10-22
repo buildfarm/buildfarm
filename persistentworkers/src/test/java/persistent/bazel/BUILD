@@ -1,4 +1,4 @@
-load("//bazel/rules:java.bzl", "java_test")
+load("//build_rules/rules:java.bzl", "java_test")
 
 COMMON_DEPS = [
     "//persistentworkers/src/main/java/persistent/common:persistent-common",

@@ -1,4 +1,4 @@
-load("//bazel/rules:java.bzl", "java_library", "java_test")
+load("//build_rules/rules:java.bzl", "java_library", "java_test")
 
 java_library(
     name = "grpc",

@@ -1,4 +1,4 @@
-load("//bazel/rules:java.bzl", "java_test")
+load("//build_rules/rules:java.bzl", "java_test")
 
 java_test(
     name = "tests",
