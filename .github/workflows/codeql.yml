@@ -47,7 +47,7 @@ jobs:
         # See also: https://docs.github.com/en/enterprise-cloud@latest/code-security/codeql-cli/getting-started-with-the-codeql-cli/preparing-your-code-for-codeql-analysis#specifying-build-commands
       run: |
         bazel version
-        bazel build \
+        bazel build --config=strict \
           --spawn_strategy=local --nouse_action_cache \
           //src/main/java/build/buildfarm:buildfarm-server \
           //src/main/java/build/buildfarm:buildfarm-shard-worker

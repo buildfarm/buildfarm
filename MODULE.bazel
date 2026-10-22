@@ -100,7 +100,7 @@ maven.install(
         "com.github.jnr:jnr-constants:0.11.2",
         "com.github.jnr:jnr-ffi:2.3.4",
         "com.github.jnr:jnr-posix:3.2.5",
-        "com.github.luben:zstd-jni:1.5.7-7",
+        "com.github.luben:zstd-jni:1.5.7-24",
         "com.github.oshi:oshi-core:6.12.0",
         "com.github.pcj:google-options:1.0.0",
         "com.github.serceman:jnr-fuse:0.5.8",

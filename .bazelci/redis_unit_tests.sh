@@ -51,4 +51,4 @@ then
 fi
 
 # Run tests that rely on redis
-$BAZEL test --build_tests_only --test_tag_filters=redis --test_filter=removeFromDequeueTrueWhenValueExists //src/test/java/build/buildfarm/common/redis:balancedqueue-redis
+$BAZEL test --config=strict --build_tests_only --test_tag_filters=redis --test_filter=removeFromDequeueTrueWhenValueExists //src/test/java/build/buildfarm/common/redis:balancedqueue-redis

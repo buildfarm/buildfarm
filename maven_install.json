@@ -16,7 +16,7 @@
     "com.github.jnr:jnr-constants": -750352976,
     "com.github.jnr:jnr-ffi": -541790023,
     "com.github.jnr:jnr-posix": 466447840,
-    "com.github.luben:zstd-jni": 1844632334,
+    "com.github.luben:zstd-jni": 1042493103,
     "com.github.oshi:oshi-core": -1600608347,
     "com.github.pcj:google-options": -562301404,
     "com.github.serceman:jnr-fuse": 40392477,
@@ -131,7 +131,7 @@
     "com.github.jnr:jnr-posix": 146464772,
     "com.github.jnr:jnr-x86asm": 1097235222,
     "com.github.kevinstern:software-and-algorithms": -863567887,
-    "com.github.luben:zstd-jni": 887146326,
+    "com.github.luben:zstd-jni": -831281182,
     "com.github.oshi:oshi-common": 446254739,
     "com.github.oshi:oshi-core": 1853479862,
     "com.github.pcj:google-options": 1508027358,
@@ -461,9 +461,9 @@
     },
     "com.github.luben:zstd-jni": {
       "shasums": {
-        "jar": "d4725bce2c3e4f3df54cbea8bf5966e240872bb7ba7658572ededaef28a01d83"
+        "jar": "79f5e678ce437f09d5ab55df1c6e7fc8cf6a2eb8e73052f34b143464062fcb0b"
       },
-      "version": "1.5.7-7"
+      "version": "1.5.7-24"
     },
     "com.github.oshi:oshi-common": {
       "shasums": {

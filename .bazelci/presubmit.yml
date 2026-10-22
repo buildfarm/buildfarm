@@ -34,6 +34,7 @@ tasks:
     - //src/test/java/...:all
     coverage_flags:
     - --combined_report=lcov
+    - --config=strict
     - --test_tag_filters=-redis,-integration,-container
     post_shell_commands:
     - export BUILDFARM_INVOKE_COVERAGE=false
@@ -75,8 +76,8 @@ tasks:
   macos:
     name: Unit Tests
     environment:
-      ANDROID_HOME: ""
-      ANDROID_NDK_HOME: ""
+      ANDROID_HOME: ''
+      ANDROID_NDK_HOME: ''
     build_flags:
     - --cxxopt=-std=c++14
     - --build_tag_filters=-container
@@ -101,7 +102,7 @@ tasks:
     name: Rpm Builds
     platform: rockylinux8
     shell_commands:
-    - bazel build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
+    - bazel build --config=strict //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
   # This will run unit tests that integrate with redis.
   # Outside of this step, similar functionality may be tested with mocks.
