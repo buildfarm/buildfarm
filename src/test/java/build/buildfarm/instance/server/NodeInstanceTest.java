@@ -26,10 +26,12 @@ import static build.buildfarm.instance.server.NodeInstance.OUTPUT_FILE_IS_OUTPUT
 import static build.buildfarm.instance.server.NodeInstance.SYMLINK_TARGET_ABSOLUTE;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -93,6 +95,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -1086,10 +1089,9 @@ public class NodeInstanceTest {
   }
 
   @Test
-  public void fetchBlobUsesCasDigestFunctionAndVerifiesOriginDigest() throws Exception {
+  public void fetchBlobUsesExpectedDigestFunction() throws Exception {
     ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
-    Digest originDigest = DIGEST_UTIL.compute(content);
-    Digest casDigest = new DigestUtil(HashFunction.BLAKE3).compute(content);
+    Digest expectedDigest = new DigestUtil(HashFunction.BLAKE3).compute(content);
     ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
     NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
     Write write = mock(Write.class);
@@ -1107,11 +1109,12 @@ public class NodeInstanceTest {
     when(write.getFuture()).thenReturn(immediateFuture((long) content.size()));
     when(contentAddressableStorage.getWrite(
             eq(Compressor.Value.IDENTITY),
-            eq(casDigest),
+            eq(expectedDigest),
             any(UUID.class),
             any(RequestMetadata.class)))
         .thenReturn(write);
     HttpURLConnection connection = mock(HttpURLConnection.class);
+    when(connection.getContentLengthLong()).thenReturn((long) content.size());
     when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
     when(connection.getInputStream()).thenReturn(content.newInput());
     URL url = mock(URL.class);
@@ -1122,15 +1125,14 @@ public class NodeInstanceTest {
                 .fetchBlobUrls(
                     ImmutableList.of(url),
                     ImmutableMap.of(),
-                    originDigest,
-                    DigestFunction.Value.BLAKE3,
+                    expectedDigest,
                     RequestMetadata.getDefaultInstance())
                 .get())
-        .isEqualTo(casDigest);
+        .isEqualTo(expectedDigest);
     verify(contentAddressableStorage)
         .getWrite(
             eq(Compressor.Value.IDENTITY),
-            eq(casDigest),
+            eq(expectedDigest),
             any(UUID.class),
             any(RequestMetadata.class));
   }
@@ -1139,10 +1141,12 @@ public class NodeInstanceTest {
   public void fetchBlobRejectsMismatchedOriginDigest() throws Exception {
     ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
     Digest wrongOriginDigest =
-        DIGEST_UTIL.compute(ByteString.copyFromUtf8("Different Fetch Blob Content"));
+        new DigestUtil(HashFunction.BLAKE3)
+            .compute(ByteString.copyFromUtf8("Different Fetch Blob Content"));
     ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
     NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
     HttpURLConnection connection = mock(HttpURLConnection.class);
+    when(connection.getContentLengthLong()).thenReturn((long) content.size());
     when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
     when(connection.getInputStream()).thenReturn(content.newInput());
     URL url = mock(URL.class);
@@ -1156,7 +1160,6 @@ public class NodeInstanceTest {
                     ImmutableList.of(url),
                     ImmutableMap.of(),
                     wrongOriginDigest,
-                    DigestFunction.Value.BLAKE3,
                     RequestMetadata.getDefaultInstance())
                 .get());
     verify(contentAddressableStorage, never())
