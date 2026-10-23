@@ -26,10 +26,12 @@ import static build.buildfarm.instance.server.NodeInstance.OUTPUT_FILE_IS_OUTPUT
 import static build.buildfarm.instance.server.NodeInstance.SYMLINK_TARGET_ABSOLUTE;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -50,6 +52,8 @@ import build.bazel.remote.execution.v2.SymlinkNode;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.FastCDCChunker;
+import build.buildfarm.cas.RepMaxCDCChunker;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -91,6 +95,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -1081,5 +1086,109 @@ public class NodeInstanceTest {
     verify(httpURLConnection, times(1)).setRequestProperty(customTokenHeader, customToken);
     verifyNoMoreInteractions(httpURLConnection);
     verify(url, times(1)).openConnection();
+  }
+
+  @Test
+  public void fetchBlobUsesExpectedDigestFunction() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
+    Digest expectedDigest = new DigestUtil(HashFunction.BLAKE3).compute(content);
+    ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
+    NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
+    Write write = mock(Write.class);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(
+            new FeedbackOutputStream() {
+              @Override
+              public void write(int b) {}
+
+              @Override
+              public boolean isReady() {
+                return true;
+              }
+            });
+    when(write.getFuture()).thenReturn(immediateFuture((long) content.size()));
+    when(contentAddressableStorage.getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expectedDigest),
+            any(UUID.class),
+            any(RequestMetadata.class)))
+        .thenReturn(write);
+    HttpURLConnection connection = mock(HttpURLConnection.class);
+    when(connection.getContentLengthLong()).thenReturn((long) content.size());
+    when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
+    when(connection.getInputStream()).thenReturn(content.newInput());
+    URL url = mock(URL.class);
+    when(url.openConnection()).thenReturn(connection);
+
+    assertThat(
+            instance
+                .fetchBlobUrls(
+                    ImmutableList.of(url),
+                    ImmutableMap.of(),
+                    expectedDigest,
+                    RequestMetadata.getDefaultInstance())
+                .get())
+        .isEqualTo(expectedDigest);
+    verify(contentAddressableStorage)
+        .getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expectedDigest),
+            any(UUID.class),
+            any(RequestMetadata.class));
+  }
+
+  @Test
+  public void fetchBlobRejectsMismatchedOriginDigest() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
+    Digest wrongOriginDigest =
+        new DigestUtil(HashFunction.BLAKE3)
+            .compute(ByteString.copyFromUtf8("Different Fetch Blob Content"));
+    ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
+    NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
+    HttpURLConnection connection = mock(HttpURLConnection.class);
+    when(connection.getContentLengthLong()).thenReturn((long) content.size());
+    when(connection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
+    when(connection.getInputStream()).thenReturn(content.newInput());
+    URL url = mock(URL.class);
+    when(url.openConnection()).thenReturn(connection);
+
+    assertThrows(
+        ExecutionException.class,
+        () ->
+            instance
+                .fetchBlobUrls(
+                    ImmutableList.of(url),
+                    ImmutableMap.of(),
+                    wrongOriginDigest,
+                    RequestMetadata.getDefaultInstance())
+                .get());
+    verify(contentAddressableStorage, never())
+        .getWrite(any(Compressor.Value.class), any(Digest.class), any(UUID.class), any());
+  }
+
+  @Test
+  public void repMaxCdcUsesRepMaxCDCChunkerAndMinimumBlobSize() {
+    NodeInstance instance = new DummyServerInstance();
+
+    assertThat(
+            instance.createBlobChunker(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.REP_MAX_CDC,
+                DIGEST_UTIL,
+                ByteString.EMPTY.newInput()))
+        .isInstanceOf(RepMaxCDCChunker.class);
+    assertThat(
+            instance.createBlobChunker(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.FAST_CDC_2020,
+                DIGEST_UTIL,
+                ByteString.EMPTY.newInput()))
+        .isInstanceOf(FastCDCChunker.class);
+    assertThat(
+            instance.getMinimumBlobSize(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.REP_MAX_CDC))
+        .isEqualTo(512 * 1024L);
+    assertThat(
+            instance.getMinimumBlobSize(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.FAST_CDC_2020))
+        .isEqualTo(2 * 1024 * 1024L);
   }
 }
