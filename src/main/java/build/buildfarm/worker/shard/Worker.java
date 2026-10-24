@@ -54,6 +54,7 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.config.GrpcMetrics;
 import build.buildfarm.common.function.InterruptingConsumer;
+import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
@@ -111,6 +112,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.Status.Code;
+import io.grpc.StatusRuntimeException;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
@@ -143,7 +145,10 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -197,10 +202,13 @@ public final class Worker extends LoggingMain {
       Counter.build().name("completed_operations").help("Completed operations.").register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
+  private static final long registrationRetryInitialBackoffMillis = 1000;
+  private static final long registrationRetryMaxBackoffMillis = 30000;
+  private static final double registrationRetryJitter = 0.2;
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  private boolean isPaused = false;
+  private volatile boolean isPaused = false;
 
   private WorkerInstance instance;
 
@@ -631,19 +639,100 @@ public final class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
-  private void addWorker(ShardWorker worker) {
-    while (!backplane.isStopped()) {
+  static boolean isRetriableRegistrationException(RuntimeException e) {
+    if (e instanceof StatusRuntimeException) {
+      Code code = Status.fromThrowable(e).getCode();
+      return code == Code.UNAVAILABLE || code == Code.DEADLINE_EXCEEDED;
+    }
+    return false;
+  }
+
+  private static long nextRegistrationRetryBackoffMillis(long currentBackoffMillis) {
+    return Math.min(currentBackoffMillis * 2, registrationRetryMaxBackoffMillis);
+  }
+
+  static long registrationRetryBackoffWithJitterMillis(long backoffMillis, double jitterRatio) {
+    checkArgument(jitterRatio >= -1.0 && jitterRatio <= 1.0, "jitterRatio must be in [-1, 1]");
+    return Math.min(
+        Math.round(backoffMillis * (1 + registrationRetryJitter * jitterRatio)),
+        registrationRetryMaxBackoffMillis);
+  }
+
+  private static long registrationRetryBackoffWithJitterMillis(long backoffMillis) {
+    return registrationRetryBackoffWithJitterMillis(
+        backoffMillis, ThreadLocalRandom.current().nextDouble(-1.0, 1.0));
+  }
+
+  private boolean isShuttingDown() {
+    Server currentServer = server;
+    ShardWorkerContext currentContext = context;
+    return currentServer == null
+        || currentServer.isShutdown()
+        || (currentContext != null && currentContext.inGracefulShutdown());
+  }
+
+  private void sleepBeforeRetryingRegistration(long backoffMillis) throws InterruptedException {
+    long remainingBackoffMillis = backoffMillis;
+    while (remainingBackoffMillis > 0 && !isShuttingDown()) {
+      long sleepMillis = Math.min(remainingBackoffMillis, 1000);
+      TimeUnit.MILLISECONDS.sleep(sleepMillis);
+      remainingBackoffMillis -= sleepMillis;
+    }
+  }
+
+  private void addWorker(Supplier<ShardWorker> worker) throws InterruptedException {
+    addWorker(worker, () -> backplane, this::isShuttingDown, this::sleepBeforeRetryingRegistration);
+  }
+
+  static void addWorker(
+      Supplier<ShardWorker> worker,
+      Supplier<Backplane> backplane,
+      BooleanSupplier isShuttingDown,
+      InterruptingConsumer<Long> sleepBeforeRetryingRegistration)
+      throws InterruptedException {
+    long retryBackoffMillis = registrationRetryInitialBackoffMillis;
+    while (!isShuttingDown.getAsBoolean()) {
       try {
-        backplane.addWorker(worker);
+        Backplane currentBackplane = backplane.get();
+        if (currentBackplane == null) {
+          throw Status.UNAVAILABLE
+              .withDescription("backplane is not initialized")
+              .asRuntimeException();
+        }
+        currentBackplane.addWorker(worker.get());
         return;
       } catch (IOException e) {
         Status status = Status.fromThrowable(e);
         if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
           throw status.asRuntimeException();
         }
+        log.log(Level.WARNING, "error registering worker; retrying", e);
+      } catch (RuntimeException e) {
+        if (isShuttingDown.getAsBoolean()) {
+          return;
+        }
+        if (!isRetriableRegistrationException(e)) {
+          throw e;
+        }
+        log.log(Level.WARNING, "error registering worker; retrying", e);
+      }
+      if (!isShuttingDown.getAsBoolean()) {
+        sleepBeforeRetryingRegistration.acceptInterruptibly(
+            registrationRetryBackoffWithJitterMillis(retryBackoffMillis));
+        retryBackoffMillis = nextRegistrationRetryBackoffMillis(retryBackoffMillis);
       }
     }
-    throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
+  }
+
+  static void runFailsafeRegistrationLoop(
+      BooleanSupplier keepRunning,
+      InterruptingRunnable registerIfExpired,
+      InterruptingRunnable sleepBetweenChecks)
+      throws InterruptedException {
+    while (keepRunning.getAsBoolean()) {
+      registerIfExpired.runInterruptibly();
+      sleepBetweenChecks.runInterruptibly();
+    }
   }
 
   private void startFailsafeRegistration(Supplier<Boolean> isReadOnly) {
@@ -683,25 +772,25 @@ public final class Worker extends LoggingMain {
                 return isPaused;
               }
 
-              void registerIfExpired() {
+              void registerIfExpired() throws InterruptedException {
                 long now = System.currentTimeMillis();
                 if (now >= workerRegistrationExpiresAt
                     && !context.inGracefulShutdown()
                     && !isWorkerPausedFromNewWork()) {
                   // worker must be registered to match
-                  addWorker(nextRegistration(now));
+                  addWorker(() -> nextRegistration(System.currentTimeMillis()));
                   // update every 10 seconds
-                  workerRegistrationExpiresAt = nextInterval(now);
+                  workerRegistrationExpiresAt = nextInterval(System.currentTimeMillis());
                 }
               }
 
               @Override
               public void run() {
                 try {
-                  while (server != null && !server.isShutdown()) {
-                    registerIfExpired();
-                    SECONDS.sleep(1);
-                  }
+                  runFailsafeRegistrationLoop(
+                      () -> server != null && !server.isShutdown(),
+                      this::registerIfExpired,
+                      () -> SECONDS.sleep(1));
                 } catch (InterruptedException e) {
                   // ignore
                 }
