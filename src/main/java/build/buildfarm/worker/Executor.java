@@ -15,8 +15,6 @@
 package build.buildfarm.worker;
 
 import static build.buildfarm.common.Claim.Stage.EXECUTE_ACTION_STAGE;
-import static com.google.common.collect.Maps.transformValues;
-import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.protobuf.util.Durations.add;
 import static com.google.protobuf.util.Durations.compare;
 import static com.google.protobuf.util.Durations.fromSeconds;
@@ -246,7 +244,7 @@ public class Executor {
     return timeout;
   }
 
-  private static final class Interpolator {
+  static final class Interpolator {
     private final Iterable<?> value;
 
     Interpolator(String value) {
@@ -262,26 +260,39 @@ public class Executor {
     }
   }
 
-  private static Map<String, Interpolator> createInterpolations(
-      Claim claim, Iterable<Property> properties) {
+  static Map<String, Interpolator> createInterpolations(
+      Claim claim, Iterable<Property> properties, Map<String, String> workerInterpolations) {
     Map<String, Interpolator> interpolations = new HashMap<>();
     if (claim != null) {
       for (Map.Entry<String, List<Object>> pool : claim.getPools()) {
         List<Object> ids = pool.getValue();
-        interpolations.put(pool.getKey(), new Interpolator(ids));
+        putInterpolation(interpolations, pool.getKey(), new Interpolator(ids));
         for (int i = 0; i < ids.size(); i++) {
-          interpolations.put(pool.getKey() + "-" + i, new Interpolator(String.valueOf(ids.get(i))));
+          putInterpolation(
+              interpolations,
+              pool.getKey() + "-" + i,
+              new Interpolator(String.valueOf(ids.get(i))));
         }
       }
     }
-    interpolations.putAll(
-        transformValues(
-            uniqueIndex(properties, Property::getName),
-            property -> new Interpolator(property.getValue())));
+    for (Property property : properties) {
+      putInterpolation(interpolations, property.getName(), new Interpolator(property.getValue()));
+    }
+    for (Map.Entry<String, String> interpolation : workerInterpolations.entrySet()) {
+      putInterpolation(
+          interpolations, interpolation.getKey(), new Interpolator(interpolation.getValue()));
+    }
     return interpolations;
   }
 
-  private static Iterable<String> transformWrapper(
+  private static void putInterpolation(
+      Map<String, Interpolator> interpolations, String name, Interpolator interpolation) {
+    if (interpolations.putIfAbsent(name, interpolation) != null) {
+      throw new IllegalStateException("duplicate execution policy interpolation: " + name);
+    }
+  }
+
+  static Iterable<String> transformWrapper(
       ExecutionWrapper wrapper, Map<String, Interpolator> interpolations) {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
@@ -331,7 +342,9 @@ public class Executor {
     // similar to the policy selection here
     Map<String, Interpolator> interpolations =
         createInterpolations(
-            executionContext.claim, executionContext.queueEntry.getPlatform().getPropertiesList());
+            executionContext.claim,
+            executionContext.queueEntry.getPlatform().getPropertiesList(),
+            executionContext.executionPolicyInterpolations);
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
