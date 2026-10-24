@@ -28,6 +28,7 @@ import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
@@ -80,6 +81,11 @@ class StubWorkerContext implements WorkerContext {
   @Override
   public List<ExecutionPolicy> getExecutionPolicies(String name) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Map<String, String> getExecutionPolicyInterpolations(String operationName) {
+    return ImmutableMap.of();
   }
 
   @Override

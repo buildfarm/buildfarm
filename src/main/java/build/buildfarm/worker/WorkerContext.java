@@ -81,6 +81,8 @@ public interface WorkerContext {
 
   List<ExecutionPolicy> getExecutionPolicies(String name);
 
+  Map<String, String> getExecutionPolicyInterpolations(String operationName);
+
   int getExecuteStageWidth();
 
   int getInputFetchStageWidth();

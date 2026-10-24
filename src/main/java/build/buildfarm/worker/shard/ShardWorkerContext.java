@@ -969,6 +969,12 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  public Map<String, String> getExecutionPolicyInterpolations(String operationName) {
+    return ImmutableMap.of(
+        "cgroup", operationsGroup.getChild(getOperationId(operationName)).getHierarchy());
+  }
+
+  @Override
   public int commandExecutionClaims(Command command) {
     return commandExecutionSettings(command).cpu.claimed;
   }

@@ -516,9 +516,11 @@ worker:
           - "<platform-property-name>"
 ```
 
-`arg1` and `arg2` are interpreted literally. `<platform-property-value>` will be substituted with the value of a property named `"platform-property-name"` from a Command's Platform _or_ the requested pool resources for the execution. If a matching property or pool resource is not found for a specified name, the entire wrapper will be discarded and have no effect on the execution.
+`arg1` and `arg2` are interpreted literally. `<platform-property-name>` will be substituted with the value of a property named `"platform-property-name"` from an Action's Platform or the requested pool resources for the execution. If a matching interpolation is not found for a specified name, the entire wrapper will be discarded and have no effect on the execution.
 
 `<exec-owner>` is an automatically provided pool resource when `execOwner` or `execOwners` is specified, and will contain the value of the execution's owner selected for exec tree creation.
+
+`<cgroup>` is a reserved worker-provided interpolation containing the action's relative cgroup v2 hierarchy, `executions/operations/<operation-id>`. It is available regardless of whether the worker's built-in cgroup limits are enabled and cannot be overridden by an action platform property.
 
 An execution with `as-nobody`, `unshare`, and `linux-sandbox` execution policies enabled would produce a command line like:
 ```sh
