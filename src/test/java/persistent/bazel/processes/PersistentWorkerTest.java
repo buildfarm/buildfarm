@@ -69,7 +69,7 @@ public class PersistentWorkerTest {
             JavaProcessWrapper.CURRENT_JVM_COMMAND,
             "-cp",
             jarPath.toString(),
-            "adder.Adder",
+            "persistent.examples.adder.Adder",
             "--persistent_worker");
 
     WorkerKey key = WorkerUtils.emptyWorkerKey(workDir, initCmd);

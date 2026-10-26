@@ -4,7 +4,7 @@ java_test(
     name = "tests",
     size = "small",
     srcs = glob(["**/*.java"]),
-    test_class = "adder.AdderTest",
+    test_class = "persistent.examples.adder.AdderTest",
     deps = [
         "//src/main/java/persistent/bazel:bazel-persistent-workers",
         "//src/main/java/persistent/common:persistent-common",

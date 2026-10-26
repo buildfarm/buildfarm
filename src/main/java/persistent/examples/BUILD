@@ -14,7 +14,7 @@ java_library(
 
 java_binary(
     name = "adder-bin",
-    main_class = "adder.Adder",
+    main_class = "persistent.examples.adder.Adder",
     visibility = ["//visibility:public"],
     runtime_deps = [":adder-lib"],
 )

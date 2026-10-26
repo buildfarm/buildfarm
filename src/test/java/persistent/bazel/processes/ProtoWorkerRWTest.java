@@ -44,7 +44,8 @@ public class ProtoWorkerRWTest {
             workDir.resolve(filename));
 
     ProcessWrapper process;
-    try (JavaProcessWrapper jpw = spawnPersistentWorkerProcess(jarPath, "adder.Adder")) {
+    try (JavaProcessWrapper jpw =
+        spawnPersistentWorkerProcess(jarPath, "persistent.examples.adder.Adder")) {
       process = jpw;
       ProtoWorkerRW rw = new ProtoWorkerRW(jpw);
 
