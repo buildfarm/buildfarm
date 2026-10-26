@@ -14,8 +14,12 @@
 
 package persistent.common;
 
+import static java.lang.String.format;
+
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import org.apache.commons.pool2.BaseKeyedPooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
@@ -50,21 +54,22 @@ public abstract class CommonsSupervisor<K, V extends Destructable>
   public void destroyObject(K key, PooledObject<V> p) {
     V obj = p.getObject();
 
-    var maybeOverriddenLogger = getLogger();
-    final var logLevel = Level.FINE;
+    Logger maybeOverriddenLogger = getLogger();
+    final Level logLevel = Level.FINE;
     if (maybeOverriddenLogger.isLoggable(logLevel)) {
-      StringBuilder msgBuilder = new StringBuilder();
-      msgBuilder.append("Supervisor.destroyObject() from key:\n");
-      msgBuilder.append(key);
-      msgBuilder.append("\nobj.toString():\n");
-      msgBuilder.append(obj);
-      msgBuilder.append("\nSupervisor.destroyObject() stackTrack:");
-      for (StackTraceElement e : Thread.currentThread().getStackTrace()) {
-        msgBuilder.append("\n\t");
-        msgBuilder.append(e);
-      }
-
-      maybeOverriddenLogger.log(logLevel, msgBuilder.toString());
+      String trace =
+          Arrays.stream(Thread.currentThread().getStackTrace())
+              .map(e -> "\n\t" + e)
+              .collect(Collectors.joining());
+      maybeOverriddenLogger.log(
+          logLevel,
+          format(
+              "Supervisor.destroyObject() from key:\n"
+                  + " %s\n"
+                  + "obj.toString():\n"
+                  + "%s\n"
+                  + "Supervisor.destroyObject() stackTrace:%s",
+              key, obj, trace));
     }
 
     obj.destroy();

@@ -61,12 +61,10 @@ public class ProtoWorkerRW {
       waitForInput(processWrapper::isAlive, readStream);
     } catch (IOException e) {
       String stdErrMsg = processWrapper.getErrorString();
-      String stdOut = "";
+      String stdOut = "no stream available";
       try {
         if (processWrapper.isAlive() && readStream.available() > 0) {
           stdOut = IOUtils.toString(readStream, StandardCharsets.UTF_8);
-        } else {
-          stdOut = "no stream available";
         }
       } catch (IOException e2) {
         stdOut = "Exception trying to read stdout: " + e2;

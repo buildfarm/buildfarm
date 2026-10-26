@@ -25,8 +25,8 @@ import persistent.common.CtxAround.Id;
  * @param <I> request type
  * @param <O> work response type
  * @param <W> worker type
- * @param <CI> request with extra context/info
- * @param <CO> response with extra context/info
+ * @param <C> request with extra context/info
+ * @param <D> response with extra context/info
  * @param <P> pool type
  */
 public abstract class Coordinator<
@@ -34,8 +34,8 @@ public abstract class Coordinator<
     I,
     O,
     W extends Worker<I, O>,
-    CI extends CtxAround<I>,
-    CO extends CtxAround<O>,
+    C extends CtxAround<I>,
+    D extends CtxAround<O>,
     P extends ObjectPool<K, W>> {
   protected final P workerPool;
 
@@ -43,20 +43,20 @@ public abstract class Coordinator<
     this.workerPool = workerPool;
   }
 
-  public CO runRequest(K workerKey, CI reqWithCtx) throws Exception {
+  public D runRequest(K workerKey, C reqWithCtx) throws Exception {
     W worker = workerPool.obtain(workerKey);
 
     I request = preWorkInit(workerKey, reqWithCtx, worker);
     O workResponse = worker.doWork(request);
-    CO responseAfterCLeanup = postWorkCleanup(workResponse, worker, reqWithCtx);
+    D responseAfterCLeanup = postWorkCleanup(workResponse, worker, reqWithCtx);
 
     workerPool.release(workerKey, worker);
     return responseAfterCLeanup;
   }
 
-  public abstract I preWorkInit(K workerKey, CI request, W worker) throws IOException;
+  public abstract I preWorkInit(K workerKey, C request, W worker) throws IOException;
 
-  public abstract CO postWorkCleanup(O response, W worker, CI request) throws IOException;
+  public abstract D postWorkCleanup(O response, W worker, C request) throws IOException;
 
   public static <K, I, O, W extends Worker<I, O>> SimpleCoordinator<K, I, O, W> simple(
       ObjectPool<K, W> workerPool) {

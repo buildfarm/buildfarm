@@ -14,6 +14,8 @@
 
 package persistent.bazel.client;
 
+import static java.lang.String.format;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
@@ -58,19 +60,14 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
 
     Files.createDirectories(execRoot);
 
-    final var logLevel = Level.FINE;
+    final Level logLevel = Level.FINE;
     if (logger.isLoggable(logLevel)) {
       Set<Path> workerFiles = ImmutableSet.copyOf(key.getWorkerFilesWithHashes().keySet());
-      StringBuilder msg = new StringBuilder();
-      msg.append("Starting Worker[");
-      msg.append(key.getMnemonic());
-      msg.append("]<");
-      msg.append(execRoot);
-      msg.append(">(");
-      msg.append(initCmd);
-      msg.append(") with files: \n");
-      msg.append(workerFiles);
-      logger.log(logLevel, msg.toString());
+      logger.log(
+          logLevel,
+          format(
+              "Starting Worker[%s]<%s>(%s) with files: %s",
+              key.getMnemonic(), execRoot, initCmd, workerFiles));
     }
 
     ProcessWrapper processWrapper = new ProcessWrapper(execRoot, initCmd, key.getEnv());
@@ -129,16 +126,15 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
   private void logIfBadResponse(WorkResponse response) throws IOException {
     int returnCode = response.getExitCode();
     if (returnCode != 0 && logger.isLoggable(Level.FINE)) {
-      StringBuilder sb = new StringBuilder();
-      sb.append("logBadResponse(err)");
-      sb.append("\nResponse non-zero exit_code: ");
-      sb.append(returnCode);
-      sb.append("\nResponse output: ");
-      sb.append(response.getOutput());
-      sb.append("\n\tProcess stderr: ");
       String stderr = workerRW.getProcessWrapper().getErrorString();
-      sb.append(stderr);
-      logger.log(Level.FINE, sb.toString());
+      logger.log(
+          Level.FINE,
+          format(
+              "logBadResponse(err)\n"
+                  + "Response non-zero exit_code: %d\n"
+                  + "Response output: %s\n"
+                  + "\tProcess stderr: %s",
+              returnCode, response.getOutput(), stderr));
     }
   }
 
