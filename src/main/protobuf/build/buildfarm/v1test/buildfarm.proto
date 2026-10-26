@@ -583,7 +583,8 @@ message OperationTimesBetweenStages {
   // Rolling observation period for these averages.
   google.protobuf.Duration period = 8;
 
-  // Number of completed operations represented in the rolling period.
+  // Average number of completed operations per time bucket in the rolling
+  // period; it is not a cumulative counter.
   int32 operation_count = 9;
 }
 
@@ -665,7 +666,7 @@ message WorkerProfileMessage {
   // Current number of unreferenced entries in the worker's local CAS.
   int64 cas_unreferenced_entry_count = 11;
 
-  // Current number of directory entries in the worker's local CAS.
+  // Current number of directory entries reported by the worker's local CAS.
   int64 cas_directory_entry_count = 2;
 
   // Number of local-CAS entries evicted since the preceding profile read. This
@@ -692,7 +693,7 @@ message WorkerProfileMessage {
 
 // Request a profile for one worker.
 message WorkerProfileRequest {
-  // Optional instance name. The current WorkerProfile service implementation
+  // Not required by the current WorkerProfile service implementation, which
   // does not use this field to select a Buildfarm instance.
   string instance_name = 1;
 
@@ -703,7 +704,7 @@ message WorkerProfileRequest {
 
 // Request profiles for multiple workers.
 message BatchWorkerProfilesRequest {
-  // Optional instance name. The current WorkerProfile service implementation
+  // Not required by the current WorkerProfile service implementation, which
   // does not use this field to select a Buildfarm instance.
   string instance_name = 1;
 
