@@ -66,6 +66,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FastCdc2020Params;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.bazel.remote.execution.v2.RepMaxCdcParams;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
@@ -3393,6 +3394,7 @@ public class ServerInstance extends NodeInstance {
         configs.isAllowSymlinkTargetAbsolute()
             ? SymlinkAbsolutePathStrategy.Value.ALLOWED
             : SymlinkAbsolutePathStrategy.Value.DISALLOWED;
+    int repMaxCdcMinChunkSizeBytes = 256 * 1024;
     return super.getCacheCapabilities().toBuilder()
         .setActionCacheUpdateCapabilities(
             ActionCacheUpdateCapabilities.newBuilder()
@@ -3404,6 +3406,10 @@ public class ServerInstance extends NodeInstance {
             FastCdc2020Params.newBuilder()
                 .setAvgChunkSizeBytes(configs.getServer().getFastCdc2020AvgChunkSizeBytes())
                 .setSeed(configs.getServer().getFastCdc2020Seed()))
+        .setRepMaxCdcParams(
+            RepMaxCdcParams.newBuilder()
+                .setMinChunkSizeBytes(repMaxCdcMinChunkSizeBytes)
+                .setHorizonSizeBytes(8 * repMaxCdcMinChunkSizeBytes))
         .build();
   }
 

@@ -49,6 +49,7 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
@@ -211,6 +212,14 @@ public class ServerInstanceTest {
 
   private static ShardWorker shardWorker(String endpoint) {
     return ShardWorker.newBuilder().setEndpoint(endpoint).build();
+  }
+
+  @Test
+  public void advertisesRepMaxCdcParameters() {
+    CacheCapabilities capabilities = instance.getCapabilities().getCacheCapabilities();
+
+    assertThat(capabilities.getRepMaxCdcParams().getMinChunkSizeBytes()).isEqualTo(256 * 1024);
+    assertThat(capabilities.getRepMaxCdcParams().getHorizonSizeBytes()).isEqualTo(2 * 1024 * 1024);
   }
 
   @SuppressWarnings("unchecked")
