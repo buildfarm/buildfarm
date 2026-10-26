@@ -559,123 +559,169 @@ message BlobWriteKey {
 }
 
 message OperationTimesBetweenStages {
+  // Average elapsed time from queuing an operation until a worker matches it.
   google.protobuf.Duration queued_to_match = 1;
 
+  // Average elapsed time from worker matching until input fetch begins.
   google.protobuf.Duration match_to_input_fetch_start = 2;
 
+  // Average input-fetch duration.
   google.protobuf.Duration input_fetch_start_to_complete = 3;
 
+  // Average elapsed time from input fetch completion until execution begins.
   google.protobuf.Duration input_fetch_complete_to_execution_start = 4;
 
+  // Average execution duration.
   google.protobuf.Duration execution_start_to_complete = 5;
 
+  // Average elapsed time from execution completion until output upload begins.
   google.protobuf.Duration execution_complete_to_output_upload_start = 6;
 
+  // Average output-upload duration.
   google.protobuf.Duration output_upload_start_to_complete = 7;
 
+  // Rolling observation period for these averages.
   google.protobuf.Duration period = 8;
 
+  // Number of completed operations represented in the rolling period.
   int32 operation_count = 9;
 }
 
+// A point-in-time view of a worker pipeline stage.
 message StageInformation {
-  // name of the stage this message represent, i.e. InputFetchStage
+  // Worker-defined name of the stage, for example, InputFetchStage.
   string name = 1;
 
-  // number of slots configured for this stage
+  // Number of concurrent slots configured for this stage.
   int32 slots_configured = 2;
 
-  // number of slots used for this stage
+  // Number of slots in use when the profile was collected.
   int32 slots_used = 3;
 
+  // Names of operations observed in this stage when the profile was collected.
   repeated string operation_names = 4;
 
+  // Executions observed in this stage when the profile was collected.
   repeated WorkerExecution executions = 5;
 }
 
+// An operation executing on a worker at the time of profiling.
 message WorkerExecution {
-  // longrunning operation name
+  // Long-running operation name.
   string name = 1;
 
+  // Local resources currently retained by this execution.
   repeated Resource resources = 2;
 }
 
+// A local resource retained by a worker execution.
 message Resource {
-  // retained resource name for execution
+  // Configured resource name.
   string name = 1;
 
+  // Number of units of this resource retained by the execution.
   int32 amount = 2;
 }
 
+// Results of profiling multiple workers.
 message BatchWorkerProfilesResponse {
+  // Result for one requested worker.
   message Response {
+    // Worker name supplied in the corresponding request entry.
     string worker_name = 1;
 
+    // Worker profile on success. Unset when status reports a failure.
     WorkerProfileMessage profile = 2;
 
+    // Per-worker result status. An unset status has code OK; on failure, this
+    // contains the status from profiling this worker.
     google.rpc.Status status = 3;
   }
 
+  // One response for each requested worker, in the same order as worker_names.
   repeated Response responses = 1;
 }
 
+// A point-in-time profile of one Buildfarm worker.
 message WorkerProfileMessage {
-  // useful name for worker
+  // Worker-provided name.
   string name = 15;
 
-  // preferred way to contact this worker
+  // Worker-provided endpoint for contacting this worker.
   string endpoint = 16;
 
-  // number of Entry in CAS
+  // Current number of entries in the worker's local CAS.
   int64 cas_entry_count = 1;
 
-  // current size of the CAS as sum of entries
+  // Current total size, in bytes, of entries in the worker's local CAS.
   int64 cas_size = 12;
 
-  // configured maximum size of the CAS
+  // Configured maximum size, in bytes, of the worker's local CAS.
   int64 cas_max_size = 13;
 
-  // configured maximum entry size of the CAS
+  // Configured maximum entry size, in bytes, of the worker's local CAS.
   int64 cas_max_entry_size = 14;
 
-  // number of unreferenced Entry in CAS
+  // Current number of unreferenced entries in the worker's local CAS.
   int64 cas_unreferenced_entry_count = 11;
 
-  // number of DirectoryEntry in CAS
+  // Current number of directory entries in the worker's local CAS.
   int64 cas_directory_entry_count = 2;
 
-  // number of evicted Entries since last profile request
+  // Number of local-CAS entries evicted since the preceding profile read. This
+  // value is reset after it is read.
   int32 cas_evicted_entry_count = 5;
 
-  // the total size of evicted Entries since last profile request
+  // Total size, in bytes, of local-CAS entries evicted since the preceding
+  // profile read. This value is reset after it is read.
   int64 cas_evicted_entry_size = 6;
 
-  // If the CAS is in read-only mode
+  // Whether the worker's local CAS is read-only.
   bool cas_read_only = 17;
 
   // used for removed fields representing composed used/configured slots
   reserved 7 to 8;
 
+  // Point-in-time information for worker pipeline stages. Fields in this list
+  // are sampled independently and are not a consistency snapshot.
   repeated StageInformation stages = 9;
 
+  // Rolling averages of operation time spent between pipeline stages.
   repeated OperationTimesBetweenStages times = 10;
 }
 
+// Request a profile for one worker.
 message WorkerProfileRequest {
+  // Optional instance name. The current WorkerProfile service implementation
+  // does not use this field to select a Buildfarm instance.
   string instance_name = 1;
 
+  // Worker routing name. When requesting through a Buildfarm server, this name
+  // identifies the worker endpoint to profile.
   string worker_name = 2;
 }
 
+// Request profiles for multiple workers.
 message BatchWorkerProfilesRequest {
+  // Optional instance name. The current WorkerProfile service implementation
+  // does not use this field to select a Buildfarm instance.
   string instance_name = 1;
 
+  // Worker routing names to profile. An empty list returns an empty responses
+  // list.
   repeated string worker_names = 2;
 }
 
+// Provides monitoring-oriented, point-in-time worker profiles. The current
+// Buildfarm implementation does not apply service-specific authorization;
+// callers are subject to deployment transport and access controls.
 service WorkerProfile {
+  // Returns one worker profile. A failure to profile the worker is returned as
+  // an RPC error.
   rpc GetWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
 
+  // Returns one result per requested worker. Individual worker failures are
+  // reported in the corresponding Response.status.
   rpc BatchWorkerProfiles(BatchWorkerProfilesRequest) returns (BatchWorkerProfilesResponse) {}
 }
 
