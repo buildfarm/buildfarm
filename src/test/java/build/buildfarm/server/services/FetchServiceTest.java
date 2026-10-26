@@ -21,10 +21,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import build.bazel.remote.asset.v1.FetchBlobRequest;
 import build.bazel.remote.asset.v1.FetchBlobResponse;
 import build.bazel.remote.asset.v1.Qualifier;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -33,6 +35,7 @@ import build.buildfarm.v1test.Digest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.Futures;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import org.junit.Test;
@@ -76,6 +79,7 @@ public class FetchServiceTest {
             .addQualifiers(
                 Qualifier.newBuilder().setName(authorizationHeader).setValue(authorization))
             .addQualifiers(Qualifier.newBuilder().setName(customTokenHeader).setValue(customToken))
+            .setDigestFunction(DigestFunction.Value.SHA256)
             .build();
 
     doAnswer(
@@ -98,13 +102,57 @@ public class FetchServiceTest {
             eq(uris),
             eq(ImmutableMap.of(authorizationHeader, authorization, customTokenHeader, customToken)),
             eq(contentDigest),
+            eq(Digest.newBuilder().setDigestFunction(DigestFunction.Value.SHA256).build()),
             any(RequestMetadata.class));
     verify(response, times(1)).onCompleted();
     verify(response, times(1))
         .onNext(
             FetchBlobResponse.newBuilder()
                 .setBlobDigest(DigestUtil.toDigest(contentDigest))
+                .setDigestFunction(DigestFunction.Value.SHA256)
                 .build());
+  }
+
+  @Test
+  public void mixedDigestFunctionPassesOriginIntegrityAndCasDigestSeparately()
+      throws InterruptedException {
+    Instance instance = mock(Instance.class);
+    FetchService service = new FetchService(instance);
+    ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
+    Digest originDigest = DIGEST_UTIL.compute(content);
+    Digest casDigest = new DigestUtil(HashFunction.BLAKE3).compute(content);
+    FetchBlobRequest request =
+        FetchBlobRequest.newBuilder()
+            .addUris("http://example.com/a")
+            .addQualifiers(
+                Qualifier.newBuilder()
+                    .setName(FetchService.QUALIFIER_CHECKSUM_SRI)
+                    .setValue(hashChecksumSRI(originDigest.getHash())))
+            .setDigestFunction(DigestFunction.Value.BLAKE3)
+            .build();
+    Digest parsedOriginDigest = originDigest.toBuilder().setSize(-1).build();
+    Digest expectedCasDigest =
+        Digest.newBuilder().setDigestFunction(DigestFunction.Value.BLAKE3).build();
+    when(instance.fetchBlob(any(), any(), eq(parsedOriginDigest), eq(expectedCasDigest), any()))
+        .thenReturn(Futures.immediateFuture(casDigest));
+    StreamObserver<FetchBlobResponse> response = mock(StreamObserver.class);
+
+    service.fetchBlob(request, response);
+
+    verify(instance)
+        .fetchBlob(
+            eq(ImmutableList.of("http://example.com/a")),
+            eq(ImmutableMap.of()),
+            eq(parsedOriginDigest),
+            eq(expectedCasDigest),
+            any(RequestMetadata.class));
+    verify(response)
+        .onNext(
+            FetchBlobResponse.newBuilder()
+                .setBlobDigest(DigestUtil.toDigest(casDigest))
+                .setDigestFunction(DigestFunction.Value.BLAKE3)
+                .build());
+    verify(response).onCompleted();
   }
 
   private String hashChecksumSRI(String hash) {
