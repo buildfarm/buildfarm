@@ -5,9 +5,9 @@ java_library(
     srcs = glob(["*.java"]),
     visibility = ["//visibility:public"],
     deps = [
-        "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
         "//src/main/java/build/buildfarm/common",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "//src/main/protobuf/persistent:worker_protocol_java_proto",
         "@buildfarm_maven//:com_google_code_gson_gson",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
