@@ -98,6 +98,44 @@ Most third-party dependencies (e.g. protobuf, gRPC, ...) are managed automatical
 Things that aren't supported by `rules_jvm_external` are being imported as manually managed remote repos via
 `MODULE.bazel`.
 
+### Building Container Images
+
+Buildfarm uses [rules_img](https://github.com/bazel-contrib/rules_img) to build OCI container images.
+
+#### Building Images Locally
+
+To build the server and worker images:
+
+```shell
+# Build single-platform images (requires --platforms flag)
+$ bazel build //container:_buildfarm-server.image --platforms=@hermetic_cc_toolchain//toolchain/platform:linux_amd64
+$ bazel build //container:_buildfarm-worker.image --platforms=@hermetic_cc_toolchain//toolchain/platform:linux_amd64
+
+# Build multi-architecture images (includes both amd64 and arm64)
+$ bazel build //container:buildfarm-server
+$ bazel build //container:buildfarm-worker
+```
+
+The multi-architecture targets automatically handle platform transitions and produce OCI image indexes that support both `linux/amd64` and `linux/arm64` platforms.
+
+#### Loading Images to Docker
+
+To load built images into your local Docker daemon:
+
+```shell
+$ bazel run //container:buildfarm-server_load
+$ bazel run //container:buildfarm-worker_load
+```
+
+#### Pushing Images
+
+To push images to a registry (requires authentication):
+
+```shell
+$ bazel run //container:public_push_buildfarm-server -- --tag latest
+$ bazel run //container:public_push_buildfarm-worker -- --tag latest
+```
+
 ### Deployments
 
 Buildfarm can be used as an external repository for composition into a deployment of your choice.
@@ -133,10 +171,18 @@ bazel_dep(name = "grpc-java", version = "1.84.0")
 
 ```
 
-You can then use the existing layer targets to build your own OCI images, for example:
+You can then use the existing layer targets to build your own OCI images using [rules_img](https://github.com/bazel-contrib/rules_img), for example:
 
 ``` starlark
-oci_image(
+load("@rules_img//img:image.bzl", "image_manifest")
+load("@rules_img//img:layer.bzl", "layer_from_tar")
+
+layer_from_tar(
+    name = "buildfarm_server_layer",
+    src = "@build_buildfarm//container:layer_buildfarm_server",
+)
+
+image_manifest(
     name = "mycompany-buildfarm-server",
     base = "@<YOUPROVIDE>",
     entrypoint = [
@@ -144,13 +190,17 @@ oci_image(
         "-jar",
         "/app/build_buildfarm/buildfarm-server_deploy.jar",
     ],
-    tars = [
-        "@build_buildfarm//:layer_buildfarm_server",
+    env = {
+        "CONFIG_PATH": "/app/build_buildfarm/config.minimal.yml",
+        "JAVA_TOOL_OPTIONS": "-XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0",
+    },
+    layers = [
+        ":buildfarm_server_layer",
     ],
 )
 ```
 
-where `@<YOUPROVIDE>` is the name of an `oci.pull(name = 'YOUPROVIDE', ...)` in your `MODULE.bazel`
+where `@<YOUPROVIDE>` is the name of a base image pulled via `pull = use_repo_rule("@rules_img//img:pull.bzl", "pull")` in your `MODULE.bazel`
 
 ### Helm Chart
 
