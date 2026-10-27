@@ -9,10 +9,10 @@ java_test(
         "//src/test/java/build/buildfarm:test_runner",
     ],
     deps = [
-        "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
         "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "//src/main/protobuf/persistent:worker_protocol_java_proto",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
         "@buildfarm_maven//:com_google_truth_truth",
     ],
