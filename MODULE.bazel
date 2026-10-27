@@ -225,8 +225,8 @@ oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 # Server base image
 oci.pull(
     name = "amazon_corretto_java_image_base",
-    digest = "sha256:53463affec61309c62bf118c2d8cbc5d1b4b11e6f456e9f2a71e4f0a4b27f037",
-    image = "public.ecr.aws/amazoncorretto/amazoncorretto",
+    digest = "sha256:1a307926702559b0086a5c4d339eaafa9c992b3e8ba54201ac8ebbde31d22f0b",
+    image = "index.docker.io/amazoncorretto",
     platforms = [
         "linux/amd64",
         "linux/arm64/v8",
