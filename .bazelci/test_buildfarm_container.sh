@@ -47,6 +47,8 @@ GRPC_LOGS2="/tmp/parsed-grpc2.log"
 RAW_GRPC_LOGS1=${RAW_GRPC_LOGS1:-src/test/many/grpc.log}
 RAW_GRPC_LOGS2=${RAW_GRPC_LOGS2:-src/test/many/grpc2.log}
 if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
+    RAW_GRPC_LOGS_UPLOAD="$CDC_ARTIFACTS/upload.grpc.log"
+    GRPC_LOGS_UPLOAD="$CDC_ARTIFACTS/upload.grpc.json"
     RAW_GRPC_LOGS1="$CDC_ARTIFACTS/cold.grpc.log"
     RAW_GRPC_LOGS2="$CDC_ARTIFACTS/cached.grpc.log"
     GRPC_LOGS1="$CDC_ARTIFACTS/cold.grpc.json"
@@ -168,7 +170,12 @@ parse_grpc_logs(){
         echo "Parse grpc log"
         ./tools_remote/bazel-bin/remote_client --grpc_log "$RAW_GRPC_LOGS1" printlog --format_json > "$GRPC_LOGS1"
         ./tools_remote/bazel-bin/remote_client --grpc_log "$RAW_GRPC_LOGS2" printlog --format_json > "$GRPC_LOGS2"
-        calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
+        if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
+            ./tools_remote/bazel-bin/remote_client --grpc_log "$RAW_GRPC_LOGS_UPLOAD" printlog --format_json > "$GRPC_LOGS_UPLOAD"
+            calculate_cache_statistics "$GRPC_LOGS_UPLOAD" "$GRPC_LOGS1" "$GRPC_LOGS2"
+        else
+            calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
+        fi
     fi
 }
 
@@ -178,7 +185,7 @@ trap buildfarm_cleanup EXIT INT TERM
 calculate_cache_statistics(){
     echo "Calculating cache statistics..."
     if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
-        python3 ./.bazelci/ingest_grpc_logs.py --cdc-manifest "$CDC_ARTIFACTS/manifest.json" "$1" "$2"
+        python3 ./.bazelci/ingest_grpc_logs.py --cdc-manifest "$CDC_ARTIFACTS/manifest.json" "$1" "$2" "$3"
     else
         python3 ./.bazelci/ingest_grpc_logs.py "$1" "$2"
     fi

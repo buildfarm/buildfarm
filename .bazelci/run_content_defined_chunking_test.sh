@@ -35,20 +35,30 @@ cat "$ARTIFACTS/bazel-version.txt"
 "$BAZEL_BIN" --ignore_all_rc_files --batch help build > "$ARTIFACTS/bazel-build-help.txt"
 grep -q -- 'experimental_remote_cache_chunking ' "$ARTIFACTS/bazel-build-help.txt"
 
-COMMON=(--remote_executor=grpc://localhost:8980
+COMMON=(--remote_cache=grpc://localhost:8980
     --experimental_remote_cache_chunking
     --experimental_remote_cache_chunking_function=fast_cdc_2020
     --remote_download_outputs=all --remote_verify_downloads
-    --disk_cache= --noremote_local_fallback --noremote_upload_local_results
-    --spawn_strategy=remote --strategy=CdcFixture=remote
+    --disk_cache= --noremote_local_fallback
     --lockfile_mode=off --symlink_prefix=bazel-)
 
-for PHASE in cold cached; do
+for PHASE in upload cold cached; do
     # Separate output bases isolate action outputs AND the local CDC chunk cache.
     # Batch mode leaves no additional Bazel servers to clean up.
-    FLAGS=(--remote_accept_cached)
-    if [[ "$PHASE" == cold ]]; then
-        FLAGS=(--noremote_accept_cached)
+    FLAGS=(--remote_executor=grpc://localhost:8980
+        --spawn_strategy=remote --strategy=CdcFixture=remote
+        --noremote_upload_local_results)
+    if [[ "$PHASE" == upload ]]; then
+        # Only local output uploads use CombinedCache's CDC upload path in
+        # Bazel 9.3.0. Await completion before the gRPC log is closed, and run
+        # this phase first so the fixture output/chunks are absent remotely.
+        FLAGS=(--spawn_strategy=local --strategy=CdcFixture=local
+            --remote_upload_local_results --remote_cache_async=false
+            --noremote_accept_cached)
+    elif [[ "$PHASE" == cold ]]; then
+        FLAGS+=(--noremote_accept_cached)
+    else
+        FLAGS+=(--remote_accept_cached)
     fi
     "$BAZEL_BIN" --ignore_all_rc_files --batch --output_base="$ARTIFACTS/$PHASE-output-base" \
         build //:artifact "${COMMON[@]}" "${FLAGS[@]}" \

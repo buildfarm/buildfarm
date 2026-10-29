@@ -52,7 +52,6 @@ def entry(method, details=None, status=None):
 
 
 def phases():
-    input_chunks = [digest("d", SIZE // 2), digest("e", SIZE // 2)]
     output_chunks = [
         digest("f", SIZE // 2),
         digest("0", int(OUTPUT["sizeBytes"]) - SIZE // 2),
@@ -77,24 +76,23 @@ def phases():
         {"execute": {"request": {"actionDigest": ACTION, "skipCacheLookup": True}}},
     )
     execute["metadata"] = {"targetId": "//:artifact"}
-    cold = [
+    upload = [
         copy.deepcopy(caps),
         entry(
             logs.SPLICE,
             {
                 "spliceBlob": {
                     "request": {
-                        "blobDigest": INPUT,
-                        "chunkDigests": input_chunks,
+                        "blobDigest": OUTPUT,
+                        "chunkDigests": output_chunks,
                         "chunkingFunction": "FAST_CDC_2020",
                     },
-                    "response": {"blobDigest": INPUT},
+                    "response": {"blobDigest": OUTPUT},
                 }
             },
         ),
-        execute,
     ]
-    cold += [
+    upload += [
         entry(
             logs.CAS_UPLOAD,
             {
@@ -106,7 +104,22 @@ def phases():
                 }
             },
         )
-        for d in input_chunks
+        for d in output_chunks
+    ]
+    # RemoteExecutionCache bypasses CombinedCache chunking for action inputs.
+    cold = [
+        copy.deepcopy(caps),
+        entry(
+            logs.CAS_UPLOAD,
+            {
+                "write": {
+                    "resourceNames": [
+                        "uploads/id/blobs/%s/%s" % (INPUT["hash"], INPUT["sizeBytes"])
+                    ]
+                }
+            },
+        ),
+        execute,
     ]
     cached = [
         copy.deepcopy(caps),
@@ -150,46 +163,83 @@ def phases():
         )
         for d in output_chunks
     ]
-    return copy.deepcopy(cold), copy.deepcopy(cached)
+    return copy.deepcopy(upload), copy.deepcopy(cold), copy.deepcopy(cached)
 
 
 class AnalyzerTest(unittest.TestCase):
-    def check(self, cold, cached):
+    def check(self, upload, cold, cached):
         with contextlib.redirect_stdout(io.StringIO()):
+            logs.analyze(upload, "CDC upload")
             logs.analyze(cold, "CDC cold")
             logs.analyze(cached, "CDC cached", cached=True)
-            logs.validate_cdc(cold, cached, MANIFEST)
+            logs.validate_cdc(upload, cold, cached, MANIFEST)
 
     def test_valid_cdc(self):
         self.check(*phases())
 
+    def test_upload_must_not_execute_remotely(self):
+        upload, cold, cached = phases()
+        upload.append(entry(logs.REMOTE_EXECUTIONS, status={"code": 14}))
+        with self.assertRaisesRegex(
+            logs.ValidationError, "unexpected remote execution"
+        ):
+            self.check(upload, cold, cached)
+
+    def test_whole_output_batch_upload_fallback(self):
+        upload, cold, cached = phases()
+        upload.append(
+            entry(
+                logs.BATCH_UPLOAD,
+                {"batchUpdateBlobs": {"request": {"requests": [{"digest": OUTPUT}]}}},
+            )
+        )
+        with self.assertRaisesRegex(
+            logs.ValidationError, "whole-output BatchUpdateBlobs"
+        ):
+            self.check(upload, cold, cached)
+
+    def test_upload_requires_successful_associated_chunk_write(self):
+        for mutation in ("failed", "unrelated"):
+            upload, cold, cached = phases()
+            for call in upload[2:]:
+                if mutation == "failed":
+                    call["status"] = {"code": 14}
+                else:
+                    call["details"]["write"]["resourceNames"] = [
+                        "uploads/id/blobs/%s/%s" % (INPUT["hash"], INPUT["sizeBytes"])
+                    ]
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(
+                logs.ValidationError, "missing successful fixture chunk Write"
+            ):
+                self.check(upload, cold, cached)
+
     def test_retries_are_not_exact_counts(self):
-        cold, cached = phases()
-        retry = copy.deepcopy(cold[1])
+        upload, cold, cached = phases()
+        retry = copy.deepcopy(upload[1])
         retry["status"] = {"code": 14}
-        cold.insert(1, retry)
+        upload.insert(1, retry)
         cached += copy.deepcopy(cached[2:])
-        self.check(cold, cached)
+        self.check(upload, cold, cached)
 
     def test_missing_cdc(self):
         for method in (logs.SPLICE, logs.SPLIT):
             with self.subTest(method=method):
-                cold, cached = phases()
-                cold = [e for e in cold if e["methodName"] != method]
+                upload, cold, cached = phases()
+                upload = [e for e in upload if e["methodName"] != method]
                 cached = [e for e in cached if e["methodName"] != method]
                 with self.assertRaisesRegex(
                     logs.ValidationError, "missing successful.*" + method
                 ):
-                    self.check(cold, cached)
+                    self.check(upload, cold, cached)
 
     def test_failed_cdc_followed_by_fallback(self):
-        for phase_index, method, full_digest in (
-            (0, logs.SPLICE, INPUT),
-            (1, logs.SPLIT, OUTPUT),
+        for phase_index, method in (
+            (0, logs.SPLICE),
+            (2, logs.SPLIT),
         ):
             with self.subTest(method=method):
-                cold, cached = phases()
-                phase = (cold, cached)[phase_index]
+                upload, cold, cached = phases()
+                phase = (upload, cold, cached)[phase_index]
                 next(e for e in phase if e["methodName"] == method)["status"] = {
                     "code": 12
                 }
@@ -198,7 +248,7 @@ class AnalyzerTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                     logs.ValidationError, "missing successful.*" + method
                 ):
-                    self.check(cold, cached)
+                    self.check(upload, cold, cached)
 
     def test_empty_and_non_array_logs(self):
         for data in ([], {}, None, "", [None]):
@@ -208,12 +258,12 @@ class AnalyzerTest(unittest.TestCase):
     def test_unexpected_cached_execution_and_uploads(self):
         for method in logs.FORBIDDEN_CACHED:
             with self.subTest(method=method):
-                cold, cached = phases()
+                upload, cold, cached = phases()
                 cached.append(entry(method, status={"code": 14}))
                 with self.assertRaisesRegex(
                     logs.ValidationError, "unexpected execution/upload"
                 ):
-                    self.check(cold, cached)
+                    self.check(upload, cold, cached)
 
     def test_chunk_metadata(self):
         for name, index in (("spliceBlob", 0), ("splitBlob", 1)):
@@ -227,8 +277,8 @@ class AnalyzerTest(unittest.TestCase):
                 "response",
             ):
                 with self.subTest(name=name, change=change):
-                    cold, cached = phases()
-                    call = (cold[1], cached[2])[index]["details"][name]
+                    upload, cold, cached = phases()
+                    call = (upload[1], cached[2])[index]["details"][name]
                     chunk_holder = call["request"] if index == 0 else call["response"]
                     if change == "missing":
                         del chunk_holder["chunkDigests"]
@@ -245,43 +295,43 @@ class AnalyzerTest(unittest.TestCase):
                     else:
                         del call["response"]
                     with self.assertRaises(logs.ValidationError):
-                        self.check(cold, cached)
+                        self.check(upload, cold, cached)
 
     def test_wrong_blob_association(self):
         for index, name in ((0, "spliceBlob"), (1, "splitBlob")):
-            cold, cached = phases()
-            (cold[1], cached[2])[index]["details"][name]["request"]["blobDigest"] = (
+            upload, cold, cached = phases()
+            (upload[1], cached[2])[index]["details"][name]["request"]["blobDigest"] = (
                 digest("1")
             )
             with self.subTest(name=name), self.assertRaisesRegex(
                 logs.ValidationError, "missing successful"
             ):
-                self.check(cold, cached)
+                self.check(upload, cold, cached)
 
     def test_wrong_splice_response_digest(self):
-        cold, cached = phases()
-        cold[1]["details"]["spliceBlob"]["response"]["blobDigest"] = OUTPUT
+        upload, cold, cached = phases()
+        upload[1]["details"]["spliceBlob"]["response"]["blobDigest"] = INPUT
         with self.assertRaisesRegex(logs.ValidationError, "wrong splice response"):
-            self.check(cold, cached)
+            self.check(upload, cold, cached)
 
     def test_split_request_and_response_function(self):
         for holder in ("request", "response"):
-            cold, cached = phases()
+            upload, cold, cached = phases()
             cached[2]["details"]["splitBlob"][holder]["chunkingFunction"] = "UNKNOWN"
             with self.subTest(holder=holder), self.assertRaisesRegex(
                 logs.ValidationError, "not FastCDC"
             ):
-                self.check(cold, cached)
+                self.check(upload, cold, cached)
 
     def test_missing_details(self):
-        cold, cached = phases()
-        del cold[1]["details"]["spliceBlob"]
+        upload, cold, cached = phases()
+        del upload[1]["details"]["spliceBlob"]
         with self.assertRaisesRegex(logs.ValidationError, "missing spliceBlob details"):
-            self.check(cold, cached)
+            self.check(upload, cold, cached)
 
     def test_missing_remote_fixture_execution(self):
         for mutation in ("remove", "target", "skip", "failed"):
-            cold, cached = phases()
+            upload, cold, cached = phases()
             call = cold[2]
             if mutation == "remove":
                 cold.remove(call)
@@ -294,11 +344,11 @@ class AnalyzerTest(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(
                 logs.ValidationError
             ):
-                self.check(cold, cached)
+                self.check(upload, cold, cached)
 
     def test_cache_hit_action_and_output(self):
         for mutation in ("action", "output", "status"):
-            cold, cached = phases()
+            upload, cold, cached = phases()
             value = cached[1]["details"]["getActionResult"]
             if mutation == "action":
                 value["request"]["actionDigest"] = digest("1")
@@ -309,26 +359,28 @@ class AnalyzerTest(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaisesRegex(
                 logs.ValidationError, "GetActionResult"
             ):
-                self.check(cold, cached)
+                self.check(upload, cold, cached)
 
     def test_whole_blob_fallback_even_after_successful_cdc(self):
-        cold, cached = phases()
-        cold.append(
+        upload, cold, cached = phases()
+        upload.append(
             entry(
                 logs.CAS_UPLOAD,
                 {
                     "write": {
                         "resourceNames": [
                             "uploads/id/blobs/%s/%s"
-                            % (INPUT["hash"], INPUT["sizeBytes"])
+                            % (OUTPUT["hash"], OUTPUT["sizeBytes"])
                         ]
                     }
                 },
             )
         )
-        with self.assertRaisesRegex(logs.ValidationError, "whole-input Write fallback"):
-            self.check(cold, cached)
-        cold, cached = phases()
+        with self.assertRaisesRegex(
+            logs.ValidationError, "whole-output Write fallback"
+        ):
+            self.check(upload, cold, cached)
+        upload, cold, cached = phases()
         cached.append(
             entry(
                 logs.CAS_DOWNLOADS,
@@ -343,21 +395,21 @@ class AnalyzerTest(unittest.TestCase):
             )
         )
         with self.assertRaisesRegex(logs.ValidationError, "whole-output Read fallback"):
-            self.check(cold, cached)
+            self.check(upload, cold, cached)
 
     def test_missing_chunk_transfers(self):
         for method in (logs.CAS_UPLOAD, logs.CAS_DOWNLOADS):
-            cold, cached = phases()
-            cold = [e for e in cold if e["methodName"] != method]
+            upload, cold, cached = phases()
+            upload = [e for e in upload if e["methodName"] != method]
             cached = [e for e in cached if e["methodName"] != method]
             with self.subTest(method=method), self.assertRaisesRegex(
                 logs.ValidationError, "chunk (Write|Read)"
             ):
-                self.check(cold, cached)
+                self.check(upload, cold, cached)
 
     def test_advertised_threshold_and_capabilities(self):
         for mutation in ("size", "missing", "split", "splice"):
-            cold, cached = phases()
+            upload, cold, cached = phases()
             caps = cold[0]["details"]["getCapabilities"]["response"][
                 "cacheCapabilities"
             ]
@@ -370,7 +422,7 @@ class AnalyzerTest(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(
                 logs.ValidationError
             ):
-                self.check(cold, cached)
+                self.check(upload, cold, cached)
 
     def test_protobuf_default_and_explicit_ok_status(self):
         self.assertEqual(logs.status_code(entry(logs.SPLIT)), 0)
@@ -428,19 +480,21 @@ class AnalyzerTest(unittest.TestCase):
                 cached=True,
             )
 
-    def invoke(self, cold, cached, cdc=False, malformed=False):
+    def invoke(self, *phase_logs, cdc=False, malformed=False):
         with tempfile.TemporaryDirectory() as directory:
             paths = [
-                Path(directory) / name
-                for name in ("cold.json", "cached.json", "manifest.json")
+                Path(directory) / ("phase%d.json" % index)
+                for index in range(len(phase_logs))
             ]
-            for path, data in zip(paths, (cold, cached, MANIFEST)):
+            for path, data in zip(paths, phase_logs):
                 path.write_text(json.dumps(data))
             if malformed:
                 paths[0].write_text("not JSON")
-            args = [str(paths[0]), str(paths[1])]
+            args = [str(path) for path in paths]
             if cdc:
-                args = ["--cdc-manifest", str(paths[2])] + args
+                manifest = Path(directory) / "manifest.json"
+                manifest.write_text(json.dumps(MANIFEST))
+                args = ["--cdc-manifest", str(manifest)] + args
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
                 io.StringIO()
             ):
@@ -453,16 +507,84 @@ class AnalyzerTest(unittest.TestCase):
 
     def test_cdc_cli_invocation(self):
         self.assertEqual(self.invoke(*phases(), cdc=True), 0)
+        self.assertEqual(self.invoke(*phases()[1:], cdc=True), 1)
+        upload, cold, cached = phases()
+        self.assertEqual(self.invoke(cold, upload, cached, cdc=True), 1)
+        self.assertEqual(self.invoke(upload, cached, cold, cdc=True), 1)
 
     def test_cli_rejects_empty_and_malformed_logs(self):
-        cold, cached = phases()
+        upload, cold, cached = phases()
         self.assertEqual(self.invoke([], cached), 1)
         self.assertEqual(self.invoke(cold, cached, malformed=True), 1)
-        cold[1]["details"] = []
-        self.assertEqual(self.invoke(cold, cached, cdc=True), 1)
+        upload[1]["details"] = []
+        self.assertEqual(self.invoke(upload, cold, cached, cdc=True), 1)
 
 
 class FixtureTest(unittest.TestCase):
+    def test_harness_decodes_and_forwards_phase_logs(self):
+        root = Path(__file__).resolve().parents[1]
+        harness = (root / ".bazelci/test_buildfarm_container.sh").read_text()
+        # Exercise only log handling, not server startup or process cleanup.
+        definitions = (
+            harness[harness.index("parse_grpc_logs(){") : harness.index("# Trap EXIT")]
+            + harness[
+                harness.index("calculate_cache_statistics(){") : harness.index(
+                    "\nstart_server_and_worker\n"
+                )
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            decoder = directory / "tools_remote/bazel-bin/remote_client"
+            decoder.parent.mkdir(parents=True)
+            decoder.write_text(
+                "#!/bin/bash\n" 'echo "$*" >> "$MOCK_DECODES"\n' "echo '[]'\n"
+            )
+            decoder.chmod(0o755)
+            python = directory / "python3"
+            python.write_text("#!/bin/bash\n" 'echo "$*" >> "$MOCK_ANALYSES"\n')
+            python.chmod(0o755)
+            for mode in ("baseline", "cdc"):
+                env = dict(
+                    os.environ,
+                    PATH=str(directory) + os.pathsep + os.environ["PATH"],
+                    CACHE_TEST="true",
+                    CACHE_EXPECTATIONS=mode,
+                    CDC_ARTIFACTS=str(directory),
+                    MOCK_DECODES=str(directory / (mode + "-decodes")),
+                    MOCK_ANALYSES=str(directory / (mode + "-analyses")),
+                    RAW_GRPC_LOGS1="cold.grpc.log",
+                    RAW_GRPC_LOGS2="cached.grpc.log",
+                    RAW_GRPC_LOGS_UPLOAD="upload.grpc.log",
+                    GRPC_LOGS1="cold.grpc.json",
+                    GRPC_LOGS2="cached.grpc.json",
+                    GRPC_LOGS_UPLOAD="upload.grpc.json",
+                )
+                subprocess.run(
+                    ["bash", "-e", "-c", definitions + "\nparse_grpc_logs\n"],
+                    cwd=directory,
+                    env=env,
+                    check=True,
+                    capture_output=True,
+                )
+                decoded = Path(env["MOCK_DECODES"]).read_text().splitlines()
+                self.assertEqual(len(decoded), 3 if mode == "cdc" else 2)
+                analysis = Path(env["MOCK_ANALYSES"]).read_text().strip().split()
+                if mode == "cdc":
+                    self.assertEqual(
+                        analysis[1:3],
+                        ["--cdc-manifest", str(directory / "manifest.json")],
+                    )
+                    self.assertEqual(
+                        analysis[3:],
+                        ["upload.grpc.json", "cold.grpc.json", "cached.grpc.json"],
+                    )
+                    self.assertIn("--grpc_log upload.grpc.log", decoded[2])
+                else:
+                    self.assertEqual(
+                        analysis[1:], ["cold.grpc.json", "cached.grpc.json"]
+                    )
+
     def test_runner_isolation_flags_and_fail_fast(self):
         root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:
@@ -505,8 +627,8 @@ class FixtureTest(unittest.TestCase):
                 if '"build"' in line and '"help"' not in line
             ]
             self.assertEqual(
-                len(builds), 3
-            )  # No cached phase after the failed cold build.
+                len(builds), 4
+            )  # No cold/cached phase after the failed upload build.
             for call in builds:
                 for flag in (
                     "--ignore_all_rc_files",
@@ -516,16 +638,33 @@ class FixtureTest(unittest.TestCase):
                     "--remote_verify_downloads",
                     "--disk_cache=",
                     "--noremote_local_fallback",
-                    "--spawn_strategy=remote",
+                    "--remote_cache=grpc://localhost:8980",
                 ):
                     self.assertIn(flag, call)
             self.assertIn("--noremote_accept_cached", builds[0])
-            self.assertIn("--remote_accept_cached", builds[1])
+            self.assertIn("--spawn_strategy=local", builds[0])
+            self.assertIn("--strategy=CdcFixture=local", builds[0])
+            self.assertIn("--remote_upload_local_results", builds[0])
+            self.assertIn("--remote_cache_async=false", builds[0])
+            self.assertFalse(
+                any(arg.startswith("--remote_executor=") for arg in builds[0])
+            )
+            self.assertIn("--noremote_accept_cached", builds[1])
+            self.assertIn("--remote_accept_cached", builds[2])
+            for call in builds[1:3]:
+                self.assertIn("--remote_executor=grpc://localhost:8980", call)
+                self.assertIn("--spawn_strategy=remote", call)
+                self.assertIn("--strategy=CdcFixture=remote", call)
+                self.assertIn("--noremote_upload_local_results", call)
             bases = [
                 next(arg for arg in call if arg.startswith("--output_base="))
-                for call in builds[:2]
+                for call in builds[:3]
             ]
-            self.assertNotEqual(bases[0], bases[1])
+            self.assertEqual(len(set(bases)), 3)
+            for phase, call in zip(("upload", "cold", "cached"), builds):
+                self.assertTrue(
+                    any(arg.endswith("/%s.grpc.log" % phase) for arg in call)
+                )
 
     def test_reproducible_data_and_output_verification(self):
         script = Path(__file__).resolve().parents[1] / "src/test/cdc/fixture.py"

@@ -209,11 +209,15 @@ def fixture_cdc(entries, phase, method, name, expected):
     return matches[0]
 
 
-def validate_cdc(cold, cached, manifest):
+def validate_cdc(upload, cold, cached, manifest):
     input_digest = digest(manifest.get("input"))
     output_digest = digest(manifest.get("output"))
     require(input_digest != output_digest, "fixture input/output must differ")
-    for phase, entries in (("CDC cold", cold), ("CDC cached", cached)):
+    for phase, entries in (
+        ("CDC upload", upload),
+        ("CDC cold", cold),
+        ("CDC cached", cached),
+    ):
         capabilities = successful(entries, CAPABILITIES)
         require(capabilities, "%s: missing successful GetCapabilities" % phase)
         for entry in capabilities:
@@ -237,7 +241,13 @@ def validate_cdc(cold, cached, manifest):
                 % (phase, average * 4),
             )
 
-    input_chunks = fixture_cdc(cold, "CDC cold", SPLICE, "spliceBlob", input_digest)
+    require(
+        not any(e["methodName"] == REMOTE_EXECUTIONS for e in upload),
+        "CDC upload: unexpected remote execution in local upload phase",
+    )
+    upload_chunks = fixture_cdc(
+        upload, "CDC upload", SPLICE, "spliceBlob", output_digest
+    )
     output_chunks = fixture_cdc(cached, "CDC cached", SPLIT, "splitBlob", output_digest)
 
     executions = successful(cold, REMOTE_EXECUTIONS)
@@ -268,7 +278,7 @@ def validate_cdc(cold, cached, manifest):
         "CDC cached: missing successful fixture GetActionResult with expected output digest",
     )
 
-    writes = successful(cold, CAS_UPLOAD)
+    writes = successful(upload, CAS_UPLOAD)
     require(
         any(
             resource_matches(resource, chunk)
@@ -276,20 +286,29 @@ def validate_cdc(cold, cached, manifest):
             for resource in entry.get("details", {})
             .get("write", {})
             .get("resourceNames", [])
-            for chunk in input_chunks
+            for chunk in upload_chunks
         ),
-        "CDC cold: missing successful fixture chunk Write",
+        "CDC upload: missing successful fixture chunk Write",
     )
-    for entry in cold:
+    for entry in upload:
         if entry["methodName"] == CAS_UPLOAD:
             resources = (
                 entry.get("details", {}).get("write", {}).get("resourceNames", [])
             )
             require(
                 not any(
-                    resource_matches(resource, input_digest) for resource in resources
+                    resource_matches(resource, output_digest) for resource in resources
                 ),
-                "CDC cold: whole-input Write fallback",
+                "CDC upload: whole-output Write fallback",
+            )
+        elif entry["methodName"] == BATCH_UPLOAD:
+            requests = details(entry, "batchUpdateBlobs")["request"].get("requests", [])
+            require(
+                not any(
+                    digest(request.get("digest")) == output_digest
+                    for request in requests
+                ),
+                "CDC upload: whole-output BatchUpdateBlobs fallback",
             )
     reads = successful(cached, CAS_DOWNLOADS)
     for chunk in set(output_chunks):
@@ -323,21 +342,27 @@ def validate_cdc(cold, cached, manifest):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--cdc-manifest", help="fixture digests; requires cold and cached logs"
+        "--cdc-manifest",
+        help="fixture digests; requires upload, cold, cached logs in that order",
     )
     parser.add_argument("logs", nargs="+")
     args = parser.parse_args(argv)
     try:
         if args.cdc_manifest:
-            require(len(args.logs) == 2, "CDC mode requires exactly two phase logs")
+            require(
+                len(args.logs) == 3,
+                "CDC mode requires exactly three phase logs: upload, cold, cached",
+            )
         parsed = [parse_file(path) for path in args.logs]
         for index, entries in enumerate(parsed):
             phase = (
-                ("CDC cold" if index == 0 else "CDC cached")
+                ("CDC upload", "CDC cold", "CDC cached")[index]
                 if args.cdc_manifest
                 else "Build #%d" % (index + 1)
             )
-            analyze(entries, phase, cached=index >= 1)
+            analyze(
+                entries, phase, cached=index == 2 if args.cdc_manifest else index >= 1
+            )
         if args.cdc_manifest:
             validate_cdc(*parsed, parse_file(args.cdc_manifest))
         return 0
