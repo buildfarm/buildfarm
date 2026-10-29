@@ -18,7 +18,8 @@
 # All of the needed buildfarm services are initialized (redis, server, worker).
 # We ensure that the system can build a set of bazel targets.
 
-set -x
+set -ex
+set -o pipefail
 
 # Define Redis details
 REDIS_VERSION="7.2.4"
@@ -38,7 +39,7 @@ cleanup() {
     if [ -n "$REDIS_PID" ]; then
         ./"${REDIS_DIR}/src/redis-cli" shutdown 2>/dev/null || kill "$REDIS_PID" 2>/dev/null
     fi
-    wait "$REDIS_PID" "$PID2" 2>/dev/null
+    wait "$REDIS_PID" 2>/dev/null || true
     echo "All services stopped."
 }
 
@@ -54,6 +55,14 @@ then
     BAZEL=bazel
 fi
 cp `which $BAZEL` bazel
+
+# One artifact directory is shared by the CDC runner and decoder. Baseline
+# callers retain their original paths and invocation.
+if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
+    export CDC_ARTIFACTS
+    CDC_ARTIFACTS=$(mktemp -d "${TMPDIR:-/tmp}/buildfarm-cdc.XXXXXX")
+    echo "CDC artifacts: $CDC_ARTIFACTS"
+fi
 
 CACHE_TEST=$CACHE_TEST \
 BUILDFARM_CONFIG=$BUILDFARM_CONFIG \
