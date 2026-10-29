@@ -150,7 +150,7 @@ init_grpc_parser(){
     if [ "${CACHE_TEST:-false}" = true ]; then
         echo "Fetch tools_remote from git"
 
-        git clone https://github.com/bazelbuild/tools_remote.git
+        git clone https://github.com/buildfarm/tools_remote.git
         pushd tools_remote
         git reset --hard $SHA1_TOOLS_REMOTE
         ../bazel build //:remote_client
