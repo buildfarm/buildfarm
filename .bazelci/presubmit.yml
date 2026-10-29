@@ -170,7 +170,20 @@ tasks:
     - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export TEST_ARG1=--remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--remote_grpc_log='./grpc2.log'
-    - export SHA1_TOOLS_REMOTE=bc6975dcb71d090a7185f323d2905cbf1c926f52
+    - export SHA1_TOOLS_REMOTE=c0623a4cc4a2866c131b842f3d133bcd78eba25b
+    - export EXECUTION_STAGE_WIDTH=5
+    - ./.bazelci/cache_test.sh
+
+  content_defined_chunking:
+    name: Content Defined Chunking
+    platform: ubuntu2004
+    shell_commands:
+    - python3 -m unittest discover -s .bazelci -p 'test_ingest_grpc_logs.py'
+    - export CACHE_TEST=true
+    - export CACHE_EXPECTATIONS=cdc
+    - export RUN_TEST=./.bazelci/run_content_defined_chunking_test.sh
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
+    - export SHA1_TOOLS_REMOTE=c0623a4cc4a2866c131b842f3d133bcd78eba25b
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/cache_test.sh
 
