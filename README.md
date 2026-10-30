@@ -1,166 +1,93 @@
 # Buildfarm
 
-![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main)
+[![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main)](https://buildkite.com/buildfarm/buildfarm)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/buildfarm/buildfarm/badge)](https://securityscorecards.dev/viewer/?uri=github.com/buildfarm/buildfarm)
-![GitHub License](https://img.shields.io/github/license/buildfarm/buildfarm)
-![GitHub Release](https://img.shields.io/github/v/release/buildfarm/buildfarm)
-![Docker Pulls](https://img.shields.io/docker/pulls/bazelbuild/buildfarm-server)
+![License](https://img.shields.io/github/license/buildfarm/buildfarm)
+![Latest release](https://img.shields.io/github/v/release/buildfarm/buildfarm)
+![Docker pulls](https://img.shields.io/docker/pulls/bazelbuild/buildfarm-server)
 
+**Buildfarm is an open-source remote cache and remote execution service.** It implements the [Bazel Remote Execution API][remote-apis] and can serve Bazel, Buck2, Pants, and other compatible clients.
 
-This repository hosts a [remote caching and execution](https://github.com/bazelbuild/remote-apis) system, compatible with the build systems [Bazel](https://bazel.build), buck2, pants, and more.
+Buildfarm combines a distributed content-addressable store (CAS), action cache, scheduler, and execution workers. Run it locally for development, or deploy a fleet of specialized workers for shared CI and developer builds.
 
-Background information on the status of caching and remote execution in bazel can be
-found in the [bazel documentation](https://docs.bazel.build/versions/master/remote-caching.html).
+| Get started | Learn | Get help |
+| --- | --- | --- |
+| [Quick start][quick-start] | [Documentation][docs] | [GitHub issues][issues] |
+| [Helm chart](#deploy-with-helm) | [Configuration][configuration] | [Build Team Slack][slack] `#buildfarm` |
 
-File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-3xzjl2hc3-SGhLytWezvmIKD6uwwpI6Q) in the #buildfarm channel.
+> **Looking for background on Bazel remote caching and execution?** See the [Bazel documentation][bazel-remote].
 
-[Buildfarm Docs](https://buildfarm.github.io/buildfarm/)
+## Get started
 
-## Usage
+Follow the [Quick Start guide][quick-start] to run a local Redis-backed Buildfarm server and worker, configure Bazel for remote caching or execution, and verify the result. It is the maintained source for local setup instructions.
 
-All commandline options override corresponding config settings.
+For deployment design and operations, see the [configuration reference][configuration], [architecture guides][architecture], [worker execution environment guide][worker-environment], and [observability documentation][observability].
 
-### Redis
+## Remote APIs compatibility
 
-Run via
+Buildfarm is built against Remote APIs commit [`6def1c5d27a527c400875c24ae8b1a160145d7e1`][remote-apis-pin]. The table below covers optional services, RPCs, and negotiated capabilities in that API family, plus the newer upstream replacements for deprecated chunking RPCs. It describes the full Buildfarm server; a deployment can intentionally disable execution, CAS participation, Action Cache writes, or absolute symlink targets through configuration.
 
-```shell
-$ docker run -d --rm --name buildfarm-redis -p 6379:6379 redis:7.2.4
-redis-cli config set stop-writes-on-bgsave-error no
-```
+| Area              | Optional API feature                                                                            | Supported | Notes                                                                                                            |
+|-------------------|-------------------------------------------------------------------------------------------------|:---------:|------------------------------------------------------------------------------------------------------------------|
+| Core RE           | Action Cache `UpdateActionResult`                                                               |    ✅     | Can be made read-only with `server.actionCacheReadOnly`.                                                         |
+| Core RE           | Execution priorities                                                                            |    ✅     | Advertises the full signed 32-bit priority range.                                                                |
+| Core RE           | `Execute.skip_cache_lookup`                                                                     |    ✅     | Passed through to scheduling and cache lookup.                                                                   |
+| Core RE           | `Execute.execution_policy`                                                                      |    ✅     | The requested priority is persisted and used by the scheduler.                                                   |
+| Core RE           | `Execute.results_cache_policy` / cache priorities                                               |           | The request field is carried internally, but cache-priority capabilities are not advertised.                     |
+| Core RE           | Inline stdout, stderr, and output files                                                         |           | Buildfarm stores stdout and stderr in the CAS and does not honor `inline_*` hints. Bazel consumes inline payloads when present, but requests `inline_output_files` only for its designated in-memory output and does not request inline stdout or stderr. |
+| Core RE           | Additional execution `server_logs`                                                              |           | Buildfarm does not populate the optional `ExecuteResponse.server_logs` map.                                      |
+| Core RE           | Output directory formats                                                                        |    ✅     | Produces the default `TREE_ONLY` output-directory representation.                                                |
+| Core RE           | Client-requested output filesystem metadata (`Command.output_node_properties`)                  |           | Buildfarm does not advertise or implement output-node-property retrieval. Current Bazel neither requests nor consumes properties such as `mtime` or `unix_mode`; they may matter to other REAPI clients. |
+| Core RE           | Long-running Operations: `GetOperation`, `ListOperations`, `DeleteOperation`, `CancelOperation` |    ✅     | The RE API requires only the execution methods; Buildfarm also serves these Operations methods.                  |
+| CAS / ByteStream  | `BatchUpdateBlobs`, `BatchReadBlobs`, and paged `GetTree`                                       |    ✅     | Supports the standard batched and tree-transfer RPCs.                                                            |
+| CAS / ByteStream  | Resumable uploads (`QueryWriteStatus`)                                                          |    ✅     | Provided through the Google ByteStream service.                                                                  |
+| CAS / ByteStream  | Digest algorithms                                                                               |    ✅     | Advertises `SHA256` (the default), `SHA384`, `SHA512`, `SHA1`, `MD5`, and `BLAKE3` for CAS and execution.        |
+| CAS / ByteStream  | ByteStream compression                                                                          |    ✅     | Supports uncompressed (`IDENTITY`) and Zstandard (`ZSTD`) `compressed-blobs` transfers; Bazel uses `ZSTD` when remote-cache compression is enabled. |
+| CAS / ByteStream  | Deflate or Brotli blob transfer                                                                 |           | `DEFLATE` and `BROTLI` are REAPI-defined compressors but are not advertised or supported by Buildfarm; Bazel does not use them for REAPI compressed-blob transfer. |
+| CAS / ByteStream  | Batch-upload compression                                                                        |           | Buildfarm does not advertise `supported_batch_update_compressors`. Current Bazel uploads through ByteStream and uses `supported_compressors` / `ZSTD` instead. |
+| CAS / ByteStream  | Absolute symlink targets                                                                        |    ✅     | Configurable; advertised as allowed only when `allowSymlinkTargetAbsolute` is enabled.                           |
+| CAS / ByteStream  | FastCDC 2020 content-defined chunking                                                          |    ✅     | Supports `FAST_CDC_2020` with configurable average chunk size and seed (defaults: 512 KiB and `0`); normalization is 2. |
+| CAS / ByteStream  | Deprecated `SplitBlob` / `SpliceBlob` chunking RPCs                                             |    ✅     | Deprecated upstream, but required by current Bazel CDC clients when `--experimental_remote_cache_chunking` is enabled. |
+| CAS / ByteStream  | Current `GetChunkMapping` / `RegisterChunkMapping` streaming RPCs                               |           | REAPI v2.13+ replacements; not yet exposed by Buildfarm and not currently used by Bazel’s CDC client.             |
+| CAS / ByteStream  | RepMaxCDC content-defined chunking                                                              |           | `RepMaxCdcParams` are not advertised.                                                                             |
+| Remote Asset      | `Fetch.FetchBlob`                                                                               |    ✅     | Fetches supported URI schemes into the CAS; supports Bazel checksum and HTTP-header qualifiers.                  |
+| Remote Asset      | `Fetch.FetchDirectory`                                                                          |           | Returns `UNIMPLEMENTED`. Current Bazel uses `FetchBlob` for its optional remote downloader and does not use this RPC; it may matter to other Remote Asset clients. |
+| Remote Asset      | `Push.PushBlob` / `Push.PushDirectory`                                                          |           | The optional Push service is not registered.                                                                     |
+| Versioning        | RE API version range                                                                            |    ✅     | `GetCapabilities` advertises non-deprecated RE API versions 2.3 through 2.11.                                    |
+| Server extensions | gRPC health checking and reflection                                                             |    ✅     | Registered by the Buildfarm server for service discovery and health checks.                                      |
+| Server extensions | gRPC Channelz                                                                                   |    ✅     | Optional server registration via `server.grpcChannelz`.                                                          |
 
-### Buildfarm Server
+The server’s [`Capabilities.GetCapabilities`][capabilities] response is authoritative for a specific endpoint and instance. Clients should negotiate optional behavior from that response rather than assuming every deployment enables every feature.
 
-Run via
+## Deploy with Helm
 
-```shell
-$ bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- <logfile> <configfile>
-
-Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
-```
-**`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
-**`configfile`** has to be in [yaml format](https://buildfarm.github.io/buildfarm/docs/configuration).
-
-### Buildfarm Worker
-
-Run via
-
-```shell
-$ bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- <logfile> <configfile>
-
-Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
-
-```
-**`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
-**`configfile`** has to be in [yaml format](https://buildfarm.github.io/buildfarm/docs/configuration).
-
-### Bazel Client
-
-To use the example configured buildfarm with bazel (version 1.0 or higher), you can configure your `.bazelrc` as follows:
-
-```shell
-$ cat .bazelrc
-$ build --remote_executor=grpc://localhost:8980
-```
-
-Then run your build as you would normally do.
-
-### Debugging
-
-Buildfarm uses [Java's Logging framework](https://docs.oracle.com/javase/10/core/java-logging-overview.htm) and outputs all routine behavior to the NICE [Level](https://docs.oracle.com/javase/8/docs/api/java/util/logging/Level.html).
-
-You can use typical Java logging configuration to filter these results and observe the flow of executions through your running services.
-An example `logging.properties` file has been provided at [examples/logging.properties](examples/logging.properties) for use as follows:
+Install the OCI-packaged chart into its own namespace:
 
 ```shell
-$ bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
-```
-
-and
-
-``` shell
-$ bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
-```
-
-To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
-
-```shell
-$ bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/config.minimal.yml
-```
-
-
-### Third-party Dependencies
-
-Most third-party dependencies (e.g. protobuf, gRPC, ...) are managed automatically via
-[rules_jvm_external](https://github.com/bazelbuild/rules_jvm_external). These dependencies are enumerated in
-`MODULE.bazel` with a `maven.install` `artifacts` parameter.
-
-Things that aren't supported by `rules_jvm_external` are being imported as manually managed remote repos via
-`MODULE.bazel`.
-
-### Deployments
-
-Buildfarm can be used as an external repository for composition into a deployment of your choice.
-See also the documentation site in the [Worker Execution Environment](https://buildfarm.github.io/buildfarm/docs/architecture/worker-execution-environment/) section.
-
-Add the following to your `MODULE.bazel` to get access to buildfarm targets, filling in the `<COMMIT-SHA>` values:
-
-```starlark
-bazel_dep(name = "build_buildfarm")
-git_override(
-    module_name = "build_buildfarm",
-    commit = "<COMMIT-SHA>",
-    remote = "https://github.com/buildfarm/buildfarm.git",
-)
-
-# Transitive!
-bazel_dep(
-    name = "bazel_remote_apis",
-    version = "6def1c5d27a527c400875c24ae8b1a160145d7e1",
-    repo_name = "remoteapis",
-)
-archive_override(
-    module_name = "bazel_remote_apis",
-    integrity = "sha256-5j9j/ERWqAmV5bqecN8RFDrNJlGM9tqfv/WqMCxJBSQ=",
-    strip_prefix = "remote-apis-6def1c5d27a527c400875c24ae8b1a160145d7e1",
-    urls = [
-        "https://github.com/bazelbuild/remote-apis/archive/6def1c5d27a527c400875c24ae8b1a160145d7e1.zip",
-    ],
-)
-
-bazel_dep(name = "googleapis", version = "0.0.0-20260929-28769825")
-bazel_dep(name = "grpc-java", version = "1.84.0")
-
-```
-
-You can then use the existing layer targets to build your own OCI images, for example:
-
-``` starlark
-oci_image(
-    name = "mycompany-buildfarm-server",
-    base = "@<YOUPROVIDE>",
-    entrypoint = [
-        "/usr/bin/java",
-        "-jar",
-        "/app/build_buildfarm/buildfarm-server_deploy.jar",
-    ],
-    tars = [
-        "@build_buildfarm//:layer_buildfarm_server",
-    ],
-)
-```
-
-where `@<YOUPROVIDE>` is the name of an `oci.pull(name = 'YOUPROVIDE', ...)` in your `MODULE.bazel`
-
-### Helm Chart
-
-To install OCI bundled Helm chart:
-
-```bash
-helm install \
-  -n buildfarm \
+helm install buildfarm oci://ghcr.io/buildfarm/buildfarm \
+  --namespace buildfarm \
   --create-namespace \
-  buildfarm \
-  oci://ghcr.io/buildfarm/buildfarm \
-  --version "0.5.0"
+  --version 0.5.0
 ```
+
+See the [worker execution environment guide][worker-environment] for worker image composition and the [configuration reference][configuration] for production settings.
+
+## Development
+
+Third-party JVM dependencies are managed with [`rules_jvm_external`][rules-jvm-external] through the `maven.install` declaration in [`MODULE.bazel`](MODULE.bazel). Other external dependencies are declared as Bazel modules or manually managed repository overrides in the same file.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+[bazel-remote]: https://bazel.build/remote/caching
+[architecture]: https://buildfarm.github.io/buildfarm/docs/architecture/architecture/
+[capabilities]: https://github.com/bazelbuild/remote-apis/blob/main/build/bazel/remote/execution/v2/remote_execution.proto#L514
+[configuration]: https://buildfarm.github.io/buildfarm/docs/configuration/
+[docs]: https://buildfarm.github.io/buildfarm/
+[issues]: https://github.com/buildfarm/buildfarm/issues
+[observability]: https://buildfarm.github.io/buildfarm/docs/execution/observability/
+[quick-start]: https://buildfarm.github.io/buildfarm/docs/quick_start/
+[remote-apis]: https://github.com/bazelbuild/remote-apis
+[remote-apis-pin]: https://github.com/bazelbuild/remote-apis/tree/6def1c5d27a527c400875c24ae8b1a160145d7e1
+[rules-jvm-external]: https://github.com/bazel-contrib/rules_jvm_external
+[slack]: https://join.slack.com/t/buildteamworld/shared_invite/zt-3xzjl2hc3-SGhLytWezvmIKD6uwwpI6Q
+[worker-environment]: https://buildfarm.github.io/buildfarm/docs/architecture/worker-execution-environment/
