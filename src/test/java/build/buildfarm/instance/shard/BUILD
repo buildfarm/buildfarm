@@ -37,6 +37,19 @@ java_test(
 )
 
 java_test(
+    name = "StreamPelMonitorTest",
+    size = "small",
+    srcs = ["StreamPelMonitorTest.java"],
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        "//src/main/java/build/buildfarm/instance/shard",
+        "//src/test/java/build/buildfarm:test_runner",
+        "@buildfarm_maven//:com_google_truth_truth",
+        "@buildfarm_maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test(
     name = "RedisShardBackplaneTest",
     size = "small",
     srcs = [

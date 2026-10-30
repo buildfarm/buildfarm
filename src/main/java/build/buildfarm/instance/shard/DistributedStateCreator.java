@@ -29,6 +29,7 @@ import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.common.redis.RedisPriorityQueue;
 import build.buildfarm.common.redis.RedisQueue;
 import build.buildfarm.common.redis.RedisSetMap;
+import build.buildfarm.common.redis.RedisStreamQueue;
 import build.buildfarm.common.redis.StringTranslator;
 import build.buildfarm.common.redis.TranslatedQueueDecorator;
 import build.buildfarm.instance.shard.codec.InstantTranslator;
@@ -165,12 +166,18 @@ public class DistributedStateCreator {
   }
 
   private static QueueDecorator<String> getQueueDecorator() {
+    if (configs.getBackplane().isStreamQueue()) {
+      return RedisStreamQueue::decorate;
+    }
     return configs.getBackplane().isPriorityQueue()
         ? RedisPriorityQueue::decorate
         : RedisQueue::decorate;
   }
 
   private static Queue.QUEUE_TYPE getQueueType() {
+    if (configs.getBackplane().isStreamQueue()) {
+      return Queue.QUEUE_TYPE.stream;
+    }
     return configs.getBackplane().isPriorityQueue()
         ? Queue.QUEUE_TYPE.priority
         : Queue.QUEUE_TYPE.standard;
