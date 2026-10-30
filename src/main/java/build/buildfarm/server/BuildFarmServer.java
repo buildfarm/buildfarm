@@ -79,6 +79,7 @@ public class BuildFarmServer extends LoggingMain {
   private AtomicBoolean released = new AtomicBoolean(true);
   private InvocationsCollector invocationsCollector;
   private Thread invocationsCollectorThread;
+  private final PrometheusPublisher prometheusPublisher = new PrometheusPublisher();
 
   BuildFarmServer() {
     super("BuildFarmServer");
@@ -127,6 +128,7 @@ public class BuildFarmServer extends LoggingMain {
     released.set(false);
     // FIXME change to instance = ...; instance.start();
     ServerInstance serverInstance = createInstance();
+    serverInstance.setPrometheusPublisher(prometheusPublisher);
     instance = serverInstance;
 
     healthStatusManager = new HealthStatusManager();
@@ -186,7 +188,7 @@ public class BuildFarmServer extends LoggingMain {
 
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
+    prometheusPublisher.startHttpServer(configs.getPrometheusPort());
     healthCheckMetric.labels("start").inc();
   }
 
@@ -212,7 +214,7 @@ public class BuildFarmServer extends LoggingMain {
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     }
-    PrometheusPublisher.stopHttpServer();
+    prometheusPublisher.stopHttpServer();
     healthCheckMetric.labels("stop").inc();
     try {
       initiateShutdown();

@@ -97,6 +97,7 @@ import build.buildfarm.instance.server.Filter;
 import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.instance.shard.codec.ShardCodec;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.DispatchedOperation;
@@ -294,7 +295,7 @@ public class ServerInstance extends NodeInstance {
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
-  private final Thread prometheusMetricsThread;
+  private PrometheusPublisher prometheusPublisher = new PrometheusPublisher();
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
@@ -691,29 +692,30 @@ public class ServerInstance extends NodeInstance {
       operationQueuer = null;
       transformPollerExecutor = null;
     }
+  }
 
-    prometheusMetricsThread =
-        new Thread(
-            () -> {
-              while (!Thread.currentThread().isInterrupted()) {
-                try {
-                  TimeUnit.SECONDS.sleep(30);
-                  BackplaneStatus backplaneStatus = backplaneStatus();
-                  workerPoolSize.set(backplaneStatus.getActiveWorkersCount());
-                  executeWorkerPoolSize.set(backplaneStatus.getActiveExecuteWorkersCount());
-                  storageWorkerPoolSize.set(backplaneStatus.getActiveStorageWorkersCount());
-                  dispatchedOperationsSize.set(backplaneStatus.getDispatchedSize());
-                  preQueueSize.set(backplaneStatus.getPrequeue().getSize());
-                  updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
-                } catch (InterruptedException e) {
-                  Thread.currentThread().interrupt();
-                  break;
-                } catch (Exception e) {
-                  log.log(Level.SEVERE, "Could not update RedisShardBackplane metrics", e);
-                }
-              }
-            },
-            "Prometheus Metrics Collector");
+  public void setPrometheusPublisher(PrometheusPublisher prometheusPublisher) {
+    this.prometheusPublisher = prometheusPublisher;
+  }
+
+  private void collectPrometheusMetrics() {
+    while (!Thread.currentThread().isInterrupted()) {
+      try {
+        TimeUnit.SECONDS.sleep(30);
+        BackplaneStatus backplaneStatus = backplaneStatus();
+        workerPoolSize.set(backplaneStatus.getActiveWorkersCount());
+        executeWorkerPoolSize.set(backplaneStatus.getActiveExecuteWorkersCount());
+        storageWorkerPoolSize.set(backplaneStatus.getActiveStorageWorkersCount());
+        dispatchedOperationsSize.set(backplaneStatus.getDispatchedSize());
+        preQueueSize.set(backplaneStatus.getPrequeue().getSize());
+        updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      } catch (Exception e) {
+        log.log(Level.SEVERE, "Could not update RedisShardBackplane metrics", e);
+      }
+    }
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
@@ -754,9 +756,7 @@ public class ServerInstance extends NodeInstance {
       operationQueuer.start();
     }
 
-    if (prometheusMetricsThread != null) {
-      prometheusMetricsThread.start();
-    }
+    prometheusPublisher.startMetricsCollector(this::collectPrometheusMetrics);
   }
 
   @Override
@@ -775,9 +775,7 @@ public class ServerInstance extends NodeInstance {
       dispatchedMonitor.interrupt();
       dispatchedMonitor.join();
     }
-    if (prometheusMetricsThread != null) {
-      prometheusMetricsThread.interrupt();
-    }
+    prometheusPublisher.stopMetricsCollector();
     contextDeadlineScheduler.shutdown();
     operationDeletionService.shutdown();
     operationTransformService.shutdown();
