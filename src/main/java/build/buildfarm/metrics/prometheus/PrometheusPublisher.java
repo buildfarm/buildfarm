@@ -21,9 +21,10 @@ import lombok.extern.java.Log;
 
 @Log
 public class PrometheusPublisher {
-  private static HTTPServer server;
+  private HTTPServer server;
+  private Thread metricsCollectorThread;
 
-  public static void startHttpServer(int port) {
+  public void startHttpServer(int port) {
     try {
       if (port > 0) {
         DefaultExports.initialize();
@@ -37,9 +38,23 @@ public class PrometheusPublisher {
     }
   }
 
-  public static void stopHttpServer() {
+  public void stopHttpServer() {
     if (server != null) {
       server.stop();
+      server = null;
+    }
+  }
+
+  public void startMetricsCollector(Runnable collector) {
+    metricsCollectorThread = new Thread(collector, "Prometheus Metrics Collector");
+    metricsCollectorThread.start();
+  }
+
+  public void stopMetricsCollector() throws InterruptedException {
+    if (metricsCollectorThread != null) {
+      metricsCollectorThread.interrupt();
+      metricsCollectorThread.join();
+      metricsCollectorThread = null;
     }
   }
 }
