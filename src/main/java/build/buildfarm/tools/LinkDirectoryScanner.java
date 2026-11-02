@@ -16,6 +16,7 @@ package build.buildfarm.tools;
 
 import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.instance.Utils.getBlob;
+import static build.buildfarm.server.services.OperationsService.LIST_OPERATIONS_MAXIMUM_PAGE_SIZE;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
@@ -27,7 +28,6 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.redis.NodeClient;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.Digest;
@@ -41,15 +41,12 @@ import build.buildfarm.worker.OutputDirectory;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.TypeRegistry;
 import com.google.protobuf.util.Durations;
-import com.google.protobuf.util.JsonFormat;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
-import java.net.URI;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,13 +55,6 @@ import java.util.concurrent.Callable;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import picocli.CommandLine;
-import redis.clients.jedis.ConnectionPool;
-import redis.clients.jedis.HostAndPort;
-import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.RedisClient;
-import redis.clients.jedis.UnifiedJedis;
-import redis.clients.jedis.params.ScanParams;
-import redis.clients.jedis.resps.ScanResult;
 
 /**
  * Scans a random sample of Operations from the Buildfarm backplane and counts how many times each
@@ -75,10 +65,10 @@ import redis.clients.jedis.resps.ScanResult;
  * identify which directory patterns would yield the most cache reuse if targeted by the {@code
  * linkedInputDirectories} configuration.
  *
- * <p>Operations are enumerated directly from Redis via Jedis SCAN, and the inline Action available
- * in {@code QueuedOperationMetadata} is used to avoid a separate gRPC blob fetch for the Action. A
- * single {@code QueuedOperation} blob fetch (gRPC) provides the Command and the complete input
- * tree, replacing the previous approach of 3+ separate gRPC calls per operation.
+ * <p>Operations are enumerated through the Buildfarm Operations API. The inline Action available in
+ * {@code QueuedOperationMetadata} is used to avoid a separate gRPC blob fetch for the Action. A
+ * single {@code QueuedOperation} blob fetch provides the Command and the complete input tree,
+ * replacing the previous approach of 3+ separate gRPC calls per operation.
  */
 @picocli.CommandLine.Command(
     name = "bf-link-scanner",
@@ -87,7 +77,8 @@ import redis.clients.jedis.resps.ScanResult;
       "Sample Operations from the backplane and report how many times each linkable",
       "input directory (one containing no output files) appears across the sample.",
       "Sort results by appearances×fileCount to identify which regex patterns for",
-      "linkedInputDirectories would yield the greatest cache reuse."
+      "linkedInputDirectories would yield the greatest cache reuse.",
+      "Operations whose retained CAS blobs have expired are skipped and summarized."
     })
 class LinkDirectoryScanner implements Callable<Integer> {
   @picocli.CommandLine.Parameters(
@@ -95,31 +86,6 @@ class LinkDirectoryScanner implements Callable<Integer> {
       description =
           "Buildfarm server gRPC endpoint (host:port) — used to fetch QueuedOperation blobs")
   private String host;
-
-  @picocli.CommandLine.Option(
-      names = {"--redis-uri"},
-      description = "Redis connection URI (e.g. redis://localhost:6379)",
-      required = true)
-  private String redisUri;
-
-  @picocli.CommandLine.Option(
-      names = {"--operation-prefix"},
-      description = "Redis key prefix for Operation entries ({prefix}:{operationName})",
-      defaultValue = "Operation")
-  private String operationPrefix;
-
-  @picocli.CommandLine.Option(
-      names = {"--codec"},
-      description = "Encoding used for Operations in Redis: json (default) or b64",
-      defaultValue = "json")
-  private String codec;
-
-  @picocli.CommandLine.Option(
-      names = {"--cluster"},
-      description =
-          "Connect to Redis Cluster. Scans each master node individually to reach all keys."
-              + " Required when using Redis Cluster (mget across slots is not supported).")
-  private boolean cluster;
 
   @picocli.CommandLine.Option(
       names = {"-i", "--instance"},
@@ -138,7 +104,7 @@ class LinkDirectoryScanner implements Callable<Integer> {
       description =
           "Maximum number of operations to visit during the scan before stopping."
               + " The sample is drawn uniformly from the visited set."
-              + " -1 means scan all operations.",
+              + " -1 means scan all operations (potentially slow for a large backplane).",
       defaultValue = "-1")
   private int maxScan;
 
@@ -171,20 +137,66 @@ class LinkDirectoryScanner implements Callable<Integer> {
       description = "Only display result rows whose path matches this regex.")
   private String filterPattern;
 
-  // TypeRegistry for deserializing Operation protos that carry Any-typed metadata fields.
-  private static final TypeRegistry TYPE_REGISTRY =
-      TypeRegistry.newBuilder()
-          .add(ExecuteOperationMetadata.getDescriptor())
-          .add(QueuedOperationMetadata.getDescriptor())
-          .add(com.google.rpc.PreconditionFailure.getDescriptor())
-          .build();
-
-  private static final JsonFormat.Parser JSON_PARSER =
-      JsonFormat.parser().usingTypeRegistry(TYPE_REGISTRY).ignoringUnknownFields();
-
   /** Recursive size and file count for one directory (memoised across all operations). */
   private record DirStats(long sizeBytes, long fileCount) {
     static final DirStats EMPTY = new DirStats(0, 0);
+  }
+
+  /** Outcome of reading the blobs needed to analyze one listed operation. */
+  private enum ProcessResult {
+    PROCESSED,
+    MISSING_QUEUED_OPERATION("queued-operation blob was unavailable"),
+    MISSING_ACTION("action blob was unavailable"),
+    MISSING_COMMAND("command blob was unavailable"),
+    MISSING_INPUT_ROOT("input root was unavailable or absent"),
+    UNSUPPORTED_METADATA("operation metadata could not be decoded");
+
+    private final String description;
+
+    ProcessResult() {
+      this.description = null;
+    }
+
+    ProcessResult(String description) {
+      this.description = description;
+    }
+  }
+
+  /** Displays processing progress without requiring a third-party terminal UI dependency. */
+  private static final class ProgressReporter {
+    private final int total;
+    private final boolean interactive = System.console() != null;
+
+    ProgressReporter(int total) {
+      this.total = total;
+    }
+
+    void update(int complete, int processed, int skipped, int errors) {
+      if (interactive) {
+        int width = 30;
+        int filled = total == 0 ? width : width * complete / total;
+        String bar = "#".repeat(filled) + "-".repeat(width - filled);
+        System.err.printf(
+            "\rProcessing [%s] %3d%%  %,d/%,d  processed: %,d  skipped: %,d  errors: %,d",
+            bar,
+            total == 0 ? 100 : complete * 100 / total,
+            complete,
+            total,
+            processed,
+            skipped,
+            errors);
+      } else if (complete == 1 || complete == total || complete % 10 == 0) {
+        System.err.printf(
+            "  Processing: %,d/%,d operations  processed: %,d  skipped: %,d  errors: %,d%n",
+            complete, total, processed, skipped, errors);
+      }
+    }
+
+    void finish() {
+      if (interactive) {
+        System.err.println();
+      }
+    }
   }
 
   /**
@@ -326,8 +338,6 @@ class LinkDirectoryScanner implements Callable<Integer> {
 
   @Override
   public Integer call() throws Exception {
-    System.err.printf("Connecting to Redis at %s...%n", redisUri);
-    System.err.flush();
     System.err.printf("Connecting to gRPC server at %s (instance=%s)...%n", host, instanceName);
     System.err.flush();
     ManagedChannel channel = createChannel(host);
@@ -336,7 +346,7 @@ class LinkDirectoryScanner implements Callable<Integer> {
     System.err.println("gRPC channel created (lazy — will connect on first use)");
     System.err.flush();
     try {
-      List<Operation> sample = collectSample();
+      List<Operation> sample = collectSample(instance);
       System.err.printf("Sampled %d operations from backplane%n", sample.size());
 
       Map<String, KeyData> data = new HashMap<>();
@@ -347,11 +357,20 @@ class LinkDirectoryScanner implements Callable<Integer> {
       int processed = 0;
       int errors = 0;
       int total = sample.size();
-      int nextProgressAt = total / 10;
+      Map<ProcessResult, Integer> skipped = new EnumMap<>(ProcessResult.class);
+      ProgressReporter progress = new ProgressReporter(total);
+      System.err.printf(
+          "Processing %,d sampled operations (fetching queued-operation, action, and input-tree"
+              + " blobs)...%n",
+          total);
       for (Operation operation : sample) {
         try {
-          processOperation(instance, operation, caches, linkRegexes, data);
-          processed++;
+          ProcessResult result = processOperation(instance, operation, caches, linkRegexes, data);
+          if (result == ProcessResult.PROCESSED) {
+            processed++;
+          } else {
+            skipped.merge(result, 1, Integer::sum);
+          }
         } catch (Exception e) {
           errors++;
           if (errors <= 10) {
@@ -360,19 +379,15 @@ class LinkDirectoryScanner implements Callable<Integer> {
           }
         }
         int done = processed + errors;
-        if (nextProgressAt > 0 && done >= nextProgressAt) {
-          System.err.printf(
-              "  %3d%%  %d/%d operations  %,d unique dirs  %,d dirs cached  %,d subtrees memo'd%n",
-              done * 100 / total,
-              done,
-              total,
-              data.size(),
-              caches.dirCache.size(),
-              caches.subtreeMemo.size());
-          nextProgressAt += total / 10;
-        }
+        done += skipped.values().stream().mapToInt(Integer::intValue).sum();
+        progress.update(done, processed, done - processed - errors, errors);
       }
-      System.err.printf("Processed: %d, Skipped: %d%n", processed, errors);
+      progress.finish();
+      int skippedCount = skipped.values().stream().mapToInt(Integer::intValue).sum();
+      System.err.printf(
+          "Processed: %d, Skipped: %d, Failed: %d%n", processed, skippedCount, errors);
+      skipped.forEach(
+          (reason, count) -> System.err.printf("  Skipped %,d: %s%n", count, reason.description));
       printResults(data);
       System.out.flush();
       caches.printStats();
@@ -383,143 +398,50 @@ class LinkDirectoryScanner implements Callable<Integer> {
   }
 
   /**
-   * Decodes a Redis-stored Operation string using the configured codec.
-   *
-   * @return the decoded Operation, or null if the value is null or empty
+   * Pages through the Buildfarm Operations API and builds a reservoir sample of size {@link
+   * #sampleSize}, stopping after {@link #maxScan} operations when set.
    */
-  private Operation decodeOperation(String value) throws InvalidProtocolBufferException {
-    if (value == null || value.isEmpty()) {
-      return null;
-    }
-    if ("b64".equalsIgnoreCase(codec)) {
-      return Operation.parseFrom(Base64.getDecoder().decode(value));
-    } else {
-      // JSON codec (default)
-      Operation.Builder builder = Operation.newBuilder();
-      JSON_PARSER.merge(value, builder);
-      return builder.build();
-    }
-  }
-
-  /**
-   * Scans Redis directly for operations using Jedis SCAN and builds a reservoir sample of size
-   * {@link #sampleSize}, stopping early if {@link #maxScan} is set.
-   *
-   * <p>In cluster mode ({@code --cluster}), each master node is scanned individually to reach all
-   * keys across the cluster. In single-node mode, a simple pooled connection is used.
-   */
-  private List<Operation> collectSample() throws Exception {
-    // totals[0] = valid ops counted, totals[1] = decode errors
-    int[] totals = {0, 0};
+  private List<Operation> collectSample(Instance instance) throws IOException {
+    int[] totalOperations = {0};
     List<Operation> reservoir = new ArrayList<>(sampleSize);
     Random random = new Random();
-    ScanParams params = new ScanParams().match(operationPrefix + ":*").count(5000);
-
+    String pageToken = Instance.SENTINEL_PAGE_TOKEN;
+    int pagesScanned = 0;
     System.err.printf(
-        "Opening %s Redis connection to %s...%n", cluster ? "cluster" : "single-node", redisUri);
-    System.err.flush();
-
-    if (cluster) {
-      URI uri = new URI(redisUri);
-      int port = uri.getPort() > 0 ? uri.getPort() : 6379;
-      try (JedisCluster jedisCluster = new JedisCluster(new HostAndPort(uri.getHost(), port))) {
-        System.err.printf(
-            "Cluster connected (%d nodes). Scanning for %s:* ...%n",
-            jedisCluster.getClusterNodes().size(), operationPrefix);
-        System.err.flush();
-        for (ConnectionPool pool : jedisCluster.getClusterNodes().values()) {
-          try (UnifiedJedis node = new NodeClient(pool.getResource())) {
-            // Skip replica nodes — each key lives on exactly one master; scanning replicas
-            // would produce duplicates.
-            if (!node.info("replication").contains("role:master")) {
-              continue;
-            }
-            System.err.printf("  Scanning a master node...%n");
-            System.err.flush();
-            if (scanNode(node, jedisCluster, params, totals, reservoir, random)) {
-              return reservoir; // --max-scan limit hit
-            }
-          }
-        }
-      }
-    } else {
-      try (RedisClient jedis = RedisClient.create(new URI(redisUri))) {
-        System.err.printf("Connected. Scanning for %s:* ...%n", operationPrefix);
-        System.err.flush();
-        scanNode(jedis, jedis, params, totals, reservoir, random);
-      }
-    }
-
-    System.err.printf("Scanned %d operations (%d decode errors)%n", totals[0], totals[1]);
-    return reservoir;
-  }
-
-  /**
-   * Scans one Redis node (using {@code scanClient}) and fetches values via {@code getClient}. In
-   * single-node mode both are the same object. In cluster mode, {@code scanClient} is the raw node
-   * connection and {@code getClient} is the cluster client (handles slot routing).
-   *
-   * @return true if the {@code --max-scan} limit was reached (caller should stop scanning)
-   */
-  private boolean scanNode(
-      UnifiedJedis scanClient,
-      UnifiedJedis getClient,
-      ScanParams params,
-      int[] totals,
-      List<Operation> reservoir,
-      Random random)
-      throws Exception {
-    String cursor = ScanParams.SCAN_POINTER_START;
-    int scanPages = 0;
-    int keysThisNode = 0;
+        "Listing operations in pages of %d%s...%n",
+        LIST_OPERATIONS_MAXIMUM_PAGE_SIZE, maxScan > 0 ? " (stopping after " + maxScan + ")" : "");
     do {
-      ScanResult<String> scanResult = scanClient.scan(cursor, params);
-      scanPages++;
-      List<String> keys = scanResult.getResult();
-      keysThisNode += keys.size();
-      if (scanPages % 10 == 0 || scanPages == 1) {
-        System.err.printf(
-            "  SCAN page %d: %d keys this page, %d keys on node, %d valid ops, %d errors%n",
-            scanPages, keys.size(), keysThisNode, totals[0], totals[1]);
-        System.err.flush();
+      pageToken =
+          instance.listOperations(
+              "executions",
+              LIST_OPERATIONS_MAXIMUM_PAGE_SIZE,
+              pageToken,
+              "",
+              operation -> {
+                if (maxScan > 0 && totalOperations[0] >= maxScan) {
+                  return;
+                }
+                totalOperations[0]++;
+                if (reservoir.size() < sampleSize) {
+                  reservoir.add(operation);
+                } else {
+                  int j = random.nextInt(totalOperations[0]);
+                  if (j < sampleSize) {
+                    reservoir.set(j, operation);
+                  }
+                }
+              });
+      pagesScanned++;
+      System.err.printf(
+          "  Listed page %,d: %,d operations visited, %,d sampled%n",
+          pagesScanned, totalOperations[0], reservoir.size());
+      if (maxScan > 0 && totalOperations[0] >= maxScan) {
+        System.err.printf("Scanned %d operations (--max-scan limit reached)%n", totalOperations[0]);
+        break;
       }
-      for (String key : keys) {
-        String value = getClient.get(key);
-        try {
-          Operation op = decodeOperation(value);
-          if (op != null) {
-            totals[0]++;
-            if (reservoir.size() < sampleSize) {
-              reservoir.add(op);
-            } else {
-              int j = random.nextInt(totals[0]);
-              if (j < sampleSize) {
-                reservoir.set(j, op);
-              }
-            }
-          }
-        } catch (Exception e) {
-          if (totals[1] < 3) {
-            // Print the first few failures verbosely to help diagnose codec mismatches.
-            String preview =
-                value == null
-                    ? "<null>"
-                    : value.length() > 120 ? value.substring(0, 120) + "..." : value;
-            System.err.printf(
-                "  Decode error on key %s (%s): %s%n  Value preview: %s%n",
-                key, codec, e.getMessage(), preview);
-            System.err.flush();
-          }
-          totals[1]++;
-        }
-        if (maxScan > 0 && totals[0] >= maxScan) {
-          System.err.printf("Scanned %d operations (--max-scan limit reached)%n", totals[0]);
-          return true;
-        }
-      }
-      cursor = scanResult.getCursor();
-    } while (!cursor.equals(ScanParams.SCAN_POINTER_START));
-    return false;
+    } while (!pageToken.equals(Instance.SENTINEL_PAGE_TOKEN));
+    System.err.printf("Scanned %d operations%n", totalOperations[0]);
+    return reservoir;
   }
 
   /**
@@ -527,14 +449,14 @@ class LinkDirectoryScanner implements Callable<Integer> {
    * to record every linkable directory.
    *
    * <p><b>Fast path (QueuedOperationMetadata):</b> The inline Action is extracted directly from the
-   * metadata already in Redis, and a single {@code QueuedOperation} blob fetch (gRPC) provides both
-   * the Command and the complete input tree.
+   * metadata returned by the Operations API, and a single {@code QueuedOperation} blob fetch
+   * provides both the Command and the complete input tree.
    *
    * <p><b>Fallback path (other metadata types):</b> Falls back to separate gRPC fetches for the
    * Action blob, Command blob, and tree pages. Used for completed operations that no longer carry
    * QueuedOperationMetadata.
    */
-  private static void processOperation(
+  private static ProcessResult processOperation(
       Instance instance,
       Operation operation,
       Caches caches,
@@ -557,12 +479,12 @@ class LinkDirectoryScanner implements Callable<Integer> {
               queuedMeta.getQueuedOperationDigest(),
               RequestMetadata.getDefaultInstance());
       if (blob == null) {
-        return;
+        return ProcessResult.MISSING_QUEUED_OPERATION;
       }
       QueuedOperation queuedOp = QueuedOperation.parseFrom(blob);
       Action action = queuedOp.getAction();
       if (action.getInputRootDigest().getHash().isEmpty()) {
-        return; // no usable action
+        return ProcessResult.MISSING_INPUT_ROOT;
       }
       inputRootHash = DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction).getHash();
       command = queuedOp.getCommand();
@@ -571,7 +493,7 @@ class LinkDirectoryScanner implements Callable<Integer> {
       // Fallback path for completed operations that no longer carry QueuedOperationMetadata.
       ExecuteOperationMetadata metadata = extractMetadata(operation);
       if (metadata == null) {
-        return;
+        return ProcessResult.UNSUPPORTED_METADATA;
       }
       digestFunction = metadata.getDigestFunction();
       Digest actionDigest = DigestUtil.fromDigest(metadata.getActionDigest(), digestFunction);
@@ -583,7 +505,7 @@ class LinkDirectoryScanner implements Callable<Integer> {
               actionDigest,
               RequestMetadata.getDefaultInstance());
       if (actionBlob == null) {
-        return;
+        return ProcessResult.MISSING_ACTION;
       }
       Action action = Action.parseFrom(actionBlob);
 
@@ -597,7 +519,7 @@ class LinkDirectoryScanner implements Callable<Integer> {
               DigestUtil.fromDigest(action.getCommandDigest(), digestFunction),
               RequestMetadata.getDefaultInstance());
       if (commandBlob == null) {
-        return;
+        return ProcessResult.MISSING_COMMAND;
       }
       command = Command.parseFrom(commandBlob);
 
@@ -618,9 +540,10 @@ class LinkDirectoryScanner implements Callable<Integer> {
 
     Directory rootDir = caches.getDir(inputRootHash);
     if (rootDir == null) {
-      return;
+      return ProcessResult.MISSING_INPUT_ROOT;
     }
     traverseDir(rootDir, caches, outputDirRoot, digestFunction, "", linkRegexes, data);
+    return ProcessResult.PROCESSED;
   }
 
   /**

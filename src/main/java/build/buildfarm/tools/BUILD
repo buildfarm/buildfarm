@@ -205,6 +205,7 @@ java_binary(
         "@buildfarm_maven//:io_grpc_grpc_core",
         "@buildfarm_maven//:io_grpc_grpc_protobuf",
         "@buildfarm_maven//:io_grpc_grpc_stub",
+        "@buildfarm_maven//:org_slf4j_slf4j_simple",
         "@googleapis//google/rpc:rpc_java_proto",
     ],
 )
@@ -374,9 +375,9 @@ java_binary(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/grpc",
-        "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/server/services",
         "//src/main/java/build/buildfarm/worker",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@buildfarm_maven//:com_google_guava_guava",
@@ -388,7 +389,6 @@ java_binary(
         "@buildfarm_maven//:io_grpc_grpc_core",
         "@buildfarm_maven//:io_grpc_grpc_protobuf",
         "@buildfarm_maven//:io_grpc_grpc_stub",
-        "@buildfarm_maven//:redis_clients_jedis",
         "@googleapis//google/longrunning:longrunning_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
