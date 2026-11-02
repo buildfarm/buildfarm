@@ -18,7 +18,7 @@
 # All of the needed buildfarm services are initialized (redis, server, worker).
 # We ensure that the system can build a set of bazel targets.
 
-set -ex
+set -e
 set -o pipefail
 
 # Define Redis details
