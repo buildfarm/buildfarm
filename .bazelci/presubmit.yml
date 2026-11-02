@@ -63,16 +63,6 @@ tasks:
     - --test_tag_filters=-integration,-redis,-container
     test_targets:
     - '...'
-  ubuntu2004:
-    name: Unit Tests
-    build_targets:
-    - '...'
-    build_flags:
-    - --build_tag_filters=-container
-    test_flags:
-    - --test_tag_filters=-integration,-redis,-container
-    test_targets:
-    - '...'
   macos:
     name: Unit Tests
     environment:
@@ -108,7 +98,7 @@ tasks:
   # Outside of this step, similar functionality may be tested with mocks.
   redis_unit_tests:
     name: Redis Unit Tests
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - ./.bazelci/redis_unit_tests.sh
 
@@ -117,7 +107,7 @@ tasks:
   # It performs a realistic build on generated cc targets and gating projects.
   integration_test_server:
     name: Server Integration Test
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_server_test.sh
     - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
@@ -129,7 +119,7 @@ tasks:
   # It performs a realistic build on generated cc targets and gating projects.
   integration_test_many:
     name: Integration Test
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
@@ -140,7 +130,7 @@ tasks:
   # More issues can be caught when using the fully defined configuration file.
   integration_test_many_full_config:
     name: Integration Test (Full Config)
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
@@ -150,7 +140,7 @@ tasks:
   # Test that buildfarm can work with zstd compression
   compression_test_many_compression:
     name: Integration Test (Shard/Compression)
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
@@ -163,7 +153,7 @@ tasks:
   # that latencies can be captured.
   cache_check_many:
     name: Cache Check
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export CACHE_TEST=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
@@ -176,7 +166,7 @@ tasks:
 
   integration_test_abseil:
     name: Abseil Test
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
     - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
@@ -184,7 +174,7 @@ tasks:
     - ./.bazelci/integration_test.sh
   integration_test_abseil_shard_compression:
     name: Abseil Test (Shard/Compression)
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
     - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
