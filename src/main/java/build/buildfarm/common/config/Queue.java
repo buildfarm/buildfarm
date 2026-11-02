@@ -23,7 +23,8 @@ import lombok.Data;
 public class Queue {
   public enum QUEUE_TYPE {
     priority,
-    standard
+    standard,
+    stream
   }
 
   private String name;

@@ -340,4 +340,15 @@ public interface Backplane {
   void incrementRequestCounters(
       String actionId, String toolInvocationId, String actionMnemonic, String targetId)
       throws IOException;
+
+  /**
+   * Reclaim stale entries from the stream queue Pending Entries List (PEL). Only applicable when
+   * stream queues are enabled. Messages idle longer than minIdleMillis are re-enqueued.
+   *
+   * @param minIdleMillis minimum idle time before reclaiming.
+   * @return the number of entries reclaimed.
+   */
+  default int reclaimStalePelEntries(long minIdleMillis) throws IOException {
+    return 0;
+  }
 }
