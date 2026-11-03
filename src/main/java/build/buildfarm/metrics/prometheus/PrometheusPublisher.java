@@ -17,6 +17,7 @@ package build.buildfarm.metrics.prometheus;
 import io.prometheus.client.exporter.HTTPServer;
 import io.prometheus.client.hotspot.DefaultExports;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.java.Log;
 
 @Log
@@ -53,7 +54,10 @@ public class PrometheusPublisher {
   public void stopMetricsCollector() throws InterruptedException {
     if (metricsCollectorThread != null) {
       metricsCollectorThread.interrupt();
-      metricsCollectorThread.join();
+      metricsCollectorThread.join(TimeUnit.SECONDS.toMillis(10));
+      if (metricsCollectorThread.isAlive()) {
+        log.warning("Prometheus metrics collector did not terminate within 10 seconds");
+      }
       metricsCollectorThread = null;
     }
   }
