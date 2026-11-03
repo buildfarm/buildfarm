@@ -17,13 +17,15 @@ package build.buildfarm.metrics.prometheus;
 import io.prometheus.client.exporter.HTTPServer;
 import io.prometheus.client.hotspot.DefaultExports;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.java.Log;
 
 @Log
 public class PrometheusPublisher {
-  private static HTTPServer server;
+  private HTTPServer server;
+  private Thread metricsCollectorThread;
 
-  public static void startHttpServer(int port) {
+  public void startHttpServer(int port) {
     try {
       if (port > 0) {
         DefaultExports.initialize();
@@ -37,9 +39,26 @@ public class PrometheusPublisher {
     }
   }
 
-  public static void stopHttpServer() {
+  public void stopHttpServer() {
     if (server != null) {
       server.stop();
+      server = null;
+    }
+  }
+
+  public void startMetricsCollector(Runnable collector) {
+    metricsCollectorThread = new Thread(collector, "Prometheus Metrics Collector");
+    metricsCollectorThread.start();
+  }
+
+  public void stopMetricsCollector() throws InterruptedException {
+    if (metricsCollectorThread != null) {
+      metricsCollectorThread.interrupt();
+      metricsCollectorThread.join(TimeUnit.SECONDS.toMillis(10));
+      if (metricsCollectorThread.isAlive()) {
+        log.warning("Prometheus metrics collector did not terminate within 10 seconds");
+      }
+      metricsCollectorThread = null;
     }
   }
 }
