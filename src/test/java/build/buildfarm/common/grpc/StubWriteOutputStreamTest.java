@@ -43,6 +43,7 @@ import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
+import io.grpc.StatusException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -51,6 +52,7 @@ import io.grpc.util.MutableHandlerRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Before;
@@ -266,7 +268,7 @@ public class StubWriteOutputStreamTest {
   }
 
   @Test
-  public void serverErrorMakesCloseANoOp() throws IOException {
+  public void serverErrorReleasesObserverAndCloseIsNoOp() throws IOException {
     // After the response observer's onError, the gRPC stream is fully closed by the server and
     // Netty's onStreamClosed drains pendingWriteQueue. onError nulls writeObserver and marks the
     // stream fully torn down, so a subsequent close() is a no-op and does not re-initiate cancel.
@@ -283,10 +285,13 @@ public class StubWriteOutputStreamTest {
 
     OutputStream outputStream = write.getOutput(1, SECONDS, () -> {});
     assertThat(write.isGrpcRemoteCallClosed()).isFalse();
+    assertThat(write.hasActiveWriteObserver()).isTrue();
 
     capturedResponseObserver.get().onError(Status.UNAVAILABLE.asException());
 
+    // onError released the observer eagerly.
     assertThat(write.isGrpcRemoteCallClosed()).isTrue();
+    assertThat(write.hasActiveWriteObserver()).isFalse();
 
     // close() is a no-op — it does not re-throw the prior failure as
     // UncheckedExecutionException (which WriteStreamObserver's cancellation listener would log
@@ -313,17 +318,19 @@ public class StubWriteOutputStreamTest {
     listener.getValue().onMessage(WriteResponse.newBuilder().setCommittedSize(100).build());
     listener.getValue().onClose(Status.OK, new Metadata());
     verify(call, never()).halfClose();
+    assertThat(write.hasActiveWriteObserver()).isTrue();
 
     out.close();
     out.close();
 
     verify(call).halfClose();
+    assertThat(write.hasActiveWriteObserver()).isFalse();
     verify(call, never()).cancel(any(), any());
   }
 
   @SuppressWarnings("unchecked")
   @Test
-  public void closeHappyPathSendsOnCompleted() throws IOException {
+  public void closeHappyPathSendsOnCompletedAndClearsObserver() throws IOException {
     StreamObserver<WriteRequest> remoteStreamObserver = mock(StreamObserver.class);
     serviceRegistry.addService(
         new ByteStreamImplBase() {
@@ -356,6 +363,67 @@ public class StubWriteOutputStreamTest {
     verify(remoteStreamObserver, times(2)).onNext(any(WriteRequest.class));
     verify(remoteStreamObserver, times(1)).onCompleted();
     verifyNoMoreInteractions(remoteStreamObserver);
+    assertThat(write.hasActiveWriteObserver()).isFalse();
+  }
+
+  @Test
+  public void cancel_completesFutureExceptionallyAndCancelsObserver() throws IOException {
+    AtomicInteger cancelCount = new AtomicInteger();
+    registerMockByteStreamService();
+    StubWriteOutputStream write =
+        newWrite(
+            ClientInterceptors.intercept(channel, recordingCancelInterceptor(cancelCount)),
+            "cancel-resource",
+            /* expectedSize= */ 100);
+
+    write.getOutput(1, SECONDS, () -> {});
+    write.cancel("test cancel", null);
+
+    assertThat(write.getFuture().isDone()).isTrue();
+    ExecutionException ee = assertThrows(ExecutionException.class, () -> write.getFuture().get());
+    assertThat(ee.getCause()).isInstanceOf(StatusException.class);
+    assertThat(Status.fromThrowable(ee.getCause()).getCode()).isEqualTo(Status.Code.CANCELLED);
+    assertThat(cancelCount.get()).isEqualTo(1);
+    assertThat(write.hasActiveWriteObserver()).isFalse();
+  }
+
+  @Test
+  public void cancel_isIdempotent_secondCallDoesNothing() throws IOException {
+    AtomicInteger cancelCount = new AtomicInteger();
+    registerMockByteStreamService();
+    StubWriteOutputStream write =
+        newWrite(
+            ClientInterceptors.intercept(channel, recordingCancelInterceptor(cancelCount)),
+            "idempotent-cancel-resource",
+            /* expectedSize= */ 100);
+
+    write.getOutput(1, SECONDS, () -> {});
+    write.cancel("first", null);
+    write.cancel("second", null);
+
+    assertThat(cancelCount.get()).isEqualTo(1);
+  }
+
+  @Test
+  public void closeAfterCancel_isNoOp() throws IOException {
+    AtomicInteger cancelCount = new AtomicInteger();
+    registerMockByteStreamService();
+    StubWriteOutputStream write =
+        newWrite(
+            ClientInterceptors.intercept(channel, recordingCancelInterceptor(cancelCount)),
+            "cancel-then-close-resource",
+            /* expectedSize= */ 100);
+
+    OutputStream out = write.getOutput(1, SECONDS, () -> {});
+    write.cancel("oops", null);
+
+    // close() must not throw any RuntimeException (UncheckedExecutionException of the prior
+    // CANCELLED status would otherwise propagate out of checkComplete()).
+    out.close();
+
+    // The cancel happened exactly once — close() did NOT re-issue cancel via the observer.
+    assertThat(cancelCount.get()).isEqualTo(1);
+    assertThat(write.hasActiveWriteObserver()).isFalse();
   }
 
   @Test
@@ -374,6 +442,34 @@ public class StubWriteOutputStreamTest {
 
     // close() must not throw RuntimeException (UncheckedExecutionException of the prior cause).
     out.close();
+  }
+
+  @Test
+  public void onCompleted_doesNotSetFullyClosed_closeStillRuns() throws IOException {
+    // After server onCompleted, the outbound is HALF_CLOSED_REMOTE — Netty's
+    // onStreamHalfClosed will NOT release pendingWriteQueue in that state. close() must
+    // therefore still run to send the client's END_STREAM. This test pins that contract:
+    // isFullyClosed is NOT set by onCompleted, so close()'s body runs and nulls writeObserver.
+    AtomicReference<StreamObserver<WriteResponse>> capturedResponseObserver =
+        new AtomicReference<>();
+    registerCapturingByteStreamService(capturedResponseObserver);
+
+    StubWriteOutputStream write =
+        newWrite(channel, "early-completion-resource", /* expectedSize= */ 100);
+    OutputStream out = write.getOutput(1, SECONDS, () -> {});
+    // Server completes early.
+    capturedResponseObserver.get().onNext(WriteResponse.newBuilder().setCommittedSize(100).build());
+    capturedResponseObserver.get().onCompleted();
+
+    // The writeObserver is still set (onCompleted does NOT null it — that distinguishes the
+    // server-success path from the server-error path).
+    assertThat(write.hasActiveWriteObserver()).isTrue();
+    assertThat(write.isGrpcRemoteCallClosed()).isTrue();
+
+    // close() runs its body (does NOT short-circuit on isFullyClosed) and nulls writeObserver.
+    out.close();
+
+    assertThat(write.hasActiveWriteObserver()).isFalse();
   }
 
   @SuppressWarnings("unchecked")
@@ -421,6 +517,42 @@ public class StubWriteOutputStreamTest {
 
   @SuppressWarnings("unchecked")
   @Test
+  public void getOutput_afterCancel_throwsIOExceptionAndDoesNotOpenNewCall() throws IOException {
+    // After cancel, isFullyClosed is set. A second getOutput must NOT open a fresh gRPC call —
+    // close() short-circuits on isFullyClosed, so any new call would leak. initiateWrite's
+    // guard refuses under the same monitor that cancel flips the flag, so check-and-create is
+    // atomic with teardown.
+    AtomicInteger writeCallCount = new AtomicInteger();
+    serviceRegistry.addService(
+        new ByteStreamImplBase() {
+          @Override
+          public StreamObserver<WriteRequest> write(
+              StreamObserver<WriteResponse> responseObserver) {
+            writeCallCount.incrementAndGet();
+            return mock(StreamObserver.class);
+          }
+        });
+
+    StubWriteOutputStream write =
+        newWrite(channel, "cancel-then-getoutput-resource", /* expectedSize= */ 100);
+    write.getOutput(1, SECONDS, () -> {});
+    assertThat(writeCallCount.get()).isEqualTo(1);
+
+    write.cancel("test cancel", null);
+    assertThat(write.isFullyClosed()).isTrue();
+
+    IOException ex = assertThrows(IOException.class, () -> write.getOutput(1, SECONDS, () -> {}));
+    // The cancel's CANCELLED StatusException is preserved as the cause, so callers/logs see the
+    // real reason rather than a generic "terminated".
+    assertThat(Status.fromThrowable(ex).getCode()).isEqualTo(Status.Code.CANCELLED);
+
+    // No fresh gRPC call was opened.
+    assertThat(writeCallCount.get()).isEqualTo(1);
+    assertThat(write.hasActiveWriteObserver()).isFalse();
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
   public void getOutput_afterServerError_throwsIOExceptionAndDoesNotOpenNewCall()
       throws IOException {
     // Symmetric to the cancel case for the response observer's onError teardown path. onError
@@ -453,6 +585,7 @@ public class StubWriteOutputStreamTest {
     assertThat(Status.fromThrowable(ex).getCode()).isEqualTo(Status.Code.UNAVAILABLE);
 
     assertThat(writeCallCount.get()).isEqualTo(1);
+    assertThat(write.hasActiveWriteObserver()).isFalse();
   }
 
   @Test
