@@ -21,13 +21,13 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
+import java.util.stream.LongStream;
 
 public class FastCDCChunker extends BufferedChunker {
   private static final com.google.common.hash.HashFunction MD5 = HashFunction.MD5.getHash();
   private static final int SEED_LENGTH = 64;
-  public static final Long[] GEAR = generateGear();
-  public static final Long[] GEAR_LS = generateGearLS();
+  public static final long[] GEAR = generateGear();
+  public static final long[] GEAR_LS = generateGearLS();
 
   private static final long[] MASKS = {
     0, // 0: padding
@@ -85,20 +85,20 @@ public class FastCDCChunker extends BufferedChunker {
     return ByteBuffer.wrap(bytes, 0, 8).getLong();
   }
 
-  private static Stream<Long> gearStream() {
+  private static LongStream gearStream() {
     // GEAR table: 256 64-bit integers for the rolling hash, computed as:
     //   GEAR[i] = high_64_bits(MD5(byte[SEED_LENGTH].fill(i))) for i in 0..255
     return IntStream.range(0, 256)
         .mapToObj(FastCDCChunker::hashByte)
-        .map(FastCDCChunker::high64Bits);
+        .mapToLong(FastCDCChunker::high64Bits);
   }
 
-  private static Long[] generateGear() {
-    return gearStream().toArray(Long[]::new);
+  private static long[] generateGear() {
+    return gearStream().toArray();
   }
 
-  private static Long[] generateGearLS() {
-    return gearStream().map(n -> n << 1).toArray(Long[]::new);
+  private static long[] generateGearLS() {
+    return gearStream().map(n -> n << 1).toArray();
   }
 
   public FastCDCChunker(DigestUtil digestUtil, InputStream in, int averageSize, int normalization) {

@@ -27,8 +27,7 @@ public class RepMaxCDCChunker extends BufferedChunker {
   private static final int GEAR_HASH_WINDOW_SIZE = 64;
   private static final int MIN_SIZE = 256 * 1024;
   private static final int HORIZON_SIZE = 8 * MIN_SIZE;
-  private static final long[] GEAR =
-      java.util.Arrays.stream(FastCDCChunker.GEAR).mapToLong(Long::longValue).toArray();
+  private static final long[] GEAR = FastCDCChunker.GEAR;
 
   private final int minSize;
   private final int peekSize;
