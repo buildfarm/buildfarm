@@ -69,6 +69,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.cas.FastCDCChunker;
+import build.buildfarm.cas.RepMaxCDCChunker;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -1939,7 +1940,8 @@ public abstract class NodeInstance extends InstanceBase {
         .build();
   }
 
-  private Iterator<Blob> createBlobChunker(
+  @VisibleForTesting
+  Iterator<Blob> createBlobChunker(
       ChunkingFunction.Value chunkingFunction, DigestUtil digestUtil, InputStream in) {
     if (chunkingFunction == ChunkingFunction.Value.FAST_CDC_2020) {
       return new FastCDCChunker(
@@ -1947,6 +1949,9 @@ public abstract class NodeInstance extends InstanceBase {
           in,
           configs.getServer().getFastCdc2020AvgChunkSizeBytes(),
           configs.getServer().getFastCdc2020Normalization());
+    }
+    if (chunkingFunction == ChunkingFunction.Value.REP_MAX_CDC) {
+      return new RepMaxCDCChunker(digestUtil, in);
     }
     throw new UnsupportedOperationException(
         format("chunking_function '%s' is not supported", chunkingFunction));
@@ -2008,12 +2013,18 @@ public abstract class NodeInstance extends InstanceBase {
     }
   }
 
-  // Blobs smaller than max_chunk_size (avg_chunk_size_bytes * 4) SHOULD be
-  // uploaded without chunking.
-  //
-  // We'll take SHOULD a bit more seriously here...
-  protected long getFastCDC2020MinBlobSize() {
-    return configs.getServer().getFastCdc2020AvgChunkSizeBytes() * 4;
+  @VisibleForTesting
+  long getMinimumBlobSize(ChunkingFunction.Value chunkingFunction) {
+    if (chunkingFunction == ChunkingFunction.Value.FAST_CDC_2020) {
+      // Blobs smaller than max_chunk_size (avg_chunk_size_bytes * 4) SHOULD be uploaded
+      // without chunking. We'll take SHOULD a bit more seriously here.
+      return configs.getServer().getFastCdc2020AvgChunkSizeBytes() * 4L;
+    }
+    if (chunkingFunction == ChunkingFunction.Value.REP_MAX_CDC) {
+      return 512 * 1024L;
+    }
+    throw new UnsupportedOperationException(
+        format("chunking_function '%s' is not supported", chunkingFunction));
   }
 
   @Override
@@ -2022,12 +2033,13 @@ public abstract class NodeInstance extends InstanceBase {
       Iterable<build.bazel.remote.execution.v2.Digest> chunkDigests,
       ChunkingFunction.Value chunkingFunction,
       RequestMetadata requestMetadata) {
-    if (expectedBlobDigest.getSize() < getFastCDC2020MinBlobSize()) {
+    long minimumBlobSize = getMinimumBlobSize(chunkingFunction);
+    if (expectedBlobDigest.getSize() < minimumBlobSize) {
       return immediateFailedFuture(
           new IllegalArgumentException(
               format(
                   "Blob size %d < minimum size %d.",
-                  expectedBlobDigest.getSize(), getFastCDC2020MinBlobSize())));
+                  expectedBlobDigest.getSize(), minimumBlobSize)));
     }
 
     long accumulatedSize = 0;

@@ -53,6 +53,8 @@ import build.bazel.remote.execution.v2.SymlinkNode;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.FastCDCChunker;
+import build.buildfarm.cas.RepMaxCDCChunker;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -1162,5 +1164,31 @@ public class NodeInstanceTest {
                 .get());
     verify(contentAddressableStorage, never())
         .getWrite(any(Compressor.Value.class), any(Digest.class), any(UUID.class), any());
+  }
+
+  @Test
+  public void repMaxCdcUsesRepMaxCDCChunkerAndMinimumBlobSize() {
+    NodeInstance instance = new DummyServerInstance();
+
+    assertThat(
+            instance.createBlobChunker(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.REP_MAX_CDC,
+                DIGEST_UTIL,
+                ByteString.EMPTY.newInput()))
+        .isInstanceOf(RepMaxCDCChunker.class);
+    assertThat(
+            instance.createBlobChunker(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.FAST_CDC_2020,
+                DIGEST_UTIL,
+                ByteString.EMPTY.newInput()))
+        .isInstanceOf(FastCDCChunker.class);
+    assertThat(
+            instance.getMinimumBlobSize(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.REP_MAX_CDC))
+        .isEqualTo(512 * 1024L);
+    assertThat(
+            instance.getMinimumBlobSize(
+                build.bazel.remote.execution.v2.ChunkingFunction.Value.FAST_CDC_2020))
+        .isEqualTo(2 * 1024 * 1024L);
   }
 }
