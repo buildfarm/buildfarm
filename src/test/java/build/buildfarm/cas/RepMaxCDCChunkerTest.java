@@ -24,6 +24,7 @@ import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -57,6 +58,35 @@ public class RepMaxCDCChunkerTest {
 
     assertThat(join(chunks)).isEqualTo(ByteString.copyFrom(data));
     assertThat(chunks).hasSize(1);
+  }
+
+  @Test
+  public void hasNextIsIdempotent() {
+    byte[] data = new byte[2 * MIN_SIZE];
+    new Random(7).nextBytes(data);
+
+    Iterator<Blob> iterator = new RepMaxCDCChunker(DIGEST_UTIL, new ByteArrayInputStream(data));
+
+    assertThat(iterator.hasNext()).isTrue();
+    assertThat(iterator.hasNext()).isTrue();
+    Blob firstChunk = iterator.next();
+    assertThat(firstChunk.getData()).isEqualTo(chunks(data).get(0).getData());
+  }
+
+  @Test
+  public void emptyInputHasNoChunks() {
+    Iterator<Blob> iterator =
+        new RepMaxCDCChunker(DIGEST_UTIL, new ByteArrayInputStream(new byte[0]));
+
+    assertThat(iterator.hasNext()).isFalse();
+  }
+
+  @Test(expected = NoSuchElementException.class)
+  public void nextAfterEndThrows() {
+    Iterator<Blob> iterator =
+        new RepMaxCDCChunker(DIGEST_UTIL, new ByteArrayInputStream(new byte[0]));
+
+    iterator.next();
   }
 
   private static List<Blob> chunks(byte[] data) {
