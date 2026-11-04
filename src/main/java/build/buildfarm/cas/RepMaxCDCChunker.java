@@ -14,13 +14,8 @@
 
 package build.buildfarm.cas;
 
-import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
-import com.google.protobuf.ByteString;
-import java.io.IOException;
 import java.io.InputStream;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 
 /**
  * Splits a stream using RepMax content-defined chunking.
@@ -28,7 +23,7 @@ import java.util.NoSuchElementException;
  * <p>This is a port of Buildbarn's optimized implementation. It preserves rolling-hash and cut
  * candidate state across chunks, so every input byte is hashed only once.
  */
-public class RepMaxCDCChunker implements Iterator<Blob> {
+public class RepMaxCDCChunker extends BufferedChunker {
   private static final int GEAR_HASH_WINDOW_SIZE = 64;
   private static final int MIN_SIZE = 256 * 1024;
   private static final int HORIZON_SIZE = 8 * MIN_SIZE;
@@ -37,80 +32,21 @@ public class RepMaxCDCChunker implements Iterator<Blob> {
 
   private final int minSize;
   private final int peekSize;
-  private final DigestUtil digestUtil;
-  private final InputStream in;
-  private final byte[] buffer;
   private final IntList completeChunks = new IntList();
   private final IntList incompleteChunks = new IntList();
-  private int bufferStart;
-  private int bufferEnd;
-  private int pendingChunkSize = -1;
-  private int previousChunkSize;
   private long currentHash;
   private long bestHash;
-  private boolean eof;
 
   public RepMaxCDCChunker(DigestUtil digestUtil, InputStream in) {
+    super(digestUtil, in, (2 * MIN_SIZE + HORIZON_SIZE) * 2);
     this.minSize = MIN_SIZE;
     peekSize = 2 * MIN_SIZE + HORIZON_SIZE;
-    this.digestUtil = digestUtil;
-    this.in = in;
-    buffer = new byte[peekSize * 2];
-  }
-
-  @Override
-  public boolean hasNext() {
-    if (pendingChunkSize == -1) {
-      pendingChunkSize = nextChunkSize();
-    }
-    return pendingChunkSize != 0;
-  }
-
-  @Override
-  public Blob next() {
-    if (!hasNext()) {
-      throw new NoSuchElementException();
-    }
-    int chunkSize = pendingChunkSize;
-    pendingChunkSize = -1;
-    Blob blob = new Blob(ByteString.copyFrom(buffer, bufferStart, chunkSize), digestUtil);
-    previousChunkSize = chunkSize;
-    return blob;
-  }
-
-  private int peek(int size) {
-    int available = bufferEnd - bufferStart;
-    if (available < size && !eof) {
-      if (bufferStart > 0 && available > 0) {
-        System.arraycopy(buffer, bufferStart, buffer, 0, available);
-      }
-      bufferStart = 0;
-      bufferEnd = available;
-      while (bufferEnd < buffer.length) {
-        try {
-          int read = in.read(buffer, bufferEnd, buffer.length - bufferEnd);
-          if (read == -1) {
-            eof = true;
-            break;
-          }
-          if (read > 0) {
-            bufferEnd += read;
-          }
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }
-      available = bufferEnd - bufferStart;
-    }
-    return Math.min(size, available);
   }
 
   // This compatibility port intentionally keeps Buildbarn's state-machine structure.
   @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.ForLoopVariableCount"})
-  private int nextChunkSize() {
-    bufferStart += previousChunkSize;
-    previousChunkSize = 0;
-
+  @Override
+  protected int nextChunkSize() {
     if (!completeChunks.isEmpty()) {
       return completeChunks.popLast();
     }
