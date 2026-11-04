@@ -14,20 +14,16 @@
 
 package build.buildfarm.cas;
 
-import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import com.google.common.hash.HashCode;
-import com.google.protobuf.ByteString;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-public class FastCDCChunker implements Iterator<Blob> {
+public class FastCDCChunker extends BufferedChunker {
   private static final com.google.common.hash.HashFunction MD5 = HashFunction.MD5.getHash();
   private static final int SEED_LENGTH = 64;
   public static final Long[] GEAR = generateGear();
@@ -76,10 +72,6 @@ public class FastCDCChunker implements Iterator<Blob> {
   private final long maskStrictLS;
   private final long maskLooseLS;
 
-  private final DigestUtil digestUtil;
-  private final InputStream in;
-  private ByteString chunk = ByteString.EMPTY;
-
   private static HashCode hashByte(int i) {
     byte[] seed = new byte[SEED_LENGTH];
     Arrays.fill(seed, (byte) i);
@@ -110,8 +102,7 @@ public class FastCDCChunker implements Iterator<Blob> {
   }
 
   public FastCDCChunker(DigestUtil digestUtil, InputStream in, int averageSize, int normalization) {
-    this.digestUtil = digestUtil;
-    this.in = in;
+    super(digestUtil, in, averageSize * (1 << normalization) * 2);
     this.averageSize = averageSize;
 
     int bits = 31 - Integer.numberOfLeadingZeros(averageSize);
@@ -127,36 +118,8 @@ public class FastCDCChunker implements Iterator<Blob> {
   }
 
   @Override
-  public boolean hasNext() {
-    if (chunk.size() < maxSize) {
-      chunk = chunk.concat(nextChunk());
-    }
-    return !chunk.isEmpty();
-  }
-
-  @Override
-  public Blob next() {
-    int n = findChunkBoundary();
-    Blob blob = new Blob(chunk.substring(0, n), digestUtil);
-    chunk = chunk.substring(n);
-    return blob;
-  }
-
-  private ByteString nextChunk() {
-    byte[] buf = new byte[maxSize];
-    try {
-      int len = in.read(buf);
-      if (len == -1) {
-        return ByteString.EMPTY;
-      }
-      return ByteString.copyFrom(buf, 0, len);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private int findChunkBoundary() {
-    int size = chunk.size();
+  protected int nextChunkSize() {
+    int size = peek(maxSize);
     int avgLimit = Math.min(size, averageSize);
     int maxLimit = Math.min(size, maxSize);
     long hash = 0;
@@ -165,7 +128,7 @@ public class FastCDCChunker implements Iterator<Blob> {
       // position incremented during loop to make it 2 bytes
 
       // &-away signedness
-      int data = chunk.byteAt(position) & 0xff;
+      int data = buffer[bufferStart + position] & 0xff;
       hash = (hash << 2) + GEAR_LS[data];
 
       position++; // preincrement for check
@@ -174,7 +137,7 @@ public class FastCDCChunker implements Iterator<Blob> {
       }
 
       // &-away signedness
-      data = chunk.byteAt(position) & 0xff;
+      data = buffer[bufferStart + position] & 0xff;
       hash = hash + GEAR[data];
 
       if ((hash & maskStrict) == 0) {
@@ -187,7 +150,7 @@ public class FastCDCChunker implements Iterator<Blob> {
       // position incremented during loop to make it 2 bytes
 
       // &-away signedness
-      int data = chunk.byteAt(position) & 0xff;
+      int data = buffer[bufferStart + position] & 0xff;
       hash = (hash << 2) + GEAR_LS[data];
 
       position++; // preincrement for check
@@ -196,7 +159,7 @@ public class FastCDCChunker implements Iterator<Blob> {
       }
 
       // &-away signedness
-      data = chunk.byteAt(position) & 0xff;
+      data = buffer[bufferStart + position] & 0xff;
       hash = hash + GEAR[data];
 
       if ((hash & maskLoose) == 0) {
