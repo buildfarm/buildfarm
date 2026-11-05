@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 
 import build.buildfarm.common.Visitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.instance.shard.JedisClusterFactory;
+import build.buildfarm.shard.backplane.JedisClusterFactory;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import org.junit.After;

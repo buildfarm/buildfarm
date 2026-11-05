@@ -1,10 +1,10 @@
 load("@rules_java//java:java_test.bzl", "java_test")
 
 COMMON_DEPS = [
-    "//src/main/java/build/buildfarm/instance/shard",
     "//src/main/java/build/buildfarm/common",
     "//src/main/java/build/buildfarm/common/config",
     "//src/main/java/build/buildfarm/common/redis",
+    "//src/main/java/build/buildfarm/shard/backplane",
     "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
     "//src/test/java/build/buildfarm:test_runner",
     "@buildfarm_maven//:com_github_fppt_jedis_mock",

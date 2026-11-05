@@ -21,7 +21,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import build.buildfarm.common.Visitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.redis.BalancedRedisQueue.BalancedQueueEntry;
-import build.buildfarm.instance.shard.JedisClusterFactory;
+import build.buildfarm.shard.backplane.JedisClusterFactory;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;

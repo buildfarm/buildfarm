@@ -18,7 +18,7 @@ import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ToolDetails;
-import build.buildfarm.instance.shard.ServerInstance;
+import build.buildfarm.shard.instance.ServerInstance;
 import com.google.common.base.Strings;
 import com.google.common.cache.CacheBuilder;
 import java.io.IOException;

@@ -28,7 +28,6 @@ import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.shard.ServerInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.services.ActionCacheService;
 import build.buildfarm.server.services.CapabilitiesService;
@@ -38,6 +37,7 @@ import build.buildfarm.server.services.OperationQueueService;
 import build.buildfarm.server.services.OperationsService;
 import build.buildfarm.server.services.PublishBuildEventService;
 import build.buildfarm.server.services.WorkerProfileService;
+import build.buildfarm.shard.instance.ServerInstance;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
