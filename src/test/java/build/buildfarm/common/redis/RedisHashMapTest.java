@@ -17,7 +17,7 @@ package build.buildfarm.common.redis;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.instance.shard.JedisClusterFactory;
+import build.buildfarm.shard.backplane.JedisClusterFactory;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;

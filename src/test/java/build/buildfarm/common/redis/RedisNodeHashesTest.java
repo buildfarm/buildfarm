@@ -16,7 +16,7 @@ package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.buildfarm.instance.shard.JedisClusterFactory;
+import build.buildfarm.shard.backplane.JedisClusterFactory;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;

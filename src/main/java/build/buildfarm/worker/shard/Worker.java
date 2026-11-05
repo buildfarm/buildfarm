@@ -60,12 +60,12 @@ import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.shard.RedisShardBackplane;
-import build.buildfarm.instance.shard.RemoteInputStreamFactory;
-import build.buildfarm.instance.shard.WorkerStubs;
-import build.buildfarm.instance.shard.codec.ShardCodec;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
+import build.buildfarm.shard.RemoteInputStreamFactory;
+import build.buildfarm.shard.WorkerStubs;
+import build.buildfarm.shard.backplane.RedisShardBackplane;
+import build.buildfarm.shard.codec.ShardCodec;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.PipelineChange;
 import build.buildfarm.v1test.QueuedOperationMetadata;
