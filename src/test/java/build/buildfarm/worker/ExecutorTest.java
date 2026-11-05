@@ -33,7 +33,6 @@ public class ExecutorTest {
     ExecutionWrapper wrapper = new ExecutionWrapper();
     wrapper.setPath("/bin/wrapper");
     wrapper.setArguments(new String[] {"--cgroup", "<cgroup>"});
-
     Map<String, Executor.Interpolator> interpolations =
         Executor.createInterpolations(
             /* claim= */ null,

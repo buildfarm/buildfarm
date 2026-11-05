@@ -158,4 +158,45 @@ public class RedisNodeHashesMockTest {
     verify(pool, times(1)).returnResource(connection);
     verifyNoMoreInteractions(pool);
   }
+
+  // Function under test: getEvenlyDistributedHashesWithPrefix
+  // Reason for testing: failed Redis primaries are reported as shards with no assigned slots
+  // Failure explanation: attempting to generate a hashtag for the empty slot range crashes startup
+  @Test
+  public void getEvenlyDistributedHashesWithPrefixSkipsShardsWithoutSlots() throws Exception {
+    // ARRANGE
+    Connection connection = spy(Connection.class);
+    doNothing().when(connection).connect();
+    doNothing().when(connection).sendCommand(CLUSTER, SHARDS);
+    doReturn(
+            Arrays.asList(
+                Arrays.asList(
+                    SafeEncoder.encode(ClusterShardInfo.SLOTS), Arrays.asList(0L, 100L),
+                    SafeEncoder.encode(ClusterShardInfo.NODES), Arrays.asList()),
+                Arrays.asList(
+                    SafeEncoder.encode(ClusterShardInfo.SLOTS), Arrays.asList(),
+                    SafeEncoder.encode(ClusterShardInfo.NODES), Arrays.asList()),
+                Arrays.asList(
+                    SafeEncoder.encode(ClusterShardInfo.SLOTS), Arrays.asList(101L, 200L),
+                    SafeEncoder.encode(ClusterShardInfo.NODES), Arrays.asList())))
+        .when(connection)
+        .getObjectMultiBulkReply();
+    doReturn(false).when(connection).isBroken();
+
+    ConnectionPool pool = mock(ConnectionPool.class);
+    when(pool.getResource()).thenReturn(connection);
+    connection.setHandlingPool(pool);
+
+    JedisCluster redis = mock(JedisCluster.class);
+    Map<String, ConnectionPool> poolMap = new HashMap<>();
+    poolMap.put("key1", pool);
+    when(redis.getClusterNodes()).thenReturn(poolMap);
+
+    // ACT
+    List<String> hashtags =
+        RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(redis, "Execution");
+
+    // ASSERT
+    assertThat(hashtags).containsExactly("Execution:97", "Execution:66").inOrder();
+  }
 }
