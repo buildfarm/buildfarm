@@ -143,7 +143,7 @@ public class StubInstanceTest {
   }
 
   @Test
-  public void putActionResultCallsUpdateActionResult() throws InterruptedException {
+  public void putActionResultCallsUpdateActionResult() throws IOException, InterruptedException {
     AtomicReference<UpdateActionResultRequest> reference = new AtomicReference<>();
     serviceRegistry.addService(
         new ActionCacheImplBase() {
@@ -160,7 +160,7 @@ public class StubInstanceTest {
     ActionKey actionKey =
         DigestUtil.asActionKey(Digest.newBuilder().setHash("action-digest").setSize(1).build());
     ActionResult actionResult = ActionResult.getDefaultInstance();
-    instance.putActionResult(actionKey, actionResult);
+    instance.putActionResult(actionKey, actionResult, RequestMetadata.getDefaultInstance());
     UpdateActionResultRequest request = reference.get();
     assertThat(request.getInstanceName()).isEqualTo(instanceName);
     assertThat(DigestUtil.fromDigest(request.getActionDigest(), request.getDigestFunction()))

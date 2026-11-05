@@ -30,10 +30,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.jspecify.annotations.Nullable;
 
 public interface ExecFileSystem extends InputStreamFactory {
-  ListenableFuture<Void> start(Consumer<List<Digest>> onDigests, boolean skipLoad, boolean writable)
+  ListenableFuture<Void> start(
+      Consumer<List<Digest>> onDigests,
+      Predicate<String> isValidRootEntry,
+      boolean skipLoad,
+      boolean writable)
       throws IOException, InterruptedException;
 
   void stop() throws IOException, InterruptedException;

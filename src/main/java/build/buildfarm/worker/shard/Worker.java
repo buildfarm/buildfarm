@@ -17,22 +17,28 @@ package build.buildfarm.worker.shard;
 import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
 import static build.buildfarm.common.Claim.Stage.REPORT_RESULT_STAGE;
 import static build.buildfarm.common.config.Backplane.BACKPLANE_TYPE.SHARD;
+import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.common.io.Utils.formatIOError;
 import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.ActionCacheGrpc;
+import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheFutureStub;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.ac.ActionCache;
+import build.buildfarm.ac.ActionCache.NullActionCache;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -48,8 +54,10 @@ import build.buildfarm.common.EmptyInputStreamFactory;
 import build.buildfarm.common.FailoverInputStreamFactory;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.Time;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.common.ZstdDecompressingOutputStream.ZstdFixedBufferPool;
+import build.buildfarm.common.config.AC;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.config.GrpcMetrics;
@@ -59,13 +67,18 @@ import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
+import build.buildfarm.fs.ac.FileSystemActionCache;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
+import build.buildfarm.server.services.ActionCacheService;
+import build.buildfarm.server.services.CapabilitiesService;
 import build.buildfarm.shard.RemoteInputStreamFactory;
 import build.buildfarm.shard.WorkerStubs;
+import build.buildfarm.shard.ac.ShardActionCache;
 import build.buildfarm.shard.backplane.RedisShardBackplane;
 import build.buildfarm.shard.codec.ShardCodec;
+import build.buildfarm.stub.ac.StubActionCache;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.PipelineChange;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -100,13 +113,16 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
+import io.grpc.Channel;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -115,6 +131,7 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionServiceV1;
 import io.grpc.services.ChannelzService;
+import io.grpc.stub.AbstractStub;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.Span;
@@ -155,6 +172,7 @@ import org.jspecify.annotations.Nullable;
 public final class Worker extends LoggingMain {
   /* all docs on using this from io.opentelemetry.semconv result in failure */
   private static final AttributeKey SERVICE_NAME = AttributeKey.stringKey("service.name");
+  private static final String ACTION_CACHE_FILE_NAME = "ac.txt";
 
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
@@ -209,6 +227,7 @@ public final class Worker extends LoggingMain {
   private Server server;
   private Path root;
   private ExecFileSystem execFileSystem;
+  private ActionCache actionCache;
   private Pipeline pipeline;
   private PipelineStage matchStage;
   private ShardWorkerContext context;
@@ -290,11 +309,14 @@ public final class Worker extends LoggingMain {
       ServerBuilder<?> serverBuilder,
       Instance instance,
       WorkerProfileService workerProfileService) {
-    serverBuilder.addService(healthStatusManager.getHealthService());
-    serverBuilder.addService(new ContentAddressableStorageService(instance));
-    serverBuilder.addService(new ByteStreamService(instance));
-    serverBuilder.addService(new WorkerControl(this));
-    serverBuilder.addService(ProtoReflectionServiceV1.newInstance());
+    serverBuilder
+        .addService(healthStatusManager.getHealthService())
+        .addService(new CapabilitiesService(instance))
+        .addService(new ContentAddressableStorageService(instance))
+        .addService(new ActionCacheService(instance, /* isWritable= */ true))
+        .addService(new ByteStreamService(instance))
+        .addService(new WorkerControl(this))
+        .addService(ProtoReflectionServiceV1.newInstance());
     if (configs.getWorker().isGrpcChannelz()) {
       serverBuilder.addService(ChannelzService.newInstance(/* maxPageSize= */ 100));
     }
@@ -438,6 +460,91 @@ public final class Worker extends LoggingMain {
         throw e;
       }
     };
+  }
+
+  private static final class DeadlineStubSupplier<T extends AbstractStub<T>>
+      implements Supplier<T> {
+    private final Supplier<T> delegate;
+    private final Duration timeout;
+
+    DeadlineStubSupplier(Duration timeout, Supplier<T> delegate) {
+      this.timeout = timeout;
+      this.delegate = delegate;
+    }
+
+    @Override
+    public T get() {
+      T stub = delegate.get();
+      if (Durations.isPositive(timeout)) {
+        stub = stub.withDeadline(Time.toDeadline(timeout));
+      }
+      return stub;
+    }
+  }
+
+  private ActionCache createGrpcActionCache(AC ac) {
+    Channel channel = createChannel(ac.getTarget());
+    Duration timeout = Durations.fromSeconds(ac.getTimeout());
+    Supplier<ActionCacheFutureStub> stubSupplier = () -> ActionCacheGrpc.newFutureStub(channel);
+    return new StubActionCache(
+        new DeadlineStubSupplier<>(timeout, stubSupplier), ac.getInstanceName(), ac.isReadOnly());
+  }
+
+  private ActionCache createFileSystemActionCache(
+      AC ac,
+      ContentAddressableStorage storage,
+      Path root,
+      DigestUtil digestUtil,
+      ActionCache delegate,
+      Executor executor)
+      throws IOException {
+    return new FileSystemActionCache(
+        ac.getMaxEntries(),
+        root.resolve(ACTION_CACHE_FILE_NAME),
+        storage,
+        digestUtil,
+        ac.getSaveIntervalSecs(),
+        delegate,
+        executor);
+  }
+
+  private ActionCache createActionCache(
+      ContentAddressableStorage storage,
+      Backplane backplane,
+      DigestUtil digestUtil,
+      AC ac,
+      ActionCache delegate,
+      ListeningExecutorService service)
+      throws ConfigurationException, IOException {
+    switch (ac.getType()) {
+      default:
+        throw new IllegalArgumentException("Invalid ac type specified");
+      case BACKPLANE:
+        // is the "local cache" really just another AC configuration, with memory/caffiene, with a
+        // delegate to XXX?
+        return new ShardActionCache(ac.getMaxLocalCacheSize(), backplane, service);
+      case GRPC:
+        // this isn't quite true, we can definitely apply some delegation semantics
+        checkState(delegate == null, "grpc ac cannot delegate");
+        return createGrpcActionCache(ac);
+      case FILESYSTEM:
+        return createFileSystemActionCache(ac, storage, root, digestUtil, delegate, service);
+    }
+  }
+
+  private ActionCache createActionCaches(
+      ContentAddressableStorage storage,
+      DigestUtil digestUtil,
+      ListeningExecutorService service,
+      List<AC> acs)
+      throws ConfigurationException, IOException {
+    ActionCache actionCache = null;
+    ActionCache delegate = new NullActionCache();
+    for (AC ac : Lists.reverse(acs)) {
+      actionCache = createActionCache(storage, backplane, digestUtil, ac, delegate, service);
+      delegate = actionCache;
+    }
+    return actionCache;
   }
 
   private CASFileCache createStorages(
@@ -1024,8 +1131,16 @@ public final class Worker extends LoggingMain {
             configs.getWorker().getExecOwner(),
             execOwners,
             workerEventObserver);
+    DigestUtil acDigestUtil = new DigestUtil(HashFunction.BLAKE3);
+    actionCache =
+        createActionCaches(
+            storage,
+            acDigestUtil,
+            listeningDecorator(removeDirectoryService),
+            configs.getWorker().getAcs());
 
-    instance = new WorkerInstance(configs.getWorker().getPublicName(), backplane, storage);
+    instance =
+        new WorkerInstance(configs.getWorker().getPublicName(), backplane, storage, actionCache);
 
     // Create the appropriate writer for the context
     CasWriter writer;
@@ -1120,6 +1235,7 @@ public final class Worker extends LoggingMain {
     ListenableFuture<Void> fileSystemStarted =
         execFileSystem.start(
             (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()),
+            name -> name.equals(ACTION_CACHE_FILE_NAME),
             skipLoad,
             startWritable);
 
@@ -1252,6 +1368,9 @@ public final class Worker extends LoggingMain {
     healthCheckMetric.labels("stop").inc();
     executionSlotsTotal.set(0);
     inputFetchSlotsTotal.set(0);
+    if (actionCache != null) {
+      actionCache.stop();
+    }
     if (execFileSystem != null) {
       log.info("Stopping exec filesystem");
       try {

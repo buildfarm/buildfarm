@@ -50,7 +50,7 @@ public class ShardActionCacheTest {
   @Test
   public void getShouldLoadFromBackplaneAndCacheResultWhenCacheMisses() throws Exception {
     when(backplane.getActionResult(KEY_A)).thenReturn(RESULT_A);
-    ShardActionCache cache = newCache(/* maxEntries= */ 10L);
+    ShardActionCache cache = newCache(/* maxEntries= */ 10);
 
     // First get reaches the backplane and caches; second get for the same key uses the cache.
     assertThat(cache.get(KEY_A).get()).isEqualTo(RESULT_A);
@@ -62,7 +62,7 @@ public class ShardActionCacheTest {
   @Test
   public void invalidateShouldRemoveEntryAndForceReloadFromBackplane() throws Exception {
     when(backplane.getActionResult(KEY_A)).thenReturn(RESULT_A);
-    ShardActionCache cache = newCache(/* maxEntries= */ 10L);
+    ShardActionCache cache = newCache(/* maxEntries= */ 10);
 
     // First get reaches backplane, then invalidate, then get again reaches backplane again.
     cache.get(KEY_A).get();
@@ -74,7 +74,7 @@ public class ShardActionCacheTest {
 
   @Test
   public void readThroughShouldWriteLocalCacheOnlyAndNeverCallBackplane() throws Exception {
-    ShardActionCache cache = newCache(/* maxEntries= */ 10L);
+    ShardActionCache cache = newCache(/* maxEntries= */ 10);
 
     // Puts the key in the cache and doesn't contact the backplane.
     cache.readThrough(KEY_A, RESULT_A);
@@ -88,7 +88,7 @@ public class ShardActionCacheTest {
   public void readThroughShouldEvictOldEntriesAndReloadFromBackplaneWhenCapExceeded()
       throws Exception {
     when(backplane.getActionResult(KEY_A)).thenReturn(RESULT_A);
-    ShardActionCache cache = newCache(/* maxEntries= */ 10L);
+    ShardActionCache cache = newCache(/* maxEntries= */ 10);
 
     cache.readThrough(KEY_A, RESULT_A);
     for (int i = 0; i < 100; i++) {
@@ -101,7 +101,7 @@ public class ShardActionCacheTest {
     verify(backplane, times(1)).getActionResult(KEY_A);
   }
 
-  private ShardActionCache newCache(long maxEntries) {
+  private ShardActionCache newCache(int maxEntries) {
     return new ShardActionCache(maxEntries, backplane, newDirectExecutorService());
   }
 

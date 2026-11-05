@@ -152,7 +152,7 @@ public class ServerInstanceTest {
   public void setUp() throws IOException, InterruptedException {
     MockitoAnnotations.initMocks(this);
     blobDigests = Maps.newHashMap();
-    ActionCache actionCache = new ShardActionCache(10L, mockBackplane, newDirectExecutorService());
+    ActionCache actionCache = new ShardActionCache(10, mockBackplane, newDirectExecutorService());
     instance =
         new ServerInstance(
             "shard",
@@ -169,6 +169,7 @@ public class ServerInstanceTest {
             /* mergeExecutions= */ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
+            /* rand= */ new Random(),
             /* actionCacheFetchService= */ listeningDecorator(newSingleThreadExecutor()),
             false);
     instance.start("startTime/test:0000");

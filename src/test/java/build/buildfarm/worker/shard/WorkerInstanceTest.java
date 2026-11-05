@@ -23,20 +23,20 @@ import static org.mockito.Mockito.when;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.ac.ActionCache;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.Tree;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Futures;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.net.SocketException;
-import java.util.concurrent.ExecutionException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,12 +52,14 @@ public class WorkerInstanceTest {
 
   @Mock private ContentAddressableStorage storage;
 
+  @Mock private ActionCache actionCache;
+
   private WorkerInstance instance;
 
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    instance = new WorkerInstance("test", backplane, storage);
+    instance = new WorkerInstance("test", backplane, storage, actionCache);
   }
 
   @Test(expected = StatusRuntimeException.class)
@@ -66,24 +68,24 @@ public class WorkerInstanceTest {
     instance.getOperation("op");
   }
 
-  @Test(expected = UnsupportedOperationException.class)
-  public void getActionResultIsUnsupported() throws InterruptedException {
-    try {
-      instance.getActionResult(null, null).get();
-    } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
-      Throwables.propagateIfInstanceOf(cause, RuntimeException.class);
-      throw new RuntimeException(cause);
-    }
-  }
-
   @Test
-  public void putActionResultDelegatesToBackplane() throws IOException {
+  public void getActionResultDelegatesToActionCache() throws InterruptedException {
     DigestUtil.ActionKey key =
         DigestUtil.asActionKey(DIGEST_UTIL.compute(ByteString.copyFromUtf8("Hello, World")));
     ActionResult result = ActionResult.getDefaultInstance();
-    instance.putActionResult(key, result);
-    verify(backplane, times(1)).putActionResult(key, result);
+    when(actionCache.get(key)).thenReturn(Futures.immediateFuture(result));
+    instance.getActionResult(key, RequestMetadata.getDefaultInstance());
+    verify(actionCache, times(1)).get(key);
+  }
+
+  @Test
+  public void putActionResultDelegatesToActionCache() throws Exception {
+    DigestUtil.ActionKey key =
+        DigestUtil.asActionKey(DIGEST_UTIL.compute(ByteString.copyFromUtf8("Hello, World")));
+    ActionResult result = ActionResult.getDefaultInstance();
+    when(actionCache.put(key, result)).thenReturn(Futures.immediateFuture(result));
+    instance.putActionResult(key, result, RequestMetadata.getDefaultInstance());
+    verify(actionCache, times(1)).put(key, result);
   }
 
   @Test(expected = UnsupportedOperationException.class)

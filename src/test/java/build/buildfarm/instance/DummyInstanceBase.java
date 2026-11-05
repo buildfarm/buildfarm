@@ -71,7 +71,8 @@ class DummyInstanceBase extends InstanceBase {
   }
 
   @Override
-  public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+  public void putActionResult(
+      ActionKey actionKey, ActionResult actionResult, RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 

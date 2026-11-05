@@ -409,10 +409,12 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
-  public void putActionResult(ActionKey actionKey, ActionResult actionResult)
-      throws InterruptedException {
+  public void putActionResult(
+      ActionKey actionKey, ActionResult actionResult, RequestMetadata requestMetadata)
+      throws IOException, InterruptedException {
     if (actionResult.getExitCode() == 0) {
-      actionCache.put(actionKey, actionResult);
+      ListenableFuture<ActionResult> result = actionCache.put(actionKey, actionResult);
+      Preconditions.checkState(result.isDone(), "Put Action Result Not Complete");
     }
   }
 

@@ -59,6 +59,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 import org.jspecify.annotations.Nullable;
@@ -105,7 +106,10 @@ public class CFCExecFileSystem implements ExecFileSystem {
   @SuppressWarnings("ConstantConditions")
   @Override
   public ListenableFuture<Void> start(
-      Consumer<List<Digest>> onDigests, boolean skipLoad, boolean writable)
+      Consumer<List<Digest>> onDigests,
+      Predicate<String> isValidRootEntry,
+      boolean skipLoad,
+      boolean writable)
       throws IOException, InterruptedException {
     fileStore = Files.getFileStore(root);
     List<Dirent> dirents = null;
@@ -120,6 +124,10 @@ public class CFCExecFileSystem implements ExecFileSystem {
     // only valid path under root is cache
     for (Dirent dirent : dirents) {
       String name = dirent.getName();
+      if (!isValidRootEntry.test(name)) {
+        removeDirectoryFutures.add(
+            Directories.remove(root.resolve(name), fileStore, removeDirectoryService));
+      }
       Path child = root.resolve(name);
       if (!child.equals(fileCache.getRoot())) {
         removeDirectoryFutures.add(

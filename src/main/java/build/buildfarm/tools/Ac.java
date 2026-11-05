@@ -17,6 +17,7 @@ package build.buildfarm.tools;
 import static build.buildfarm.common.grpc.Channels.createChannel;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
@@ -55,7 +56,7 @@ class Ac implements Callable<Integer> {
       DigestUtil.ActionKey key =
           DigestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("Hello, World")));
       ActionResult.Builder result = ActionResult.newBuilder();
-      instance.putActionResult(key, result.build());
+      instance.putActionResult(key, result.build(), RequestMetadata.getDefaultInstance());
     } finally {
       instance.stop();
     }

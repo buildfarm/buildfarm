@@ -15,6 +15,7 @@
 package build.buildfarm.shard.ac;
 
 import static com.google.common.util.concurrent.Futures.catching;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
@@ -38,7 +39,7 @@ public class ShardActionCache implements ActionCache {
   private final AsyncLoadingCache<ActionKey, ActionResult> actionResultCache;
 
   public ShardActionCache(
-      long maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
+      int maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
     this.backplane = backplane;
 
     AsyncCacheLoader<ActionKey, ActionResult> loader =
@@ -66,7 +67,7 @@ public class ShardActionCache implements ActionCache {
   }
 
   @Override
-  public void put(ActionKey actionKey, ActionResult actionResult) {
+  public ListenableFuture<ActionResult> put(ActionKey actionKey, ActionResult actionResult) {
     try {
       backplane.putActionResult(actionKey, actionResult);
     } catch (IOException e) {
@@ -74,6 +75,7 @@ public class ShardActionCache implements ActionCache {
       throw Status.fromThrowable(e).asRuntimeException();
     }
     readThrough(actionKey, actionResult);
+    return immediateFuture(actionResult);
   }
 
   @Override
