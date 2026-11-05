@@ -35,6 +35,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
@@ -216,7 +217,6 @@ public class S3Bucket {
    * @param secretName The name where the secrets are stored.
    * @return AWS secrets for interacting with the bucket.
    */
-  @SuppressWarnings("PMD.StringInstantiation")
   private static AwsSecret getAwsSecret(String region, String secretName) {
     // create secret manager for fetching secrets
     AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard().withRegion(region).build();
@@ -228,7 +228,7 @@ public class S3Bucket {
     try {
       getSecretValueResult = client.getSecretValue(getSecretValueRequest);
     } catch (Exception e) {
-      log.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName));
+      log.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName), e);
     }
 
     // decode secret
@@ -237,7 +237,9 @@ public class S3Bucket {
       secret = getSecretValueResult.getSecretString();
     } else {
       secret =
-          new String(Base64.getDecoder().decode(getSecretValueResult.getSecretBinary()).array());
+          StandardCharsets.US_ASCII
+              .decode(Base64.getDecoder().decode(getSecretValueResult.getSecretBinary()))
+              .toString();
     }
 
     // extract access keys
