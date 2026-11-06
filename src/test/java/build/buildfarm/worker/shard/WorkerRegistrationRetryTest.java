@@ -59,14 +59,6 @@ public class WorkerRegistrationRetryTest {
   }
 
   @Test
-  public void registrationRetryBackoffAddsTwentyPercentJitter() {
-    assertThat(Worker.registrationRetryBackoffWithJitterMillis(1000, -1.0)).isEqualTo(800);
-    assertThat(Worker.registrationRetryBackoffWithJitterMillis(1000, 0.0)).isEqualTo(1000);
-    assertThat(Worker.registrationRetryBackoffWithJitterMillis(1000, 1.0)).isEqualTo(1200);
-    assertThat(Worker.registrationRetryBackoffWithJitterMillis(30000, 1.0)).isEqualTo(30000);
-  }
-
-  @Test
   public void addWorkerRetriesWithFreshRegistrationUntilBackplaneAcceptsWorker()
       throws IOException, InterruptedException {
     Backplane backplane = mock(Backplane.class);

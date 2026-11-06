@@ -145,7 +145,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
@@ -202,9 +201,16 @@ public final class Worker extends LoggingMain {
       Counter.build().name("completed_operations").help("Completed operations.").register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
-  private static final long registrationRetryInitialBackoffMillis = 1000;
-  private static final long registrationRetryMaxBackoffMillis = 30000;
-  private static final double registrationRetryJitter = 0.2;
+  // Registration retries until shutdown, so attempts are unbounded.
+  private static Backoff newRegistrationBackoff() {
+    return Backoff.exponential(
+            /* initial= */ java.time.Duration.ofSeconds(1),
+            /* max= */ java.time.Duration.ofSeconds(30),
+            /* multiplier= */ 2.0,
+            /* jitter= */ 0.2,
+            Integer.MAX_VALUE)
+        .get();
+  }
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
@@ -647,22 +653,6 @@ public final class Worker extends LoggingMain {
     return false;
   }
 
-  private static long nextRegistrationRetryBackoffMillis(long currentBackoffMillis) {
-    return Math.min(currentBackoffMillis * 2, registrationRetryMaxBackoffMillis);
-  }
-
-  static long registrationRetryBackoffWithJitterMillis(long backoffMillis, double jitterRatio) {
-    checkArgument(jitterRatio >= -1.0 && jitterRatio <= 1.0, "jitterRatio must be in [-1, 1]");
-    return Math.min(
-        Math.round(backoffMillis * (1 + registrationRetryJitter * jitterRatio)),
-        registrationRetryMaxBackoffMillis);
-  }
-
-  private static long registrationRetryBackoffWithJitterMillis(long backoffMillis) {
-    return registrationRetryBackoffWithJitterMillis(
-        backoffMillis, ThreadLocalRandom.current().nextDouble(-1.0, 1.0));
-  }
-
   private boolean isShuttingDown() {
     Server currentServer = server;
     ShardWorkerContext currentContext = context;
@@ -690,7 +680,7 @@ public final class Worker extends LoggingMain {
       BooleanSupplier isShuttingDown,
       InterruptingConsumer<Long> sleepBeforeRetryingRegistration)
       throws InterruptedException {
-    long retryBackoffMillis = registrationRetryInitialBackoffMillis;
+    Backoff backoff = newRegistrationBackoff();
     while (!isShuttingDown.getAsBoolean()) {
       try {
         Backplane currentBackplane = backplane.get();
@@ -717,9 +707,7 @@ public final class Worker extends LoggingMain {
         log.log(Level.WARNING, "error registering worker; retrying", e);
       }
       if (!isShuttingDown.getAsBoolean()) {
-        sleepBeforeRetryingRegistration.acceptInterruptibly(
-            registrationRetryBackoffWithJitterMillis(retryBackoffMillis));
-        retryBackoffMillis = nextRegistrationRetryBackoffMillis(retryBackoffMillis);
+        sleepBeforeRetryingRegistration.acceptInterruptibly(backoff.nextDelayMillis());
       }
     }
   }
