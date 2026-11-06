@@ -186,6 +186,10 @@ public class DigestUtil {
     return hashFn.getDigestFunction();
   }
 
+  public Hasher newHasher() {
+    return hashFn.getHash().newHasher();
+  }
+
   public Digest compute(Path file) throws IOException {
     return buildDigest(computeHash(file), Files.size(file), getDigestFunction());
   }

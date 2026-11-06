@@ -232,6 +232,7 @@ public final class Worker extends LoggingMain {
   private AtomicBoolean shutdownInitiated = new AtomicBoolean(false);
   private boolean startWritable = true;
   private SdkTracerProvider oTelSdkTracerProvider;
+  private final PrometheusPublisher prometheusPublisher = new PrometheusPublisher();
 
   /**
    * The method will prepare the worker for graceful shutdown when the worker is ready. Note on
@@ -1127,6 +1128,7 @@ public final class Worker extends LoggingMain {
             executeStageWidth,
             reportResultStageWidth,
             configs.getWorker().getInputFetchDeadline(),
+            configs.getWorker().getReportResultDeadline(),
             backplane,
             execFileSystem,
             new EmptyInputStreamFactory(
@@ -1207,7 +1209,7 @@ public final class Worker extends LoggingMain {
             log.log(INFO, String.format("%s initialized", identifier));
             healthStatusManager.setStatus(
                 HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-            PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
+            prometheusPublisher.startHttpServer(configs.getPrometheusPort());
           }
 
           @Override
@@ -1311,7 +1313,7 @@ public final class Worker extends LoggingMain {
     prepareWorkerForGracefulShutdown();
     // Clean-up any cgroups that were possibly created/mutated.
     Group.onShutdown();
-    PrometheusPublisher.stopHttpServer();
+    prometheusPublisher.stopHttpServer();
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
       log.log(INFO, "Closing the pipeline");

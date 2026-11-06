@@ -18,6 +18,6 @@ java_library(
         "@buildfarm_maven//:org_jspecify_jspecify",
         "@buildfarm_maven//:org_projectlombok_lombok",
         "@buildfarm_maven//:redis_clients_jedis",
-        "@com_google_protobuf//java/core",
+        "@protobuf//java/core",
     ],
 )

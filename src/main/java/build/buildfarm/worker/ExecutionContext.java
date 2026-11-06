@@ -23,8 +23,10 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
+import com.google.common.collect.ImmutableMap;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
+import java.util.Map;
 
 public final class ExecutionContext {
   final ExecuteResponse.Builder executeResponse;
@@ -39,6 +41,7 @@ public final class ExecutionContext {
   public final Claim claim;
   final WorkerExecutedMetadata.Builder workerExecutedMetadata;
   final boolean marketExecution;
+  final Map<String, String> executionPolicyInterpolations;
 
   private ExecutionContext(
       ExecuteResponse.Builder executeResponse,
@@ -52,7 +55,8 @@ public final class ExecutionContext {
       QueueEntry queueEntry,
       Claim claim,
       WorkerExecutedMetadata.Builder workerExecutedMetadata,
-      boolean marketExecution) {
+      boolean marketExecution,
+      Map<String, String> executionPolicyInterpolations) {
     this.executeResponse = executeResponse;
     this.operation = operation;
     this.metadata = metadata;
@@ -65,6 +69,7 @@ public final class ExecutionContext {
     this.claim = claim;
     this.workerExecutedMetadata = workerExecutedMetadata;
     this.marketExecution = marketExecution;
+    this.executionPolicyInterpolations = executionPolicyInterpolations;
   }
 
   public static final class Builder {
@@ -80,6 +85,7 @@ public final class ExecutionContext {
     private Claim claim;
     private WorkerExecutedMetadata.Builder workerExecutedMetadata;
     private boolean marketExecution;
+    private Map<String, String> executionPolicyInterpolations;
 
     private Builder(
         ExecuteResponse.Builder executeResponse,
@@ -93,7 +99,8 @@ public final class ExecutionContext {
         QueueEntry queueEntry,
         Claim claim,
         WorkerExecutedMetadata.Builder workerExecutedMetadata,
-        boolean marketExecution) {
+        boolean marketExecution,
+        Map<String, String> executionPolicyInterpolations) {
       this.executeResponse = executeResponse;
       this.operation = operation;
       this.metadata = metadata;
@@ -106,6 +113,7 @@ public final class ExecutionContext {
       this.claim = claim;
       this.workerExecutedMetadata = workerExecutedMetadata;
       this.marketExecution = marketExecution;
+      this.executionPolicyInterpolations = executionPolicyInterpolations;
     }
 
     public Builder setOperation(Operation operation) {
@@ -158,6 +166,12 @@ public final class ExecutionContext {
       return this;
     }
 
+    public Builder setExecutionPolicyInterpolations(
+        Map<String, String> executionPolicyInterpolations) {
+      this.executionPolicyInterpolations = ImmutableMap.copyOf(executionPolicyInterpolations);
+      return this;
+    }
+
     public ExecutionContext build() {
       return new ExecutionContext(
           executeResponse,
@@ -171,7 +185,8 @@ public final class ExecutionContext {
           queueEntry,
           claim,
           workerExecutedMetadata,
-          marketExecution);
+          marketExecution,
+          executionPolicyInterpolations);
     }
   }
 
@@ -188,7 +203,8 @@ public final class ExecutionContext {
         /* queueEntry= */ null,
         /* claim= */ null,
         /* workerExecutedMetadata= */ WorkerExecutedMetadata.newBuilder(),
-        /* marketExecution= */ false);
+        /* marketExecution= */ false,
+        /* executionPolicyInterpolations= */ ImmutableMap.of());
   }
 
   public Builder toBuilder() {
@@ -204,6 +220,7 @@ public final class ExecutionContext {
         queueEntry,
         claim,
         workerExecutedMetadata,
-        marketExecution);
+        marketExecution,
+        executionPolicyInterpolations);
   }
 }

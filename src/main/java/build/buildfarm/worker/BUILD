@@ -6,8 +6,6 @@ java_library(
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
-        "//persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers",
-        "//persistentworkers/src/main/java/persistent/common:persistent-common",
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
@@ -16,6 +14,8 @@ java_library(
         "//src/main/java/build/buildfarm/worker/persistent",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/java/build/buildfarm/worker/util",
+        "//src/main/java/persistent/bazel:bazel-persistent-workers",
+        "//src/main/java/persistent/common:persistent-common",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@bazel//src/main/protobuf:execution_statistics_java_proto",
         "@buildfarm_maven//:com_github_docker_java_docker_java",

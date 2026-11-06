@@ -5,123 +5,83 @@ parent: Architecture
 nav_order: 3
 ---
 
-Since workers are expected to execute programs in a way that makes using remote transparent to build users, there is a great deal of nuance to their definition. Operating System, Distribution, runtimes, compilers, their versions, and standard libraries make this a tricky proposition. While hermeticizing a build by declaring the full set of tools a compilation requires is the 'right' solution for a build, it may be too big of a hill to climb for everyone, particularly those trying to ease into remote execution.
+A Buildfarm worker executes actions on behalf of remote-execution clients. Its operating system, libraries, compiler toolchains, runtimes, and execution wrappers therefore form part of the execution environment exposed to those clients. For fully hermetic builds, declare every required toolchain and runtime in the client build. In practice, a worker image is also useful as a compatible, supported baseline while teams adopt hermetic toolchains.
 
-Under Linux at least, this is made somewhat easier through docker, even if the steps to get to a conformant environment are a bit complicated. Here we will provide an example of creating a target execution environment container capable of running buildfarm, and this should be similar for all major distributions, particularly those with released docker hub bases and standard package managers including java runtimes and toolchain software. You should choose the versions of relevant software at first based on the client environment you want to support.
+Buildfarm's maintained worker base is [`index.docker.io/bazelbuild/buildfarm-worker-base:noble`](https://hub.docker.com/r/bazelbuild/buildfarm-worker-base). It is hosted on Docker Hub, based on **Ubuntu 24.04 (Noble Numbat)**, and includes OpenJDK 21, `build-essential`, `libfuse2`, and `cgroup-tools`. The Buildfarm release image uses this same base. It is published for both `linux/amd64` and `linux/arm64`.
 
-For this example, we're going to assume a target of ubuntu-20 (focal), with a gcc9 compiler supporting C++, and a java runtime from openjdk-14 supplied by its package manager. We will need:
+This page shows how to compose a worker image with Bzlmod and [`rules_oci`](https://github.com/bazel-contrib/rules_oci). It does not require a local registry or the Docker daemon while building the image.
 
-- a bazel 3.3.1 install (the older version is required by rules_docker at the buildfarm version, this will be updated eventually).
-- docker daemon running
+## Build a worker image
 
-First we will pull our intended base image from dockerhub:
+Start with a Buildfarm checkout (or fork) at the revision you intend to deploy. Buildfarm's root [`MODULE.bazel`](https://github.com/buildfarm/buildfarm/blob/main/MODULE.bazel) is a Bzlmod module: it declares `rules_oci`, pulls the pinned Noble worker base through the `oci` module extension, and exposes it as `@ubuntu_noble`. It also makes architecture-specific image repositories available for multi-platform image definitions.
 
-`docker pull ubuntu:focal`
-
-Next we will create our Dockerfile for our customized environment. Here is the content of that Dockerfile
-
-```
-# choose our ubuntu distribution with version 20 (focal)
-from ubuntu:focal
-
-# get our current software suite. apt-get is preferred to apt due to warnings
-# about a non-stable CLI
-run apt-get update
-
-# install the basic apt-utils to limit warnings due to its absence
-run DEBIAN_FRONTEND=noninteractive apt-get install --no-install-suggests apt-utils
-
-# upgrade to the current software suite versions
-run DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y
-
-# install the required packages for our execution environment and buildfarm runtime
-run DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-suggests \
-    g++-9 g++ openjdk-14-jdk-headless
+```shell
+git clone https://github.com/buildfarm/buildfarm.git
+cd buildfarm
 ```
 
-And build it with `docker build -t ubuntu20-java14:latest .`
+To customize the worker image, add a package such as `container/custom/BUILD.bazel` to the checkout or your fork:
 
-```
-Sending build context to Docker daemon   2.56kB
-Step 1/5 : from ubuntu:focal
- ---> 9140108b62dc
+```starlark
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
-...
+package(default_visibility = ["//visibility:public"])
 
-Removing intermediate container 505236be00e4
- ---> 77a8c2ae4d16
-Successfully built 77a8c2ae4d16
-Successfully tagged ubuntu20-java14:latest
-```
-
-In our example's case, we want to use this image as a base to build a buildfarm worker container image. Unfortunately, rules_docker does not know how to interact with the `docker images` hosted by a local docker daemon, only docker registries like `dockerhub.io`. We will get past this by running the local registry utility container. If you really want to host this base elsewhere, I'll assume that you know how to translate the host:port references below, and you can skip running your own registry.
-
-First we need to tag our image so that it gets pushed to our local registry:
-
-`docker tag ubuntu20-java14:latest localhost.localdomain:5000/ubuntu20-java14:latest`
-
-Then we can start our registry with a recognizable name for later shutdown:
-
-`docker run -d --rm --name local-registry -p 5000:5000 registry`
-
-And push our newly tagged image:
-
-`docker push localhost.localdomain:5000/ubuntu20-java14:latest`
-
-Take note of the `sha256:<sha256sum>` output that was produced with this command, as we will need to use it to specify our base.
-
-Now we have a referent docker image that can be identified as a base to apply buildfarm's worker installation onto. In a suitable location, create a WORKSPACE containing:
-
-```
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-BUILDFARM_EXTERNAL_COMMIT = "04fc2635f5546a4f5dc19dea35bb1fca5569ce24"
-BUILDFARM_EXTERNAL_SHA256 = "f45215ef075c8aff230b737ca3bc5ba183c1137787fcbbb10dd407463f76edb6"
-
-http_archive(
-    name = "build_buildfarm",
-    strip_prefix = "bazel-buildfarm-%s" % BUILDFARM_EXTERNAL_COMMIT,
-    sha256 = BUILDFARM_EXTERNAL_SHA256,
-    url = "https://github.com/buildfarm/buildfarm/archive/%s.zip" % BUILDFARM_EXTERNAL_COMMIT,
+oci_image(
+    name = "buildfarm_worker_image",
+    base = "@ubuntu_noble",
+    entrypoint = [
+        "/tini",
+        "--",
+        "java",
+        "-jar",
+        "/app/build_buildfarm/buildfarm-shard-worker_deploy.jar",
+    ],
+    env = {
+        "CONFIG_PATH": "/app/build_buildfarm/config.minimal.yml",
+        "JAVA_TOOL_OPTIONS": "-XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0",
+    },
+    tars = [
+        # Buildfarm supplies the worker binary, default configuration, logging,
+        # configuration, execution wrappers, telemetry agent, and tini layer.
+        "//container:layer_tini",
+        "//container:layer_logging_config",
+        "//container:layer_minimal_config",
+        "//container:execution_wrappers",
+        "//container:telemetry_tools",
+        "//container:layer_buildfarm_worker",
+    ],
 )
 
-load("@build_buildfarm//:deps.bzl", "buildfarm_dependencies")
-
-buildfarm_dependencies()
-
-load("@build_buildfarm//:defs.bzl", "buildfarm_init")
-
-buildfarm_init()
-
-load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
-
-load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
-
-container_deps()
-
-container_pull(
-    name = "ubuntu20_java14_image_base",
-    digest = "sha256:<sha256sum>",
-    registry = "localhost:5000",
-    repository = "ubuntu20-java14",
+# Imports the OCI image into the local Docker-compatible image store. This is
+# intentionally a separate step from image construction.
+oci_load(
+    name = "load_buildfarm_worker",
+    image = ":buildfarm_worker_image",
+    repo_tags = ["example-buildfarm-worker:ubuntu24"],
 )
 ```
 
-Be sure to substitute the `sha256:<sha256sum>` with your content from above.
+Build the OCI layout without requiring Docker:
 
-Next we will create a BUILD file to create our target image. We will use the shard variant here, but the memory worker (with supporting server execution) will work as well. The content of the BUILD file should be:
-
-```
-load("@io_bazel_rules_docker//java:image.bzl", "java_image")
-
-java_image(
-    name = "buildfarm-shard-worker-ubuntu20-java14",
-    base = "@ubuntu20_java14_image_base//image",
-    deps = ["//src/main/java/build/buildfarm:buildfarm-shard-worker"],
-    main_class = "build.buildfarm.worker.shard.Worker",
-)
+```shell
+bazel build //container/custom:buildfarm_worker_image
 ```
 
-And now that this is in place, we can use the following to build the container and make it available to our local docker daemon:
+When Docker Desktop, Podman, or another Docker-compatible image store is available, import the completed image and inspect it:
 
-`bazel run :buildfarm-shard-worker-ubuntu20-java14`
+```shell
+bazel run //container/custom:load_buildfarm_worker
+docker image inspect example-buildfarm-worker:ubuntu24
+```
+
+The image's default `CONFIG_PATH` points to Buildfarm's example configuration. Before running a worker in a real deployment, supply a configuration that identifies the deployment's backplane and worker settings, for example by mounting a configuration file and overriding `CONFIG_PATH`:
+
+```shell
+docker run --rm \
+  -v "$PWD/worker.yml:/config/worker.yml:ro" \
+  -e CONFIG_PATH=/config/worker.yml \
+  example-buildfarm-worker:ubuntu24
+```
+
+The worker must be able to reach its configured Buildfarm backplane. Its execution environment must also contain every tool expected by the actions it accepts. Extend the image with additional `pkg_tar` layers when a non-hermetic workload requires system packages; prefer declared Bazel toolchains and runfiles for new workloads so clients do not depend on undeclared packages in the worker image.

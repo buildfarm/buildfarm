@@ -119,6 +119,9 @@ public class MatchStage extends PipelineStage {
           executionContext.toBuilder()
               .setQueueEntry(queueEntry)
               .setClaim(claim)
+              .setExecutionPolicyInterpolations(
+                  workerContext.getExecutionPolicyInterpolations(
+                      queueEntry.getExecuteEntry().getOperationName()))
               .setPoller(
                   workerContext.createPoller("MatchStage", queueEntry, QUEUED, pollerExecutor))
               .build();

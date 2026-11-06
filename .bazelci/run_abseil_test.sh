@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025 The Buildfarm Authors. All rights reserved.
+# Copyright 2021-2026 The Buildfarm Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,4 +15,4 @@
 
 # Test bazel targets with buildfarm
 cd src/test/abseil;
-../../../bazel test --jobs=25 $1 --noenable_bzlmod --test_output=errors --incompatible_enable_cc_toolchain_resolution --verbose_failures --verbose_explanations --test_tag_filters=-benchmark --remote_executor=grpc://localhost:8980 @com_google_absl//... -- -@com_google_absl//absl/time/...
+../../../bazel test --jobs=25 $1 --enable_bzlmod --test_output=errors --incompatible_enable_cc_toolchain_resolution --verbose_failures --verbose_explanations --test_tag_filters=-benchmark --remote_executor=grpc://localhost:8980 @com_google_absl//... -- -@com_google_absl//absl/time/...

@@ -18,7 +18,7 @@ import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
 import static build.buildfarm.common.io.Directories.makeWritable;
 import static build.buildfarm.common.io.EvenMoreFiles.setReadOnlyPerms;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.Futures.catchingAsync;
+import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.successfulAsList;
@@ -41,8 +41,10 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import io.grpc.Context;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.io.InputStream;
@@ -68,7 +70,8 @@ import org.jspecify.annotations.Nullable;
 
 @Log
 public class DirectoryEntryCFC extends CASFileCache {
-  private final Cache<Digest, ListenableFuture<Void>> fetchers = CacheBuilder.newBuilder().build();
+  private final Cache<Digest, ListenableFuture<Boolean>> fetchers =
+      CacheBuilder.newBuilder().build();
 
   public DirectoryEntryCFC(
       Path root,
@@ -213,6 +216,7 @@ public class DirectoryEntryCFC extends CASFileCache {
       Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       ExecutorService service) {
+    Context context = Context.current();
     String suffix = UUID.randomUUID().toString();
     Path filename = path.getFileName();
     String tmpFilename = filename + ".tmp." + suffix;
@@ -223,34 +227,63 @@ public class DirectoryEntryCFC extends CASFileCache {
         transformAsync(
             fetched,
             weight -> {
+              if (Context.current().isCancelled()) {
+                return immediateFailedFuture(Context.current().cancellationCause());
+              }
               disableAllWriteAccess(tmpPath, fileStore, /* excludeTopLevel= */ true);
               return immediateFuture(null);
             },
-            service);
+            context.fixedContextExecutor(service));
     ListenableFuture<Void> renamed =
         transformAsync(
             limited,
             result -> {
+              if (Context.current().isCancelled()) {
+                return immediateFailedFuture(Context.current().cancellationCause());
+              }
               Files.move(tmpPath, path);
               makeWritable(path, /* writable= */ false, fileStore);
               return immediateFuture(result);
             },
-            service);
-    ListenableFuture<Void> rolled =
-        catchingAsync(
-            renamed,
-            Throwable.class,
-            e -> {
-              try {
-                Directories.remove(tmpPath, fileStore);
-              } catch (IOException removeException) {
-                e.addSuppressed(removeException);
-              }
-              return immediateFailedFuture(e);
-            },
-            service);
+            context.fixedContextExecutor(service));
+    Context.CancellationListener cleanupOnCancellation =
+        cancelledContext -> {
+          Context previous = Context.ROOT.attach();
+          try {
+            try {
+              Directories.remove(tmpPath, fileStore);
+            } catch (IOException e) {
+              log.log(Level.WARNING, "error removing cancelled directory fetch " + tmpPath, e);
+            }
+          } finally {
+            Context.ROOT.detach(previous);
+          }
+        };
+    context.addListener(cleanupOnCancellation, directExecutor());
+    addCallback(
+        renamed,
+        new FutureCallback<>() {
+          @Override
+          public void onSuccess(@Nullable Void result) {
+            context.removeListener(cleanupOnCancellation);
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            if (context.isCancelled()) {
+              return;
+            }
+            context.removeListener(cleanupOnCancellation);
+            try {
+              Directories.remove(tmpPath, fileStore);
+            } catch (IOException removeException) {
+              t.addSuppressed(removeException);
+            }
+          }
+        },
+        directExecutor());
     return transformAsync(
-        rolled,
+        renamed,
         result -> {
           String key = filename.toString();
           long blobSizeInBytes = getCompleted(fetched);
@@ -269,7 +302,6 @@ public class DirectoryEntryCFC extends CASFileCache {
           }
           Entry e = new Entry(key, blobSizeInBytes, Deadline.after(10, HOURS));
           safeStorageInsertion(key, e);
-          fetchers.invalidate(digest);
           return immediateFuture(result);
         },
         service);
@@ -308,6 +340,9 @@ public class DirectoryEntryCFC extends CASFileCache {
           ImmutableList.Builder<Throwable> failures = ImmutableList.builder();
           boolean failed = false;
           for (int i = 0; i < paths.size(); i++) {
+            if (Context.current().isCancelled()) {
+              return immediateFailedFuture(Context.current().cancellationCause());
+            }
             Path putPath = paths.get(i);
             if (putPath == null) {
               failed = true;
@@ -343,17 +378,8 @@ public class DirectoryEntryCFC extends CASFileCache {
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
-    // we must acquire a reference to this entry before delivering it to the client
-    // unfortunately that means that it will be placed onto the LRU queue briefly
-    // we could probably retry the whole procedure in that case, but maybe there is
-    // simply too much contention at that point
-    //
-    // to correct this, we could find a way to identify the fetching thread and perform
-    // the dereference only after all of the callbacks have been satisfied. Very funky
-    // future stuff would need to be in place.
-    //
-    // we can play games with the immediacy of the callback though
-    ListenableFuture<Void> fetch;
+    // A newly inserted entry owns the fetch creator's reference; followers acquire their own.
+    ListenableFuture<Boolean> fetch;
     // true if we were the creator of the fetch
     AtomicBoolean owner = new AtomicBoolean();
     try {
@@ -362,21 +388,34 @@ public class DirectoryEntryCFC extends CASFileCache {
               digest,
               () -> {
                 owner.set(true);
-                return add(path, digest, directoriesIndex, service);
+                if (referenceIfExists(key)) {
+                  return immediateFuture(false);
+                }
+                return transform(
+                    add(path, digest, directoriesIndex, service), result -> true, directExecutor());
               });
     } catch (ExecutionException e) {
       return immediateFailedFuture(e);
     }
-    // we wil need to increment the reference count, as we did not call the future creator
-    if (!owner.get()) {
+    // Register cleanup after get has stored the future, including synchronous completion/failure.
+    ListenableFuture<Boolean> pendingFetch = fetch;
+    if (owner.get()) {
+      fetch.addListener(() -> fetchers.asMap().remove(digest, pendingFetch), directExecutor());
+    } else {
+      // Followers acquire their own reference; the creator already owns one.
       fetch =
           transformAsync(
               fetch,
               result -> {
-                // completely unacceptable if it does not exist or is not available for reference
-                // here
+                // The owner's reference may have been released and evicted before this callback.
                 try {
-                  checkState(referenceIfExists(key));
+                  if (!referenceIfExists(key)) {
+                    fetchers.asMap().remove(digest, pendingFetch);
+                    return transform(
+                        putDirectory(digest, directoriesIndex, service),
+                        PathResult::isMissed,
+                        directExecutor());
+                  }
                 } catch (IOException e) {
                   return immediateFailedFuture(e);
                 }
@@ -384,7 +423,7 @@ public class DirectoryEntryCFC extends CASFileCache {
               },
               directExecutor());
     }
-    return transform(fetch, result -> new PathResult(path, true), directExecutor());
+    return transform(fetch, missed -> new PathResult(path, missed), directExecutor());
   }
 
   @Override

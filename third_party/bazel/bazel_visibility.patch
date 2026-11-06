@@ -1,10 +1,41 @@
 diff --git a/src/main/tools/BUILD b/src/main/tools/BUILD
-index 7e2d2a1461..a10ebef005 100644
 --- a/src/main/tools/BUILD
 +++ b/src/main/tools/BUILD
-@@ -1,4 +1,4 @@
+@@ -1 +1 @@
 -package(default_visibility = ["//src:__subpackages__"])
 +package(default_visibility = ["//visibility:public"])
-
- cc_binary(
-     name = "daemonize",
+diff --git a/src/main/protobuf/BUILD b/src/main/protobuf/BUILD
+--- a/src/main/protobuf/BUILD
++++ b/src/main/protobuf/BUILD
+@@ -2,4 +2,4 @@
+-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+-load("@com_google_protobuf//bazel:java_proto_library.bzl", "java_proto_library")
+-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+-load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
++load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
++load("@protobuf//bazel:java_proto_library.bzl", "java_proto_library")
++load("@protobuf//bazel:proto_library.bzl", "proto_library")
++load("@protobuf//bazel:py_proto_library.bzl", "py_proto_library")
+@@ -83 +83 @@
+-    deps = ["@com_google_protobuf//:any_proto"],
++    deps = ["@protobuf//:any_proto"],
+@@ -88 +88 @@
+-    deps = ["@com_google_protobuf//:wrappers_proto"],
++    deps = ["@protobuf//:wrappers_proto"],
+@@ -97 +97 @@
+-        "@com_google_protobuf//:any_proto",
++        "@protobuf//:any_proto",
+@@ -114 +114 @@
+-    deps = ["@com_google_protobuf//:descriptor_proto"],
++    deps = ["@protobuf//:descriptor_proto"],
+@@ -240 +240 @@
+-        "@com_google_protobuf//:timestamp_proto",
++        "@protobuf//:timestamp_proto",
+@@ -292 +292 @@
+-        "@com_google_protobuf//:any_proto",
++        "@protobuf//:any_proto",
+@@ -352,2 +352,2 @@
+-        "@com_google_protobuf//:duration_proto",
+-        "@com_google_protobuf//:timestamp_proto",
++        "@protobuf//:duration_proto",
++        "@protobuf//:timestamp_proto",

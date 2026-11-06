@@ -1,0 +1,20 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("@rules_java//java:java_library.bzl", "java_library")
+
+java_library(
+    name = "adder-lib",
+    srcs = glob(["**/*.java"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/persistent/bazel:bazel-persistent-workers",
+        "//src/main/java/persistent/common:persistent-common",
+        "@buildfarm_maven//:com_google_guava_guava",
+    ],
+)
+
+java_binary(
+    name = "adder-bin",
+    main_class = "persistent.examples.adder.Adder",
+    visibility = ["//visibility:public"],
+    runtime_deps = [":adder-lib"],
+)

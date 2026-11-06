@@ -111,7 +111,7 @@ class ResultReporter implements Runnable {
         executionContext.queueEntry,
         EXECUTING,
         Thread.currentThread()::interrupt,
-        Deadline.after(60, SECONDS),
+        Deadline.after(workerContext.getReportResultDeadline(), SECONDS),
         pollerExecutor);
     try {
       return reportPolled(stopwatch);

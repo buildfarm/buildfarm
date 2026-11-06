@@ -7,10 +7,10 @@ java_library(
     srcs = ["WorkerTestUtils.java"],
     visibility = ["//src/test/java:__subpackages__"],
     deps = [
-        "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/worker/util",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "//src/main/protobuf/persistent:worker_protocol_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@buildfarm_maven//:com_github_jnr_jnr_constants",
         "@buildfarm_maven//:com_github_jnr_jnr_ffi",
@@ -36,10 +36,10 @@ java_test(
     srcs = glob(["*Test.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
-        "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/worker/util",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "//src/main/protobuf/persistent:worker_protocol_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@buildfarm_maven//:com_github_jnr_jnr_constants",
         "@buildfarm_maven//:com_github_jnr_jnr_ffi",
