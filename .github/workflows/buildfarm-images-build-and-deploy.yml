@@ -28,6 +28,13 @@ jobs:
         username: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
         password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
 
+    - name: Verify Docker Hub access through Bazel
+      run: |
+        docker pull amazoncorretto:21
+        bazel fetch \
+          --repo_env=DOCKER_CONFIG="${HOME}/.docker" \
+          //container:public_push_buildfarm-server
+
     - name: Build Server Image
       id: buildAndPushServerImage
       run: bazel run //container:public_push_buildfarm-server -- --tag latest
