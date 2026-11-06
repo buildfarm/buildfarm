@@ -201,6 +201,7 @@ public final class Worker extends LoggingMain {
       Counter.build().name("completed_operations").help("Completed operations.").register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
+
   // Registration retries until shutdown, so attempts are unbounded.
   private static Backoff newRegistrationBackoff() {
     return Backoff.exponential(
