@@ -115,7 +115,7 @@ abstract class Controller implements IOResource {
     }
   }
 
-  protected int readLong(String propertyName) throws IOException {
+  protected long readLong(String propertyName) throws IOException {
     char[] data = new char[64];
     Path path = getPath().resolve(propertyName);
     int len;
@@ -128,6 +128,6 @@ abstract class Controller implements IOResource {
     if (len == 0 || data[0] == '\n' || data[len - 1] != '\n') {
       throw new NumberFormatException("invalid integer in '" + propertyName + "'");
     }
-    return Integer.parseInt(String.copyValueOf(data, 0, len - 1));
+    return Long.parseLong(String.copyValueOf(data, 0, len - 1));
   }
 }
