@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-pip3 install python-dateutil
-
 set -e
 set -o pipefail
 
@@ -46,6 +44,16 @@ BUILDFARM_WORKER_CONFIG=$BUILDFARM_CONFIG
 
 GRPC_LOGS1="/tmp/parsed-grpc.log"
 GRPC_LOGS2="/tmp/parsed-grpc2.log"
+RAW_GRPC_LOGS1=${RAW_GRPC_LOGS1:-src/test/many/grpc.log}
+RAW_GRPC_LOGS2=${RAW_GRPC_LOGS2:-src/test/many/grpc2.log}
+if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
+    RAW_GRPC_LOGS_UPLOAD="$CDC_ARTIFACTS/upload.grpc.log"
+    GRPC_LOGS_UPLOAD="$CDC_ARTIFACTS/upload.grpc.json"
+    RAW_GRPC_LOGS1="$CDC_ARTIFACTS/cold.grpc.log"
+    RAW_GRPC_LOGS2="$CDC_ARTIFACTS/cached.grpc.log"
+    GRPC_LOGS1="$CDC_ARTIFACTS/cold.grpc.json"
+    GRPC_LOGS2="$CDC_ARTIFACTS/cached.grpc.json"
+fi
 
 ensure_server_is_up(){
     # We cannot do a test build until the server is properly started.
@@ -131,16 +139,16 @@ start_server_and_worker(){
   echo "Testing with Shard Instances."
 
   # Build first to create more predictable run time.
-  ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
+  ./bazel build --config=strict $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
 
   # Start the server.
-  ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
+  ./bazel run --config=strict $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
   SERVER_PID=$!
 
   ensure_server_is_up
 
   # Start the worker.
-  ./bazel run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
+  ./bazel run --config=strict $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
   WORKER_PID=$!
 
   ensure_worker_is_up
@@ -150,7 +158,7 @@ init_grpc_parser(){
     if [ "${CACHE_TEST:-false}" = true ]; then
         echo "Fetch tools_remote from git"
 
-        git clone https://github.com/bazelbuild/tools_remote.git
+        git clone https://github.com/buildfarm/tools_remote.git
         pushd tools_remote
         git reset --hard $SHA1_TOOLS_REMOTE
         ../bazel build //:remote_client
@@ -160,9 +168,14 @@ init_grpc_parser(){
 parse_grpc_logs(){
     if [ "${CACHE_TEST:-false}" = true ]; then
         echo "Parse grpc log"
-        ./tools_remote/bazel-bin/remote_client --grpc_log src/test/many/grpc.log printlog --format_json > $GRPC_LOGS1
-        ./tools_remote/bazel-bin/remote_client --grpc_log src/test/many/grpc2.log printlog --format_json > $GRPC_LOGS2
-        calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
+        ./tools_remote/bazel-bin/remote_client --grpc_log "$RAW_GRPC_LOGS1" printlog --format_json > "$GRPC_LOGS1"
+        ./tools_remote/bazel-bin/remote_client --grpc_log "$RAW_GRPC_LOGS2" printlog --format_json > "$GRPC_LOGS2"
+        if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
+            ./tools_remote/bazel-bin/remote_client --grpc_log "$RAW_GRPC_LOGS_UPLOAD" printlog --format_json > "$GRPC_LOGS_UPLOAD"
+            calculate_cache_statistics "$GRPC_LOGS_UPLOAD" "$GRPC_LOGS1" "$GRPC_LOGS2"
+        else
+            calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
+        fi
     fi
 }
 
@@ -171,7 +184,11 @@ trap buildfarm_cleanup EXIT INT TERM
 
 calculate_cache_statistics(){
     echo "Calculating cache statistics..."
-    ./.bazelci/ingest_grpc_logs.py $1 $2
+    if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
+        python3 ./.bazelci/ingest_grpc_logs.py --cdc-manifest "$CDC_ARTIFACTS/manifest.json" "$1" "$2" "$3"
+    else
+        python3 ./.bazelci/ingest_grpc_logs.py "$1" "$2"
+    fi
 }
 start_server_and_worker
 

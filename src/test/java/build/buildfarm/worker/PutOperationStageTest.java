@@ -103,7 +103,6 @@ public class PutOperationStageTest {
   @Test
   public void averageTimeCostPerStageExposesConfiguredPeriods() {
     PutOperationStage stage = new PutOperationStage(op -> {});
-
     assertPeriodsPresent(stage.getAverageTimeCostPerStage());
   }
 

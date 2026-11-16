@@ -20,4 +20,4 @@ fi
 
 # Build bazel targets with buildfarm
 echo "Running server integration tests..."
-$BAZEL test --nocache_test_results --test_tag_filters=integration src/test/java/build/buildfarm/server:all
+$BAZEL test --config=strict --nocache_test_results --test_tag_filters=integration src/test/java/build/buildfarm/server:all

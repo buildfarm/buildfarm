@@ -1,0 +1,6 @@
+load(":fixture.bzl", "cdc_fixture")
+
+cdc_fixture(
+    name = "artifact",
+    src = "input.bin",
+)

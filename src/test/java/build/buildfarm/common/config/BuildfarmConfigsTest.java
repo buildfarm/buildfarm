@@ -1,5 +1,20 @@
+// Copyright 2025-2026 The Buildfarm Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.common.config;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 
@@ -7,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import javax.naming.ConfigurationException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -73,5 +89,118 @@ public class BuildfarmConfigsTest {
     assertNotNull(configs);
     assertNotNull(configs.getServer());
     assertNotNull(configs.getBackplane());
+  }
+
+  @Test
+  public void validateCasStorageSizeConfig_bothSet_throws() {
+    Cas cas = new Cas();
+    cas.setMaxSizeBytes(1000);
+    cas.setMaxSizePercent(50);
+    // Both maxSizeBytes and maxSizePercent can't be set simultaneously
+    assertThrows(
+        ConfigurationException.class, () -> BuildfarmConfigs.validateCasStorageSizeConfig(cas));
+  }
+
+  @Test
+  public void validateCasStorageSizeConfig_bytesNegative_throws() {
+    Cas cas = new Cas();
+    cas.setMaxSizeBytes(-1);
+    // maxSizeBytes must be non-negative
+    assertThrows(
+        ConfigurationException.class, () -> BuildfarmConfigs.validateCasStorageSizeConfig(cas));
+  }
+
+  @Test
+  public void validateCasStorageSizeConfig_percentNegative_throws() {
+    Cas cas = new Cas();
+    cas.setMaxSizePercent(-1);
+    // maxSizePercent must be positive
+    assertThrows(
+        ConfigurationException.class, () -> BuildfarmConfigs.validateCasStorageSizeConfig(cas));
+  }
+
+  @Test
+  public void validateCasStorageSizeConfig_percentZero_throws() {
+    Cas cas = new Cas();
+    cas.setMaxSizePercent(0);
+    assertThrows(
+        ConfigurationException.class, () -> BuildfarmConfigs.validateCasStorageSizeConfig(cas));
+  }
+
+  @Test
+  public void validateCasStorageSizeConfig_percentOver100_throws() {
+    Cas cas = new Cas();
+    cas.setMaxSizePercent(101);
+    // maxSizePercent must be 100 or smaller
+    assertThrows(
+        ConfigurationException.class, () -> BuildfarmConfigs.validateCasStorageSizeConfig(cas));
+  }
+
+  private void setCasMaxSizePercentAndValidateSize(int maxSizePercent)
+      throws ConfigurationException {
+    Worker worker = new Worker();
+    worker.setRoot(tempDir.toString());
+    BuildfarmConfigs.getInstance().setWorker(worker);
+
+    Cas cas = new Cas();
+    cas.setMaxSizePercent(maxSizePercent);
+    cas.setMaxSizeBytes(0);
+    BuildfarmConfigs.deriveCasStorage(cas);
+    long expectedBytes = (long) (tempDir.toFile().getTotalSpace() * maxSizePercent / 100.0);
+    assertEquals(expectedBytes, cas.getMaxSizeBytes());
+  }
+
+  @Test
+  public void deriveCasStorage_validMaxSizePercent_computesCorrectBytes()
+      throws ConfigurationException {
+    // When valid maxSizePercent values are used, the CAS size is limited correctly
+    setCasMaxSizePercentAndValidateSize(100);
+    setCasMaxSizePercentAndValidateSize(1);
+  }
+
+  @Test
+  public void deriveCasStorage_noSizeConfigured_defaultsToDefaultMaxSizePercent()
+      throws ConfigurationException {
+    Worker worker = new Worker();
+    worker.setRoot(tempDir.toString());
+    BuildfarmConfigs.getInstance().setWorker(worker);
+
+    Cas cas = new Cas();
+    BuildfarmConfigs.deriveCasStorage(cas);
+    long expectedBytes =
+        (long)
+            (tempDir.toFile().getTotalSpace() * BuildfarmConfigs.DEFAULT_MAX_SIZE_PERCENT / 100.0);
+    assertEquals(expectedBytes, cas.getMaxSizeBytes());
+  }
+
+  @Test
+  public void deriveCasStorage_maxSizeBytesAlone_limitSetCorrectly() throws ConfigurationException {
+    Cas cas = new Cas();
+    cas.setMaxSizeBytes(1000);
+    BuildfarmConfigs.deriveCasStorage(cas);
+    // When maxSizePercent is unset, maxSizeBytes is used and set correctly
+    assertEquals(1000, cas.getMaxSizeBytes());
+  }
+
+  @Test
+  public void loadConfigs_withZeroMaxSizePercent_rejectsExplicitZero() throws IOException {
+    Path configFile = tempDir.resolve("zero-percent.yaml");
+    Files.writeString(configFile, "worker:\n  storages:\n    - maxSizePercent: 0\n");
+
+    BuildfarmConfigs configs = BuildfarmConfigs.loadConfigs(configFile);
+    Cas cas = configs.getWorker().getStorages().get(0);
+    assertEquals(Integer.valueOf(0), cas.getMaxSizePercent());
+    assertThrows(
+        ConfigurationException.class, () -> BuildfarmConfigs.validateCasStorageSizeConfig(cas));
+  }
+
+  @Test
+  public void loadConfigs_withMaxSizePercent_parsesCorrectly() throws IOException {
+    Path configFile = tempDir.resolve("percent.yaml");
+    String yamlContent = "worker:\n  storages:\n    - maxSizePercent: 75\n";
+    Files.write(configFile, yamlContent.getBytes());
+
+    BuildfarmConfigs configs = BuildfarmConfigs.loadConfigs(configFile);
+    assertEquals(Integer.valueOf(75), configs.getWorker().getStorages().get(0).getMaxSizePercent());
   }
 }

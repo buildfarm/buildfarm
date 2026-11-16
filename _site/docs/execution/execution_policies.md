@@ -11,7 +11,9 @@ Policies are applied in order of definition for a single matching name, with the
 
 ## Wrapper execution policy modifier type
 
-This policy type specifies that a worker should prepend a single path, and a number of arguments, to the execution of a subprocess to generate an action result. These arguments have a limited substitution mechanism that discovers any appearance of `<property-name>` and substitutes it with a string representation of a value currently available in the platform properties for the action. _If a specified `property-name` platform property is not present for the action, the wrapper is discarded entirely._ Note that this substitution does not apply to the `path` of the wrapper, which may point to any file with appropriate permissions - executable, and readable if necessary as a shell script, on linux, for example.
+This policy type specifies that a worker should prepend a single path, and a number of arguments, to the execution of a subprocess to generate an action result. These arguments have a limited substitution mechanism that discovers any appearance of `<property-name>` and substitutes it with a string representation of a value currently available in the platform properties, allocated pool resources, or worker-provided values for the action. _If a specified interpolation is not available for the action, the wrapper is discarded entirely._ Note that this substitution does not apply to the `path` of the wrapper, which may point to any file with appropriate permissions - executable, and readable if necessary as a shell script, on linux, for example.
+
+The worker-provided `<cgroup>` interpolation contains the action's relative cgroup v2 hierarchy, `executions/operations/<operation-id>`. The value is derived from the action's operation name and is available regardless of whether the worker's built-in cgroup limits are enabled. `cgroup` is reserved and cannot be overridden by an action platform property.
 
 ### Example:
 
@@ -24,6 +26,19 @@ worker:
     - name: test
       executionWrapper:
         path: "/app/buildfarm/as-nobody"
+```
+
+For example, a custom wrapper can receive the action's cgroup hierarchy as an argument:
+
+```yaml
+worker:
+  executionPolicies:
+    - name: custom-cgroup-policy
+      executionWrapper:
+        path: "/app/buildfarm/custom-cgroup-wrapper"
+        arguments:
+          - "--cgroup"
+          - "<cgroup>"
 ```
 
 ## Action Specification

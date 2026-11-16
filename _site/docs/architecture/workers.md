@@ -70,6 +70,10 @@ Choosing a `filesystem` `storage` type in the worker config as the first `storag
 The CASFileCache provides an Exec Filesystem via CFCExecFilesystem. The (CASFileCache)'s retention of paths is used to reflect individual files, with these paths hard-linked in CFCExecFilesystem under representative directories of the input root to signify usage. The CASFileCache directory retention system is also used to provide a configurable utilization of entire directory trees as a symlink, which was a heuristic optimization applied when substantial cost was observed setting up static trees of input links for operations compared to their execution time. `link_input_directories` in the common Worker configuration will enable this heuristic.
 Outputs of actions are physically streamed into CAS writes when they are observed after an action execution.
 
+Concurrent directory fetches share an in-flight result. Completed results are removed on success,
+failure or cancellation; they are not retained as cache entries. If a directory is evicted before
+a waiting caller acquires its reference, the caller fetches it again.
+
 The CASFileCache's persistence in the filesystem and the availability of common POSIX features like symlinks and inode-based reference counts on almost any filesystem implementation have made it a solid choice for extremely large CAS installations - it scales to multi-TB host attached storages containing millions of entries with relative ease.
 
 There are plans to improve CASFileCache that will be reflected in improved performance and memory footprint for the features used by CFCExecFilesystem.

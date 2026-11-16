@@ -1,8 +1,23 @@
+// Copyright 2024-2026 The Buildfarm Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.instance;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.ChunkingFunction;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
@@ -26,6 +41,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
@@ -140,7 +156,8 @@ class DummyInstanceBase extends InstanceBase {
   public ListenableFuture<build.buildfarm.v1test.Digest> fetchBlob(
       Iterable<String> uris,
       Map<String, String> headers,
-      build.buildfarm.v1test.Digest expectedDigest,
+      build.buildfarm.v1test.Digest originDigest,
+      build.buildfarm.v1test.Digest casDigest,
       RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
@@ -240,6 +257,24 @@ class DummyInstanceBase extends InstanceBase {
 
   @Override
   public void deregisterWorker(String workerName) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void splitBlob(
+      build.buildfarm.v1test.Digest digest,
+      ChunkingFunction.Value chunkingFunction,
+      StreamObserver<Digest> responseObserver,
+      RequestMetadata requestMetadata) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ListenableFuture<Digest> spliceBlob(
+      build.buildfarm.v1test.Digest expectedDigest,
+      Iterable<Digest> chunkDigests,
+      ChunkingFunction.Value chunkingFunction,
+      RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 }

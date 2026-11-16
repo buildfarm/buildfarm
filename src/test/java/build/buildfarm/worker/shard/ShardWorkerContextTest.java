@@ -1,10 +1,10 @@
-// Copyright 2019 The Buildfarm Authors. All rights reserved.
+// Copyright 2020-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -120,6 +120,7 @@ public class ShardWorkerContextTest {
         /* executeStageWidth= */ 0,
         /* reportResultStageWidth= */ 1,
         /* inputFetchDeadline= */ 60,
+        /* reportResultDeadline= */ 60,
         backplane,
         execFileSystem,
         inputStreamFactory,
@@ -138,6 +139,16 @@ public class ShardWorkerContextTest {
         resourceSet,
         writer,
         workerEventObserver);
+  }
+
+  @Test
+  public void executionPolicyInterpolationsIncludeOperationCgroup() {
+    WorkerContext context = createTestContext();
+
+    assertThat(
+            context.getExecutionPolicyInterpolations(
+                "projects/example/operations/01J8P3ZJ4C7E8N9Y0K2M"))
+        .containsExactly("cgroup", "executions/operations/01J8P3ZJ4C7E8N9Y0K2M");
   }
 
   @SuppressWarnings("unchecked")

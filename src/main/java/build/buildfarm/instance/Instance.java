@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2017-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.ChunkingFunction;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
@@ -45,6 +46,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -117,7 +119,8 @@ public interface Instance {
   ListenableFuture<build.buildfarm.v1test.Digest> fetchBlob(
       Iterable<String> uris,
       Map<String, String> headers,
-      build.buildfarm.v1test.Digest expectedDigest,
+      build.buildfarm.v1test.Digest originDigest,
+      build.buildfarm.v1test.Digest casDigest,
       RequestMetadata requestMetadata);
 
   Write getOperationStreamWrite(String name);
@@ -192,4 +195,16 @@ public interface Instance {
   String bindCorrelatedInvocations(UUID correlatedInvocationsId);
 
   UUID unbindExecutions(String operationName);
+
+  void splitBlob(
+      build.buildfarm.v1test.Digest blobDigest,
+      ChunkingFunction.Value chunkingFunction,
+      StreamObserver<Digest> digestObserver,
+      RequestMetadata requestMetadata);
+
+  ListenableFuture<Digest> spliceBlob(
+      build.buildfarm.v1test.Digest expectedBlobDigest,
+      Iterable<Digest> chunkDigests,
+      ChunkingFunction.Value chunkingFunction,
+      RequestMetadata requestMetadata);
 }

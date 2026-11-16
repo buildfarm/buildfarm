@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2020-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -92,6 +92,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
 import io.grpc.Deadline;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
@@ -1764,67 +1765,82 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return getPath(digest, getDirectoryKey(digest));
   }
 
+  @VisibleForTesting
   @GuardedBy("this")
   @SuppressWarnings("PMD.CompareObjectsWithEquals")
-  private Entry waitForLastUnreferencedEntry(long blobSizeInBytes) throws InterruptedException {
+  Entry waitForLastUnreferencedEntry(long blobSizeInBytes) throws InterruptedException {
     while (header.after == header) { // Intentional reference comparison
-      int references = 0;
-      int keys = 0;
-      int min = -1;
-      int max = 0;
-      String minkey = null;
-      String maxkey = null;
-      log.log(
-          Level.INFO,
-          format(
-              "CASFileCache::expireEntry(%d) header(%s): { after: %s, before: %s }",
-              blobSizeInBytes,
-              header.hashCode(),
-              header.after.hashCode(),
-              header.before.hashCode()));
-      // this should be incorporated in the listenable future construction...
-      for (Map.Entry<String, Entry> pe : storage.entrySet()) {
-        String key = pe.getKey();
-        Entry e = pe.getValue();
-        if (e.referenceCount > max) {
-          max = e.referenceCount;
-          maxkey = key;
-        }
-        if (min == -1 || e.referenceCount < min) {
-          min = e.referenceCount;
-          minkey = key;
-        }
-        if (e.referenceCount == 0) {
-          log.log(
-              Level.INFO,
-              format(
-                  "CASFileCache::expireEntry(%d) unreferenced entry(%s): { after: %s, before: %s }",
-                  blobSizeInBytes,
-                  e.hashCode(),
-                  e.after == null ? null : e.after.hashCode(),
-                  e.before == null ? null : e.before.hashCode()));
-        }
-        references += e.referenceCount;
-        keys++;
-      }
-      if (keys == 0) {
+      if (storage.isEmpty()) {
         throw new IllegalStateException(
             "CASFileCache::expireEntry("
                 + blobSizeInBytes
                 + ") there are no keys to wait for expiration on");
       }
-      log.log(
-          Level.INFO,
-          format(
-              "CASFileCache::expireEntry(%d) unreferenced list is empty, %d bytes, %d keys with %d"
-                  + " references, min(%d, %s), max(%d, %s)",
-              blobSizeInBytes, sizeInBytes, keys, references, min, minkey, max, maxkey));
+      // The detailed walk is O(N) over storage and is only used for diagnostics. At
+      // hundreds-of-millions of entries it dominates each wait cycle while the global
+      // monitor on `this` is held. Gate it behind FINE; emit a lightweight INFO
+      // summary on the production path.
+      if (log.isLoggable(Level.FINE)) {
+        logDetailedExpireStats(blobSizeInBytes);
+      } else {
+        log.log(
+            Level.INFO,
+            format(
+                "CASFileCache::expireEntry(%d) waiting: %d bytes, %d keys",
+                blobSizeInBytes, sizeInBytes, storage.size()));
+      }
       wait();
       if (sizeInBytes <= maxSizeInBytes) {
         return null;
       }
     }
     return header.after;
+  }
+
+  @GuardedBy("this")
+  @SuppressWarnings("PMD.CompareObjectsWithEquals")
+  private void logDetailedExpireStats(long blobSizeInBytes) {
+    int references = 0;
+    int keys = 0;
+    int min = -1;
+    int max = 0;
+    String minkey = null;
+    String maxkey = null;
+    log.log(
+        Level.FINE,
+        format(
+            "CASFileCache::expireEntry(%d) header(%s): { after: %s, before: %s }",
+            blobSizeInBytes, header.hashCode(), header.after.hashCode(), header.before.hashCode()));
+    for (Map.Entry<String, Entry> pe : storage.entrySet()) {
+      String key = pe.getKey();
+      Entry e = pe.getValue();
+      if (e.referenceCount > max) {
+        max = e.referenceCount;
+        maxkey = key;
+      }
+      if (min == -1 || e.referenceCount < min) {
+        min = e.referenceCount;
+        minkey = key;
+      }
+      if (e.referenceCount == 0) {
+        log.log(
+            Level.FINE,
+            format(
+                "CASFileCache::expireEntry(%d) unreferenced entry(%s): { after: %s, before: %s }",
+                blobSizeInBytes,
+                e.hashCode(),
+                e.after == null ? null : e.after.hashCode(),
+                e.before == null ? null : e.before.hashCode()));
+      }
+      references += e.referenceCount;
+      keys++;
+    }
+    log.log(
+        Level.FINE,
+        format(
+            "CASFileCache::expireEntry(%d) unreferenced list is empty, %d bytes, %d keys with %d"
+                + " references, min(%d, %s), max(%d, %s)",
+            blobSizeInBytes, sizeInBytes, keys, references, min, minkey, max, maxkey));
   }
 
   protected abstract List<ListenableFuture<Void>> unlinkAndExpireDirectories(
@@ -2037,8 +2053,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path path,
       FileContent onFileContent,
       ImmutableList.Builder<ListenableFuture<Path>> putFutures,
-      ExecutorService service) {
+      ExecutorService service)
+      throws IOException {
     for (FileNode fileNode : files) {
+      if (Context.current().isCancelled()) {
+        throw new IOException(Context.current().cancellationCause());
+      }
       boolean isExecutable = fileNode.getIsExecutable();
       Path filePath = path.resolve(fileNode.getName());
       final ListenableFuture<Path> putFuture;
@@ -2148,6 +2168,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         new AbstractMap.SimpleEntry<>(
             rootPath, getDirectoryFromDigest(directoriesIndex, rootPath, digest)));
     while (!stack.isEmpty()) {
+      if (Context.current().isCancelled()) {
+        throw new IOException(Context.current().cancellationCause());
+      }
       Map.Entry<Path, Directory> pathDirectoryPair = stack.pop();
       Path path = pathDirectoryPair.getKey();
       Directory directory = pathDirectoryPair.getValue();

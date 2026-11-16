@@ -170,7 +170,6 @@ public class ChunkerTest {
   @Test
   public void seekToZeroOnFreshChunkerIsNoOp() throws IOException {
     Chunker chunker = Chunker.builder().setInput(new byte[] {1, 2, 3}).setChunkSize(2).build();
-
     chunker.seek(0);
 
     assertThat(chunker.getOffset()).isEqualTo(0);
@@ -180,7 +179,6 @@ public class ChunkerTest {
   @Test
   public void nextThrowsWhenCalledAfterFullConsumption() throws IOException {
     Chunker chunker = Chunker.builder().setInput(new byte[] {1, 2}).setChunkSize(2).build();
-
     chunker.next(); // single chunk consumed, hasNext() now true
     assertThat(chunker.hasNext()).isTrue();
 
@@ -192,7 +190,6 @@ public class ChunkerTest {
   public void chunkEqualsAndHashCode() {
     Chunker first = Chunker.builder().setInput(new byte[] {1, 2, 3}).build();
     Chunker second = Chunker.builder().setInput(new byte[] {1, 2, 3}).build();
-
     Chunk a;
     Chunk b;
     try {

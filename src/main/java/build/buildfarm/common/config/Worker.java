@@ -1,10 +1,10 @@
-// Copyright 2025 The Buildfarm Authors. All rights reserved.
+// Copyright 2022-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,6 +46,7 @@ public class Worker {
   private int executeStageWidthOffset = 0;
   private int inputFetchStageWidth = 0;
   private int inputFetchDeadline = 60;
+  private int reportResultDeadline = 60;
   private int reportResultStageWidth = 1;
   private boolean linkExecFileSystem = true;
   private boolean linkInputDirectories = true;

@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2023-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +22,7 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Throwables.propagateIfInstanceOf;
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
@@ -42,6 +43,7 @@ import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CacheCapabilities;
+import build.bazel.remote.execution.v2.ChunkingFunction;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.DigestFunction;
@@ -52,6 +54,7 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionCapabilities;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
@@ -61,10 +64,11 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
 import build.bazel.remote.execution.v2.SymlinkNode;
-import build.buildfarm.actioncache.ActionCache;
+import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
+import build.buildfarm.cas.FastCDCChunker;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -75,8 +79,8 @@ import build.buildfarm.common.Size;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.net.URL;
 import build.buildfarm.common.resources.BlobInformation;
 import build.buildfarm.common.resources.DownloadBlobRequest;
@@ -98,6 +102,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.hash.HashingOutputStream;
 import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.FutureCallback;
@@ -107,6 +112,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Parser;
 import com.google.rpc.Code;
@@ -118,6 +124,7 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.grpc.stub.StreamObserver;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import java.io.IOException;
 import java.io.InputStream;
@@ -126,10 +133,13 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -159,6 +169,17 @@ public abstract class NodeInstance extends InstanceBase {
   protected final OperationsMap completedOperations;
   protected final Map<Digest, ByteString> activeBlobWrites;
   protected final boolean ensureOutputsPresent;
+
+  // Keep GetTree pages below the default 4 MiB gRPC message limit. The serialized response can be
+  // larger than its repeated directory entries, so use the same conservative 3 MiB limit as other
+  // request batching.
+  private static final int DEFAULT_GET_TREE_MAX_MESSAGE_SIZE_BYTES = (int) Size.mbToBytes(3);
+
+  // Reserve a small portion of the message budget for the GetTreeResponse fields surrounding the
+  // repeated directories (notably nextPageToken) and grpc framing slack.
+  private static final int GET_TREE_RESPONSE_OVERHEAD_BYTES = 1024;
+
+  private int getTreeMaxMessageSizeBytes = DEFAULT_GET_TREE_MAX_MESSAGE_SIZE_BYTES;
 
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
 
@@ -423,10 +444,7 @@ public abstract class NodeInstance extends InstanceBase {
 
   @Override
   public Write getBlobWrite(
-      Compressor.Value compressor,
-      build.buildfarm.v1test.Digest digest,
-      UUID uuid,
-      RequestMetadata requestMetadata)
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException {
     return contentAddressableStorage.getWrite(compressor, digest, uuid, requestMetadata);
   }
@@ -573,6 +591,9 @@ public abstract class NodeInstance extends InstanceBase {
                 SECONDS,
                 requestMetadata);
         blobDigestsBuilder.add(DigestUtil.toDigest(responseDigest));
+      } catch (WriteCompleteException e) {
+        // write is complete, nothing to do here
+        blobDigestsBuilder.add(digest);
       } catch (StatusException e) {
         if (exception == null) {
           exception = new PutAllBlobsException();
@@ -620,11 +641,15 @@ public abstract class NodeInstance extends InstanceBase {
   protected abstract int getTreeMaxPageSize();
 
   protected abstract TokenizableIterator<DirectoryEntry> createTreeIterator(
-      String reason, build.buildfarm.v1test.Digest rootDigest, String pageToken);
+      String reason, Digest rootDigest, String pageToken);
+
+  @VisibleForTesting
+  void setGetTreeMaxMessageSizeBytes(int getTreeMaxMessageSizeBytes) {
+    this.getTreeMaxMessageSizeBytes = getTreeMaxMessageSizeBytes;
+  }
 
   @Override
-  public String getTree(
-      build.buildfarm.v1test.Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
+  public String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
     tree.setRootDigest(rootDigest);
 
     if (pageSize == 0) {
@@ -636,17 +661,45 @@ public abstract class NodeInstance extends InstanceBase {
 
     TokenizableIterator<DirectoryEntry> iter = createTreeIterator("getTree", rootDigest, pageToken);
 
+    // The page budget for the serialized directories within the GetTreeResponse. We always emit at
+    // least one directory per page to guarantee forward progress, even if that directory alone
+    // exceeds the budget (a pathological single oversized directory cannot be split here).
+    int pageBudgetBytes = getTreeMaxMessageSizeBytes - GET_TREE_RESPONSE_OVERHEAD_BYTES;
+    int pageBytes = 0;
+    boolean directoryAdded = false;
+
+    // The page token resuming at the current entry. Captured before advancing the iterator so that,
+    // if the entry does not fit, we can return a token that re-yields it as the first entry of the
+    // next page - losing and duplicating nothing.
+    String resumeToken = iter.toNextPageToken();
+
     while (iter.hasNext() && pageSize != 0) {
       DirectoryEntry entry = iter.next();
       Directory directory = entry.getDirectory();
       // If part of the tree is missing from the CAS, the server will return the
       // portion present and omit the rest.
       if (directory != null) {
+        // The contribution of this directory to the serialized GetTreeResponse - a repeated
+        // Directory field: the message bytes plus its tag and length-delimiter.
+        int directorySize = directory.getSerializedSize();
+        int entryBytes =
+            CodedOutputStream.computeTagSize(GetTreeResponse.DIRECTORIES_FIELD_NUMBER)
+                + CodedOutputStream.computeUInt32SizeNoTag(directorySize)
+                + directorySize;
+        // Stop before overflowing the page, but never produce an empty page: the first directory is
+        // always emitted so the walk makes progress. The resume token points at this entry, so it
+        // will lead the next page.
+        if (directoryAdded && pageBytes + entryBytes > pageBudgetBytes) {
+          return resumeToken;
+        }
         tree.putDirectories(entry.getDigest().getHash(), directory);
+        pageBytes += entryBytes;
+        directoryAdded = true;
         if (pageSize > 0) {
           pageSize--;
         }
       }
+      resumeToken = iter.toNextPageToken();
     }
     return iter.toNextPageToken();
   }
@@ -670,9 +723,10 @@ public abstract class NodeInstance extends InstanceBase {
 
   private static ListenableFuture<Digest> downloadUrl(
       URL url,
-      String expectedHash,
+      Digest originDigest,
       Map<String, String> headers,
-      DigestUtil digestUtil,
+      DigestUtil originDigestUtil,
+      DigestUtil casDigestUtil,
       ContentWriteFactory getContentWrite)
       throws IOException {
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -684,7 +738,6 @@ public abstract class NodeInstance extends InstanceBase {
     }
     connection.setInstanceFollowRedirects(true);
     // request timeout?
-    long contentLength = connection.getContentLengthLong();
     int status = connection.getResponseCode();
 
     if (status != HttpURLConnection.HTTP_OK) {
@@ -698,40 +751,48 @@ public abstract class NodeInstance extends InstanceBase {
       throw new IOException(message);
     }
 
-    IOSupplier<InputStream> inSupplier;
-    if (expectedHash.isEmpty() || contentLength < 0) {
-      // not great, plenty risky for large objects
-      ByteString data;
-      try (InputStream in = connection.getInputStream()) {
-        data = ByteString.readFrom(in);
+    Path downloaded = Files.createTempFile("buildfarm-fetch-", ".blob");
+    try {
+      HashingOutputStream casOut =
+          casDigestUtil.newHashingOutputStream(Files.newOutputStream(downloaded));
+      HashingOutputStream originOut = originDigestUtil.newHashingOutputStream(casOut);
+      long size;
+      try (InputStream in = connection.getInputStream();
+          OutputStream out = originOut) {
+        size = ByteStreams.copy(in, out);
       }
-      if (expectedHash.isEmpty()) {
-        expectedHash = digestUtil.computeHash(data).toString();
+      Digest actualOriginDigest = originDigestUtil.build(originOut.hash().toString(), size);
+      checkOriginDigest(originDigest, actualOriginDigest);
+      Digest digest = casDigestUtil.build(casOut.hash().toString(), size);
+      Write write = getContentWrite.create(digest);
+      try (InputStream in = Files.newInputStream(downloaded);
+          OutputStream out = write.getOutput(1, DAYS, () -> {})) {
+        ByteStreams.copy(in, out);
+      } catch (WriteCompleteException e) {
+        // ignore - completed write transform below delivers early result, future should be done
       }
-      contentLength = data.size();
-      inSupplier = data::newInput;
-    } else {
-      inSupplier = connection::getInputStream;
+      return transform(write.getFuture(), committedSize -> digest, directExecutor());
+    } finally {
+      Files.deleteIfExists(downloaded);
     }
-    Digest digest = digestUtil.build(expectedHash, contentLength);
+  }
 
-    Write write = getContentWrite.create(digest);
-
-    try (InputStream in = inSupplier.get();
-        OutputStream out = write.getOutput(1, DAYS, () -> {})) {
-      ByteStreams.copy(in, out);
-    } catch (Write.WriteCompleteException e) {
-      // ignore - completed write transform below delivers early result, future should be done
+  private static void checkOriginDigest(Digest originDigest, Digest actualOriginDigest)
+      throws DigestMismatchException {
+    if (!originDigest.getHash().isEmpty()
+        && (!originDigest.getHash().equals(actualOriginDigest.getHash())
+            || (originDigest.getSize() >= 0
+                && originDigest.getSize() != actualOriginDigest.getSize()))) {
+      throw new DigestMismatchException(actualOriginDigest, originDigest);
     }
-
-    return transform(write.getFuture(), committedSize -> digest, directExecutor());
   }
 
   @Override
   public ListenableFuture<Digest> fetchBlob(
       Iterable<String> uris,
       Map<String, String> headers,
-      Digest expectedDigest,
+      Digest originDigest,
+      Digest casDigest,
       RequestMetadata requestMetadata) {
     ImmutableList.Builder<URL> urls = ImmutableList.builder();
     for (String uri : uris) {
@@ -741,7 +802,7 @@ public abstract class NodeInstance extends InstanceBase {
         return immediateFailedFuture(e);
       }
     }
-    return fetchBlobUrls(urls.build(), headers, expectedDigest, requestMetadata);
+    return fetchBlobUrls(urls.build(), headers, originDigest, casDigest, requestMetadata);
   }
 
   private static final String INDEXED_HEADER_REGEX = "^\\d+:.*$";
@@ -798,39 +859,40 @@ public abstract class NodeInstance extends InstanceBase {
   ListenableFuture<Digest> fetchBlobUrls(
       Iterable<URL> urls,
       Map<String, String> headers,
-      Digest expectedDigest,
+      Digest originDigest,
+      Digest casDigest,
       RequestMetadata requestMetadata) {
     // First pass: collect global headers
     // These apply to all URLs.
     Map<String, String> globalHeaders = calculateGlobalHeaders(headers);
     // generate a map of headers for each URL, indexed by URL index
     Map<Integer, Map<String, String>> headersMapView = createHeadersMapView(headers, globalHeaders);
+    Exception lastException = null;
     int urlIndex = 0;
     for (URL url : urls) {
       try {
         // some minor abuse here, we want the download to set our built digest size as side effect
         return downloadUrl(
             url,
-            expectedDigest.getHash(),
+            originDigest,
             headersMapView.getOrDefault(urlIndex, globalHeaders),
-            new DigestUtil(HashFunction.get(expectedDigest.getDigestFunction())),
-            actualDigest -> {
-              if (!expectedDigest.getHash().isEmpty()
-                  && expectedDigest.getSize() >= 0
-                  && expectedDigest.getSize() != actualDigest.getSize()) {
-                // TODO digestFunction
-                throw new DigestMismatchException(actualDigest, expectedDigest);
-              }
-              return getBlobWrite(
-                  Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata);
-            });
+            new DigestUtil(
+                HashFunction.get(
+                    originDigest.getDigestFunction() == DigestFunction.Value.UNKNOWN
+                        ? casDigest.getDigestFunction()
+                        : originDigest.getDigestFunction())),
+            new DigestUtil(HashFunction.get(casDigest.getDigestFunction())),
+            actualDigest ->
+                getBlobWrite(
+                    Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata));
       } catch (Exception e) {
         log.log(Level.WARNING, "download attempt failed", e);
-        // ignore?
+        lastException = e;
       }
       urlIndex++;
     }
-    return immediateFailedFuture(new NoSuchFileException(expectedDigest.getHash()));
+    return immediateFailedFuture(
+        lastException == null ? new NoSuchFileException(originDigest.getHash()) : lastException);
   }
 
   private static void stringsUniqueAndSortedPrecondition(
@@ -1868,4 +1930,166 @@ public abstract class NodeInstance extends InstanceBase {
   public abstract void deregisterWorker(String workerName);
 
   protected abstract Logger getLogger();
+
+  private static BatchUpdateBlobsRequest.Request chunkToRequest(Blob chunk) {
+    return BatchUpdateBlobsRequest.Request.newBuilder()
+        .setDigest(DigestUtil.toDigest(chunk.getDigest()))
+        .setData(chunk.getData())
+        .setCompressor(Compressor.Value.IDENTITY)
+        .build();
+  }
+
+  private Iterator<Blob> createBlobChunker(
+      ChunkingFunction.Value chunkingFunction, DigestUtil digestUtil, InputStream in) {
+    if (chunkingFunction == ChunkingFunction.Value.FAST_CDC_2020) {
+      return new FastCDCChunker(
+          digestUtil,
+          in,
+          configs.getServer().getFastCdc2020AvgChunkSizeBytes(),
+          configs.getServer().getFastCdc2020Normalization());
+    }
+    throw new UnsupportedOperationException(
+        format("chunking_function '%s' is not supported", chunkingFunction));
+  }
+
+  @Override
+  public void splitBlob(
+      Digest digest,
+      ChunkingFunction.Value chunkingFunction,
+      StreamObserver<build.bazel.remote.execution.v2.Digest> digestObserver,
+      RequestMetadata requestMetadata) {
+    HashFunction hashFn = HashFunction.get(digest.getDigestFunction());
+    DigestUtil digestUtil = new DigestUtil(hashFn);
+    // TODO route through chunkingFunction
+    try (InputStream input =
+        newBlobInput(
+            Compressor.Value.IDENTITY, digest, /* offset= */ 0, 10, DAYS, requestMetadata)) {
+      // need to specify hash
+      Iterator<Blob> chunkIterator = createBlobChunker(chunkingFunction, digestUtil, input);
+      // need to translate RuntimeException...
+      Set<build.bazel.remote.execution.v2.Digest> seen = new HashSet<>();
+      try {
+        while (chunkIterator.hasNext()) {
+          Blob chunk = chunkIterator.next();
+          Digest chunkDigest = chunk.getDigest();
+          if (chunkDigest.getSize() == 0) {
+            continue;
+          }
+          build.bazel.remote.execution.v2.Digest reDigest = DigestUtil.toDigest(chunkDigest);
+          digestObserver.onNext(reDigest);
+          // banal, still no benefit to batch on workers
+          if (!seen.contains(reDigest)) {
+            // need to push this into a future
+            if (!containsBlob(chunkDigest, null, requestMetadata)) {
+              putBlob(
+                  this,
+                  Compressor.Value.IDENTITY,
+                  chunkDigest,
+                  chunk.getData(),
+                  1,
+                  SECONDS,
+                  requestMetadata);
+            }
+            seen.add(reDigest);
+          }
+        }
+      } catch (RuntimeException e) {
+        // hasNext will throw io exception if input stream failed
+        propagateIfInstanceOf(e.getCause(), IOException.class);
+        throw e;
+      }
+      digestObserver.onCompleted();
+    } catch (IOException | InterruptedException | StatusException e) {
+      log.log(
+          Level.WARNING,
+          format("Split %s, %s failed", DigestUtil.toString(digest), chunkingFunction),
+          e);
+      digestObserver.onError(e);
+    }
+  }
+
+  // Blobs smaller than max_chunk_size (avg_chunk_size_bytes * 4) SHOULD be
+  // uploaded without chunking.
+  //
+  // We'll take SHOULD a bit more seriously here...
+  protected long getFastCDC2020MinBlobSize() {
+    return configs.getServer().getFastCdc2020AvgChunkSizeBytes() * 4;
+  }
+
+  @Override
+  public ListenableFuture<build.bazel.remote.execution.v2.Digest> spliceBlob(
+      Digest expectedBlobDigest,
+      Iterable<build.bazel.remote.execution.v2.Digest> chunkDigests,
+      ChunkingFunction.Value chunkingFunction,
+      RequestMetadata requestMetadata) {
+    if (expectedBlobDigest.getSize() < getFastCDC2020MinBlobSize()) {
+      return immediateFailedFuture(
+          new IllegalArgumentException(
+              format(
+                  "Blob size %d < minimum size %d.",
+                  expectedBlobDigest.getSize(), getFastCDC2020MinBlobSize())));
+    }
+
+    long accumulatedSize = 0;
+    for (build.bazel.remote.execution.v2.Digest chunkDigest : chunkDigests) {
+      accumulatedSize += chunkDigest.getSizeBytes();
+    }
+    if (accumulatedSize != expectedBlobDigest.getSize()) {
+      // we must not start the write. if we had less than the amount, it would hang and consume
+      // charge size
+      return immediateFailedFuture(
+          new IllegalArgumentException(
+              format(
+                  "Splice chunks size %d cannot represent %s",
+                  accumulatedSize, DigestUtil.toString(expectedBlobDigest))));
+    }
+
+    try {
+      // docs indicate that we should be able to check for this digest and just return it if it
+      // exists
+      build.bazel.remote.execution.v2.Digest digest = DigestUtil.toDigest(expectedBlobDigest);
+      // we could potentially store these as 'virtual entries', respond immediately, and collate
+      // them for the rest
+      // absolutely no reason to actually read these blobs, we just return NOT_FOUND when one entry
+      // goes away on the read, which needs to be virtual-aware
+      if (containsBlob(expectedBlobDigest, digest.toBuilder(), requestMetadata)) {
+        return immediateFuture(digest);
+      }
+
+      return transform(
+          writeSpliceBlob(expectedBlobDigest, chunkDigests, requestMetadata),
+          size -> digest,
+          directExecutor());
+    } catch (InterruptedException | IOException e) {
+      log.log(
+          Level.WARNING,
+          format(
+              "Splice of %s, %s failed", DigestUtil.toString(expectedBlobDigest), chunkingFunction),
+          e);
+      return immediateFailedFuture(e);
+    }
+  }
+
+  private ListenableFuture<Long> writeSpliceBlob(
+      Digest expectedBlobDigest,
+      Iterable<build.bazel.remote.execution.v2.Digest> chunkDigests,
+      RequestMetadata requestMetadata)
+      throws IOException, InterruptedException {
+    // does the chunking function even matter here??
+    DigestFunction.Value digestFunction = expectedBlobDigest.getDigestFunction();
+    Write write =
+        getBlobWrite(
+            Compressor.Value.IDENTITY, expectedBlobDigest, UUID.randomUUID(), requestMetadata);
+    try (OutputStream out = write.getOutput(1, DAYS, () -> {})) {
+      for (build.bazel.remote.execution.v2.Digest chunkDigest : chunkDigests) {
+        Digest inDigest = DigestUtil.fromDigest(chunkDigest, digestFunction);
+        try (InputStream in =
+            newBlobInput(
+                Compressor.Value.IDENTITY, inDigest, /* offset= */ 0, 1, DAYS, requestMetadata)) {
+          ByteStreams.copy(in, out);
+        }
+      }
+    }
+    return write.getFuture();
+  }
 }

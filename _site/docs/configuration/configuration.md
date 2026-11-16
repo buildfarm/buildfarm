@@ -303,11 +303,14 @@ backplane:
 | executeStageWidthOffset           | Integer, _0_                  |                       | Offset number of CPU cores available for execution (to allow for use by other processes)                                                                                                                                                                                                                                 |
 | inputFetchStageWidth              | Integer, _0_                  |                       | Number of concurrently available slots to fetch inputs (0 = system calculated based on CPU cores)                                                                                                                                                                                                                        |
 | inputFetchDeadline                | Integer, _60_                 |                       | Limit on time (seconds) for input fetch stage to fetch inputs                                                                                                                                                                                                                                                            |
+| reportResultDeadline               | Integer, _60_                 |                       | Limit on time (seconds) for the result reporting stage to report an action result                                                                                                                                                                                                                                        |
 | reportResultStageWidth            | Integer, _1_                  |                       | Number of concurrently available slots to write results and clean up execution directories                                                                                                                                                                                                                               |
 | linkExecFileSystem                | boolean, _true_               |                       | Use hard links instead of file copies to populate execution directories. Disable on Windows to compensate for shared hard-link deletion semantics for running executables.                                                                                                                                               |
 | linkInputDirectories              | boolean, _true_               |                       | Use an input directory creation strategy which creates a single directory tree at the highest level containing no output paths of any kind, and symlinks that directory into an action's execroot, saving large amounts of time spent manufacturing the same read-only input hierirchy over multiple actions' executions |
 | execOwner                         | String, _null_                |                       | Create exec trees containing directories that are owned by this user                                                                                                                                                                                                                                                     |
 | execOwners                        | List of Strings               |                       | Create exec trees containing directories that are owned by these users, unique to each execution. Must contain at least the sum of {`inputFetchStageWidth`, `executeStageWidth`, `reportResultStageWidth`} owners. If this option is specified and not empty, `execOwner` is ignored                                     |
+| executionMarket                   | boolean, _false_              |                       | Sell and Buy CPU with usage demand for executions. All executions receive a single core to start, and cpu is depleted from a pool of execution slot size, with granularity of 1/1000th of a core at 100ms quantums.                                                                                                      |
+| ignoreMarketExecutionMnemonics    | List of Strings, _TestRunner_ |                       | A list of action mnemonics from Execute's RequestMetadata that will not participate in the executionMarket                                                                                                                                                                                                               |
 | hexBucketLevels                   | Integer, _0_                  |                       | Number of levels to create for directory storage by leading byte of the hash                                                                                                                                                                                                                                             |
 | defaultMaxCores                   | Integer, _0_                  |                       | Constrain all executions to this logical core count unless otherwise specified via min/max-cores (0 = no limit)                                                                                                                                                                                                          |
 | limitGlobalExecution              | boolean, _false_              |                       | Constrain all executions to a pool of logical cores specified in executeStageWidth                                                                                                                                                                                                                                       |
@@ -435,7 +438,8 @@ Unless specified, options are only relevant for FILESYSTEM type
 |------------------------------|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
 | type                         | _FILESYSTEM_, GRPC            | Type of CAS used                                                                                                                                   |
 | path                         | String, _cache_               | Local cache location relative to the 'root', or absolute                                                                                           |
-| maxSizeBytes                 | Integer, _0_                  | Limit for contents of files retained from CAS in the cache, value of 0 means to auto-configure to 90% of _root_/_path_ underlying filesystem space |
+| maxSizeBytes                 | Integer, _0_                  | Limit in bytes for contents of files retained from CAS in the cache. Mutually exclusive with maxSizePercent. A value of 0 means to use maxSizePercent instead. |
+| maxSizePercent               | Integer (1-100), _unset_      | Limit in percent of the _root_/_path_ underlying filesystem space for contents of files retained from CAS in the cache. Mutually exclusive with maxSizeBytes. If neither size is set, 90% is used. |
 | fileDirectoriesIndexInMemory | boolean, _false_              | Determines if the file directories bidirectional mapping should be stored in memory or in sqlite                                                  |
 | skipLoad                     | boolean, _false_              | Determines if transient data on the worker should be loaded into CAS on worker startup (affects startup time)                                |
 | target                       | String, _null_                | For GRPC CAS type, target for external CAS endpoint                                                                                                |
@@ -450,6 +454,16 @@ worker:
     - type: FILESYSTEM
       path: "cache"
       maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+```
+
+This definition will create a filesystem-based CAS file cache that uses 75% of the filesystem for CAS storage.
+
+```yaml
+worker:
+  storages:
+    - type: FILESYSTEM
+      path: "cache"
+      maxSizePercent: 75
 ```
 
 This definition elides FILESYSTEM configuration with '...', will read-through an external GRPC CAS supporting the REAPI CAS Services into its storage, and will attempt to write expiring entries into the GRPC CAS (i.e. pushing new entries into the head of a worker LRU list will drop the entries from the tail into the GRPC CAS).
@@ -504,9 +518,11 @@ worker:
           - "<platform-property-name>"
 ```
 
-`arg1` and `arg2` are interpreted literally. `<platform-property-value>` will be substituted with the value of a property named `"platform-property-name"` from a Command's Platform _or_ the requested pool resources for the execution. If a matching property or pool resource is not found for a specified name, the entire wrapper will be discarded and have no effect on the execution.
+`arg1` and `arg2` are interpreted literally. `<platform-property-name>` will be substituted with the value of a property named `"platform-property-name"` from an Action's Platform or the requested pool resources for the execution. If a matching interpolation is not found for a specified name, the entire wrapper will be discarded and have no effect on the execution.
 
 `<exec-owner>` is an automatically provided pool resource when `execOwner` or `execOwners` is specified, and will contain the value of the execution's owner selected for exec tree creation.
+
+`<cgroup>` is a reserved worker-provided interpolation containing the action's relative cgroup v2 hierarchy, `executions/operations/<operation-id>`. It is available regardless of whether the worker's built-in cgroup limits are enabled and cannot be overridden by an action platform property.
 
 An execution with `as-nobody`, `unshare`, and `linux-sandbox` execution policies enabled would produce a command line like:
 ```sh

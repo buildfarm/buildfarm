@@ -1,10 +1,10 @@
-// Copyright 2018 The Buildfarm Authors. All rights reserved.
+// Copyright 2020-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@ import static java.lang.Thread.State.WAITING;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
@@ -69,6 +70,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
 import io.grpc.Deadline;
 import io.grpc.Status;
 import java.io.IOException;
@@ -76,15 +78,23 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -94,6 +104,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -307,6 +321,248 @@ class CASFileCacheTest {
     }
     assertThat(exceptionHandled).isTrue();
     assertThat(Files.exists(fileCache.getDirectoryPath(dirDigest))).isFalse();
+  }
+
+  @Test
+  public void putDirectoryDoesNotPublishAfterContextCancellation() throws Exception {
+    ByteString file = ByteString.copyFromUtf8("Peanut Butter");
+    Digest fileDigest = DIGEST_UTIL.compute(file);
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("file")
+                    .setDigest(DigestUtil.toDigest(fileDigest))
+                    .build())
+            .build();
+    Digest directoryDigest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(DigestUtil.toDigest(directoryDigest), directory);
+    CountDownLatch fileReadStarted = new CountDownLatch(1);
+    CountDownLatch releaseFileRead = new CountDownLatch(1);
+    DirectoryEntryCFC directoryCache =
+        new DirectoryEntryCFC(
+            root.resolve("directory-entry"),
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            directExecutor(),
+            Maps.newConcurrentMap(),
+            zstdBufferPool,
+            onPut,
+            onExpire,
+            delegate,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              assertThat(compressor).isEqualTo(Compressor.Value.IDENTITY);
+              assertThat(digest).isEqualTo(fileDigest);
+              return new InputStream() {
+                private final InputStream delegate = file.substring((int) offset).newInput();
+
+                @Override
+                public int read() throws IOException {
+                  awaitRelease();
+                  return delegate.read();
+                }
+
+                @Override
+                public int read(byte[] buffer, int off, int len) throws IOException {
+                  awaitRelease();
+                  return delegate.read(buffer, off, len);
+                }
+
+                private void awaitRelease() throws IOException {
+                  fileReadStarted.countDown();
+                  try {
+                    releaseFileRead.await();
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                  }
+                }
+              };
+            });
+    directoryCache.initializeRootDirectory();
+
+    Context.CancellableContext context = Context.current().withCancellation();
+    Context previous = context.attach();
+    try {
+      ListenableFuture<CASFileCache.PathResult> directoryFuture =
+          directoryCache.putDirectory(directoryDigest, directoriesIndex, putService);
+      assertThat(fileReadStarted.await(5, SECONDS)).isTrue();
+
+      context.cancel(null);
+      releaseFileRead.countDown();
+
+      assertThrows(ExecutionException.class, () -> directoryFuture.get(5, SECONDS));
+      assertThat(Files.exists(directoryCache.getDirectoryPath(directoryDigest))).isFalse();
+    } finally {
+      context.detach(previous);
+      context.cancel(null);
+      releaseFileRead.countDown();
+    }
+  }
+
+  @Test
+  public void putDirectoryDoesNotPublishAfterOwnerContextCancellation() throws Exception {
+    Directory childDirectory = Directory.getDefaultInstance();
+    Digest childDirectoryDigest = DIGEST_UTIL.compute(childDirectory);
+    Directory directory =
+        Directory.newBuilder()
+            .addDirectories(
+                DirectoryNode.newBuilder()
+                    .setName("child")
+                    .setDigest(DigestUtil.toDigest(childDirectoryDigest))
+                    .build())
+            .build();
+    Digest directoryDigest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(
+            DigestUtil.toDigest(directoryDigest), directory,
+            DigestUtil.toDigest(childDirectoryDigest), childDirectory);
+    DirectoryEntryCFC directoryCache =
+        new DirectoryEntryCFC(
+            root.resolve("directory-entry"),
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            directExecutor(),
+            Maps.newConcurrentMap(),
+            zstdBufferPool,
+            onPut,
+            onExpire,
+            delegate,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              throw new AssertionError("an empty directory should not fetch a file");
+            });
+    directoryCache.initializeRootDirectory();
+
+    QueuedExecutorService service = new QueuedExecutorService();
+    Path directoryPath = directoryCache.getDirectoryPath(directoryDigest);
+    Context.CancellableContext context = Context.current().withCancellation();
+    Context previous = context.attach();
+    ListenableFuture<CASFileCache.PathResult> directoryFuture =
+        directoryCache.putDirectory(directoryDigest, directoriesIndex, service);
+    context.detach(previous);
+    Path temporaryDirectory;
+    try (DirectoryStream<Path> paths =
+        Files.newDirectoryStream(
+            directoryPath.getParent(), directoryPath.getFileName() + ".tmp.*")) {
+      temporaryDirectory = Iterables.getOnlyElement(paths);
+    }
+
+    // Empty directories queue only fetch completion and limited before the rename continuation.
+    service.runNext();
+    service.runNext();
+    assertThat(Files.isDirectory(temporaryDirectory.resolve("child"))).isTrue();
+
+    context.cancel(null);
+    service.runAll();
+
+    assertThat(directoryFuture.isDone()).isTrue();
+    assertThrows(ExecutionException.class, directoryFuture::get);
+    assertThat(Files.exists(directoryPath)).isFalse();
+    assertThat(Files.exists(temporaryDirectory)).isFalse();
+  }
+
+  @Test
+  public void putDirectorySharedFetchDoesNotPublishAfterOwnerContextCancellation()
+      throws Exception {
+    ByteString file = ByteString.copyFromUtf8("Peanut Butter");
+    Digest fileDigest = DIGEST_UTIL.compute(file);
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("file")
+                    .setDigest(DigestUtil.toDigest(fileDigest))
+                    .build())
+            .build();
+    Digest directoryDigest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(DigestUtil.toDigest(directoryDigest), directory);
+    java.util.concurrent.CountDownLatch fileReadStarted =
+        new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch releaseFileRead =
+        new java.util.concurrent.CountDownLatch(1);
+    AtomicInteger inputStreams = new AtomicInteger();
+    DirectoryEntryCFC directoryCache =
+        new DirectoryEntryCFC(
+            root.resolve("directory-entry"),
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            directExecutor(),
+            Maps.newConcurrentMap(),
+            zstdBufferPool,
+            onPut,
+            onExpire,
+            delegate,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              assertThat(compressor).isEqualTo(Compressor.Value.IDENTITY);
+              assertThat(digest).isEqualTo(fileDigest);
+              inputStreams.incrementAndGet();
+              return new InputStream() {
+                private final InputStream delegate = file.substring((int) offset).newInput();
+
+                @Override
+                public int read() throws IOException {
+                  awaitRelease();
+                  return delegate.read();
+                }
+
+                @Override
+                public int read(byte[] buffer, int off, int len) throws IOException {
+                  awaitRelease();
+                  return delegate.read(buffer, off, len);
+                }
+
+                private void awaitRelease() throws IOException {
+                  fileReadStarted.countDown();
+                  try {
+                    releaseFileRead.await();
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                  }
+                }
+              };
+            });
+    directoryCache.initializeRootDirectory();
+
+    Context.CancellableContext context = Context.current().withCancellation();
+    Context previous = context.attach();
+    boolean attached = true;
+    try {
+      ListenableFuture<CASFileCache.PathResult> ownerFuture =
+          directoryCache.putDirectory(directoryDigest, directoriesIndex, putService);
+      assertThat(fileReadStarted.await(5, SECONDS)).isTrue();
+
+      context.detach(previous);
+      attached = false;
+      ListenableFuture<CASFileCache.PathResult> followerFuture =
+          directoryCache.putDirectory(directoryDigest, directoriesIndex, putService);
+      assertThat(inputStreams.get()).isEqualTo(1);
+      assertThat(followerFuture.isDone()).isFalse();
+
+      context.cancel(null);
+      releaseFileRead.countDown();
+
+      assertThrows(ExecutionException.class, () -> ownerFuture.get(5, SECONDS));
+      assertThrows(ExecutionException.class, () -> followerFuture.get(5, SECONDS));
+      assertThat(Files.exists(directoryCache.getDirectoryPath(directoryDigest))).isFalse();
+    } finally {
+      if (attached) {
+        context.detach(previous);
+      }
+      context.cancel(null);
+      releaseFileRead.countDown();
+    }
   }
 
   @Test
@@ -528,6 +784,226 @@ class CASFileCacheTest {
         throw new RuntimeException("could not shut down service");
       }
     }
+  }
+
+  @Test
+  public void waitForLastUnreferencedEntrySkipsWalkAtInfoLevel()
+      throws ExecutionException, IOException, InterruptedException {
+    try (LogCapture capture = new LogCapture(CASFileCache.class, Level.INFO)) {
+      runOverflowingPutAndAwaitWaitCycle(capture);
+
+      List<LogRecord> records = capture.snapshot();
+      assertThat(records).isNotEmpty();
+      // Production path emits only the new lightweight INFO summary; the detailed walk
+      // (header / per-unreferenced-entry / min/max summary) is now FINE-only and must
+      // not appear at INFO.
+      assertThat(records.stream().anyMatch(r -> formatted(r).contains("waiting:"))).isTrue();
+      assertThat(records.stream().noneMatch(r -> formatted(r).contains("header("))).isTrue();
+      assertThat(records.stream().noneMatch(r -> formatted(r).contains("unreferenced entry(")))
+          .isTrue();
+      assertThat(
+              records.stream().noneMatch(r -> formatted(r).contains("unreferenced list is empty")))
+          .isTrue();
+    }
+  }
+
+  @Test
+  public void waitForLastUnreferencedEntryEmitsDetailAtFineLevel()
+      throws ExecutionException, IOException, InterruptedException {
+    try (LogCapture capture = new LogCapture(CASFileCache.class, Level.FINE)) {
+      runOverflowingPutAndAwaitWaitCycle(capture);
+
+      List<LogRecord> records = capture.snapshot();
+      assertThat(records).isNotEmpty();
+      // FINE level reproduces the original detailed walk: a "header(" line per
+      // iteration plus a "unreferenced list is empty ... min(..) max(..)" summary
+      // per iteration. Production INFO summary line must NOT appear at FINE because
+      // the two paths are mutually exclusive.
+      assertThat(records.stream().anyMatch(r -> formatted(r).contains("header("))).isTrue();
+      assertThat(
+              records.stream().anyMatch(r -> formatted(r).contains("unreferenced list is empty")))
+          .isTrue();
+      assertThat(records.stream().noneMatch(r -> formatted(r).contains("waiting:"))).isTrue();
+    }
+  }
+
+  // Fills the cache with one referenced entry, then submits a second put that will park
+  // inside waitForLastUnreferencedEntry (LRU is empty while the first entry is held).
+  // Awaits at least one captured log record so the assertions see the wait-cycle output,
+  // then releases the held entry and drains the put.
+  private void runOverflowingPutAndAwaitWaitCycle(LogCapture capture)
+      throws ExecutionException, IOException, InterruptedException {
+    // Six 4096-byte blocks fill the 24576-byte cache, forcing the next put to wait.
+    byte[] bigData = new byte[22000];
+    ByteString bigBlob = ByteString.copyFrom(bigData);
+    Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
+    blobs.put(bigDigest, bigBlob);
+    Path bigPath = fileCache.put(bigDigest, /* isExecutable= */ false).path();
+
+    ExecutorService service = newSingleThreadExecutor();
+    Future<Void> putFuture =
+        service.submit(
+            () -> {
+              ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
+              Digest digest = DIGEST_UTIL.compute(content);
+              blobs.put(digest, content);
+              fileCache.put(digest, /* isExecutable= */ false);
+              return null;
+            });
+    try {
+      capture.awaitRecord(SECONDS.toNanos(5));
+      decrementReference(bigPath);
+      putFuture.get();
+    } finally {
+      if (!shutdownAndAwaitTermination(service, 1, SECONDS)) {
+        throw new RuntimeException("could not shut down service");
+      }
+    }
+  }
+
+  @Test
+  public void waitForLastUnreferencedEntryStillThrowsWhenStorageEmpty()
+      throws InterruptedException {
+    // Storage starts empty in the test fixture; the LRU header is unlinked so the
+    // method enters the wait loop and immediately throws on the empty-storage check.
+    IllegalStateException thrown = null;
+    synchronized (fileCache) {
+      try {
+        fileCache.waitForLastUnreferencedEntry(1024L);
+      } catch (IllegalStateException e) {
+        thrown = e;
+      }
+    }
+    assertThat(thrown).isNotNull();
+    assertThat(thrown).hasMessageThat().contains("there are no keys to wait for expiration on");
+  }
+
+  @Test
+  public void waitForLastUnreferencedEntryExitsOnSizeDropBelowLimit()
+      throws IOException, InterruptedException {
+    // Keep the only stored entry referenced so eviction has no LRU candidate.
+    byte[] bigData = new byte[1000];
+    ByteString bigBlob = ByteString.copyFrom(bigData);
+    Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
+    blobs.put(bigDigest, bigBlob);
+    Path bigPath = fileCache.put(bigDigest, /* isExecutable= */ false).path();
+
+    // An unfinished write reserves the remaining five blocks without adding an LRU entry.
+    Digest incompleteDigest = DIGEST_UTIL.compute(ByteString.copyFrom(new byte[20000]));
+    CancellableOutputStream incompleteOut =
+        (CancellableOutputStream) getWrite(incompleteDigest).getOutput(1, SECONDS, () -> {});
+    assertThat(fileCache.size()).isEqualTo(fileCache.maxSize());
+
+    ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
+    Digest digest = DIGEST_UTIL.compute(content);
+    blobs.put(digest, content);
+
+    AtomicReference<Path> result = new AtomicReference<>();
+    AtomicReference<Throwable> error = new AtomicReference<>();
+    Thread caller =
+        new Thread(
+            () -> {
+              try {
+                result.set(fileCache.put(digest, /* isExecutable= */ false).path());
+              } catch (Throwable t) {
+                error.set(t);
+              }
+            });
+    caller.start();
+    boolean cancelled = false;
+    try {
+      // The new put reserves a block, then waits because all stored entries are referenced.
+      long deadline = System.nanoTime() + SECONDS.toNanos(5);
+      while (caller.getState() != WAITING && System.nanoTime() < deadline) {
+        Thread.yield();
+      }
+      assertThat(caller.getState()).isEqualTo(WAITING);
+      synchronized (fileCache) {
+        assertThat(fileCache.size()).isEqualTo(fileCache.maxSize() + TEST_BLOCK_SIZE);
+      }
+
+      // Cancellation releases the reservation and notifies the waiter. The put must
+      // finish via the size-drop branch without needing to evict the referenced entry.
+      cancelled = true;
+      incompleteOut.cancel();
+      caller.join(SECONDS.toMillis(5));
+      assertThat(caller.isAlive()).isFalse();
+      assertThat(error.get()).isNull();
+      assertThat(result.get()).isNotNull();
+      assertThat(Files.exists(result.get())).isTrue();
+      assertThat(Files.exists(bigPath)).isTrue();
+      assertThat(storage).hasSize(2);
+      assertThat(fileCache.size()).isEqualTo(2 * TEST_BLOCK_SIZE);
+    } finally {
+      if (caller.isAlive()) {
+        caller.interrupt();
+      }
+      caller.join(SECONDS.toMillis(5));
+      if (!cancelled) {
+        incompleteOut.cancel();
+      }
+    }
+  }
+
+  /** Captures JUL log records for a target logger at a configured level. */
+  private static final class LogCapture implements AutoCloseable {
+    private final Logger logger;
+    private final Handler handler;
+    private final Level previousLevel;
+    private final boolean previousUseParentHandlers;
+    private final List<LogRecord> records = new CopyOnWriteArrayList<>();
+
+    LogCapture(Class<?> targetClass, Level level) {
+      this.logger = Logger.getLogger(targetClass.getName());
+      this.previousLevel = logger.getLevel();
+      this.previousUseParentHandlers = logger.getUseParentHandlers();
+      this.handler =
+          new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+              records.add(record);
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+          };
+      handler.setLevel(Level.ALL);
+      logger.setLevel(level);
+      logger.setUseParentHandlers(false);
+      logger.addHandler(handler);
+    }
+
+    void awaitRecord(long timeoutNanos) throws InterruptedException {
+      long deadline = System.nanoTime() + timeoutNanos;
+      while (records.isEmpty()) {
+        if (System.nanoTime() >= deadline) {
+          throw new AssertionError(
+              "no log record arrived within " + NANOSECONDS.toMillis(timeoutNanos) + "ms");
+        }
+        MICROSECONDS.sleep(100);
+      }
+    }
+
+    List<LogRecord> snapshot() {
+      return new ArrayList<>(records);
+    }
+
+    @Override
+    public void close() {
+      logger.removeHandler(handler);
+      logger.setLevel(previousLevel);
+      logger.setUseParentHandlers(previousUseParentHandlers);
+    }
+  }
+
+  // CASFileCache pre-formats log messages with String.format, so LogRecord.getParameters()
+  // is always null and getMessage() is the final string.
+  private static String formatted(LogRecord r) {
+    String msg = r.getMessage();
+    return msg == null ? "" : msg;
   }
 
   @Test
@@ -1675,6 +2151,57 @@ class CASFileCacheTest {
                   .getRootDirectories(),
               null),
           /* storeFileDirsIndexInMemory= */ false);
+    }
+  }
+
+  private static final class QueuedExecutorService extends AbstractExecutorService {
+    private final Deque<Runnable> tasks = new ArrayDeque<>();
+    private boolean shutdown = false;
+
+    @Override
+    public void shutdown() {
+      shutdown = true;
+    }
+
+    @Override
+    public java.util.List<Runnable> shutdownNow() {
+      shutdown = true;
+      java.util.List<Runnable> pendingTasks = ImmutableList.copyOf(tasks);
+      tasks.clear();
+      return pendingTasks;
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return shutdown;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return shutdown && tasks.isEmpty();
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      return isTerminated();
+    }
+
+    @Override
+    public void execute(Runnable command) {
+      if (shutdown) {
+        throw new java.util.concurrent.RejectedExecutionException();
+      }
+      tasks.add(command);
+    }
+
+    void runNext() {
+      tasks.remove().run();
+    }
+
+    void runAll() {
+      while (!tasks.isEmpty()) {
+        runNext();
+      }
     }
   }
 }
