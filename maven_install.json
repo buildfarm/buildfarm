@@ -83,7 +83,7 @@
     "net.javacrumbs.future-converter:future-converter-java8-guava": -265885626,
     "net.jcip:jcip-annotations": -895865523,
     "org.apache.commons:commons-compress": -1289113474,
-    "org.apache.commons:commons-lang3": -2075119816,
+    "org.apache.commons:commons-lang3": 422896121,
     "org.apache.commons:commons-pool2": 199462478,
     "org.apache.httpcomponents:httpclient": 1643860045,
     "org.apache.tomcat:annotations-api": 1366882333,
@@ -116,12 +116,12 @@
     "com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider": 278331302,
     "com.fasterxml.jackson.module:jackson-module-jaxb-annotations": 199851608,
     "com.github.ben-manes.caffeine:caffeine": -1982218101,
-    "com.github.docker-java:docker-java": 1689916387,
+    "com.github.docker-java:docker-java": 1994238005,
     "com.github.docker-java:docker-java-api": -1951121294,
-    "com.github.docker-java:docker-java-core": 1915994547,
+    "com.github.docker-java:docker-java-core": -1489830737,
     "com.github.docker-java:docker-java-transport": 1636993572,
-    "com.github.docker-java:docker-java-transport-jersey": -2047807522,
-    "com.github.docker-java:docker-java-transport-netty": 1015463380,
+    "com.github.docker-java:docker-java-transport-jersey": 1638712081,
+    "com.github.docker-java:docker-java-transport-netty": -1189138515,
     "com.github.fppt:jedis-mock": 535836718,
     "com.github.jnr:jffi": -1023150778,
     "com.github.jnr:jffi:jar:native": -136718591,
@@ -243,8 +243,8 @@
     "net.javacrumbs.future-converter:future-converter-java8-guava": 82024381,
     "net.jcip:jcip-annotations": -1056889859,
     "net.sf.jopt-simple:jopt-simple": 19860810,
-    "org.apache.commons:commons-compress": -1115316192,
-    "org.apache.commons:commons-lang3": -334582849,
+    "org.apache.commons:commons-compress": -1210139850,
+    "org.apache.commons:commons-lang3": -648243582,
     "org.apache.commons:commons-math3": -1540896879,
     "org.apache.commons:commons-pool2": 1348705978,
     "org.apache.httpcomponents:httpclient": -1865169839,
@@ -1132,9 +1132,9 @@
     },
     "org.apache.commons:commons-lang3": {
       "shasums": {
-        "jar": "a2af247ec4db6eb8947e18e23e0433e4871a7c5d0a40e1f92e46ede54ae1defe"
+        "jar": "2ea88052c8662bf51874f4159467ba24b040b22dfd54d2596e11936896c76192"
       },
-      "version": "3.21.0"
+      "version": "3.22.0"
     },
     "org.apache.commons:commons-math3": {
       "shasums": {
