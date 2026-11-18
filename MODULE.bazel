@@ -29,7 +29,7 @@ bazel_dep(name = "grpc", version = GRPC_VERSION, repo_name = "com_github_grpc_gr
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "blake3", version = "1.8.2.bcr.1")
-bazel_dep(name = "buildifier_prebuilt", version = "10.1.0")
+bazel_dep(name = "buildifier_prebuilt", version = "10.2.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
 bazel_dep(name = "grpc-java", version = GRPC_JAVA_VERSION)
 archive_override(
