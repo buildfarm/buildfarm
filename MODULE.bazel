@@ -41,7 +41,7 @@ archive_override(
     urls = ["https://github.com/grpc/grpc-java/archive/refs/tags/v" + GRPC_JAVA_VERSION + ".tar.gz"],
 )
 
-bazel_dep(name = "googleapis", version = "0.0.0-20260929-28769825")
+bazel_dep(name = "googleapis", version = "0.0.0-20261103-57aa4dbc")
 bazel_dep(name = "googleapis-grpc-java", version = "1.1.5")
 bazel_dep(name = "grpc-proto", version = "0.0.0-20260915-dd549fc", repo_name = "io_grpc_grpc_proto")
 bazel_dep(name = "hermetic_cc_toolchain", version = "4.3.0")
