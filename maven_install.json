@@ -5,7 +5,7 @@
     "com.amazonaws:aws-java-sdk-core": -1345067077,
     "com.amazonaws:aws-java-sdk-s3": 1221415194,
     "com.amazonaws:aws-java-sdk-secretsmanager": 1815998320,
-    "com.fasterxml.jackson.core:jackson-databind": -1774975712,
+    "com.fasterxml.jackson.core:jackson-databind": -637076515,
     "com.github.ben-manes.caffeine:caffeine": 1146040953,
     "com.github.docker-java:docker-java": 421032364,
     "com.github.docker-java:docker-java-api": 1515671481,
@@ -103,25 +103,25 @@
     "repositories": 514854214
   },
   "__RESOLVED_ARTIFACTS_HASH": {
-    "com.amazonaws:aws-java-sdk-core": 1574396543,
-    "com.amazonaws:aws-java-sdk-kms": -38470359,
-    "com.amazonaws:aws-java-sdk-s3": 1621690598,
-    "com.amazonaws:aws-java-sdk-secretsmanager": -1003818652,
-    "com.amazonaws:jmespath-java": 343483864,
-    "com.fasterxml.jackson.core:jackson-annotations": -1369026137,
-    "com.fasterxml.jackson.core:jackson-core": -850624377,
-    "com.fasterxml.jackson.core:jackson-databind": 593979767,
-    "com.fasterxml.jackson.dataformat:jackson-dataformat-cbor": -1963069846,
-    "com.fasterxml.jackson.jaxrs:jackson-jaxrs-base": 18181988,
-    "com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider": 1082297574,
-    "com.fasterxml.jackson.module:jackson-module-jaxb-annotations": -914373278,
+    "com.amazonaws:aws-java-sdk-core": 2010803953,
+    "com.amazonaws:aws-java-sdk-kms": -644945240,
+    "com.amazonaws:aws-java-sdk-s3": -12459250,
+    "com.amazonaws:aws-java-sdk-secretsmanager": -631718877,
+    "com.amazonaws:jmespath-java": -1445919312,
+    "com.fasterxml.jackson.core:jackson-annotations": -1164007714,
+    "com.fasterxml.jackson.core:jackson-core": -893464506,
+    "com.fasterxml.jackson.core:jackson-databind": 823453948,
+    "com.fasterxml.jackson.dataformat:jackson-dataformat-cbor": -1494917777,
+    "com.fasterxml.jackson.jaxrs:jackson-jaxrs-base": 486334057,
+    "com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider": 278331302,
+    "com.fasterxml.jackson.module:jackson-module-jaxb-annotations": 199851608,
     "com.github.ben-manes.caffeine:caffeine": -335548148,
-    "com.github.docker-java:docker-java": 998886418,
-    "com.github.docker-java:docker-java-api": -60307625,
-    "com.github.docker-java:docker-java-core": 1431377649,
+    "com.github.docker-java:docker-java": -619693831,
+    "com.github.docker-java:docker-java-api": -1951121294,
+    "com.github.docker-java:docker-java-core": 2002509825,
     "com.github.docker-java:docker-java-transport": 1636993572,
-    "com.github.docker-java:docker-java-transport-jersey": 1261137585,
-    "com.github.docker-java:docker-java-transport-netty": 68174363,
+    "com.github.docker-java:docker-java-transport-jersey": -935766223,
+    "com.github.docker-java:docker-java-transport-netty": -510763481,
     "com.github.fppt:jedis-mock": -358605108,
     "com.github.jnr:jffi": -1051844914,
     "com.github.jnr:jffi:jar:native": -1162544056,
@@ -328,21 +328,21 @@
     },
     "com.fasterxml.jackson.core:jackson-annotations": {
       "shasums": {
-        "jar": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0"
+        "jar": "e5b60c3088e0887b290ff9226394354589a1dad583743944b7f5538661056b4c"
       },
-      "version": "2.22"
+      "version": "2.23"
     },
     "com.fasterxml.jackson.core:jackson-core": {
       "shasums": {
-        "jar": "2d30c375cddea9657a1e1ef97547a2694b663b355facb4de53a097782b312d1a"
+        "jar": "449798beb4c4ec26de9cc25b39ca2198036883fb905ca968cbef7136d19a25d9"
       },
-      "version": "2.22.4"
+      "version": "2.23.0"
     },
     "com.fasterxml.jackson.core:jackson-databind": {
       "shasums": {
-        "jar": "d4cbf8947087f305869826801913abdc50735a1fab2074a1993e7bc67ca974a3"
+        "jar": "abd1edd2736c764da03fe6cb7a9de70d48dd0a198aed131604c564bff62f9cc1"
       },
-      "version": "2.22.4"
+      "version": "2.23.0"
     },
     "com.fasterxml.jackson.dataformat:jackson-dataformat-cbor": {
       "shasums": {
@@ -1429,9 +1429,9 @@
     }
   },
   "conflict_resolution": {
-    "com.fasterxml.jackson.core:jackson-annotations:2.10.3": "com.fasterxml.jackson.core:jackson-annotations:2.22",
-    "com.fasterxml.jackson.core:jackson-core:2.10.3": "com.fasterxml.jackson.core:jackson-core:2.22.4",
-    "com.fasterxml.jackson.core:jackson-core:2.12.6": "com.fasterxml.jackson.core:jackson-core:2.22.4",
+    "com.fasterxml.jackson.core:jackson-annotations:2.10.3": "com.fasterxml.jackson.core:jackson-annotations:2.23",
+    "com.fasterxml.jackson.core:jackson-core:2.10.3": "com.fasterxml.jackson.core:jackson-core:2.23.0",
+    "com.fasterxml.jackson.core:jackson-core:2.12.6": "com.fasterxml.jackson.core:jackson-core:2.23.0",
     "com.google.auto.value:auto-value-annotations:1.9": "com.google.auto.value:auto-value-annotations:1.10.4",
     "commons-codec:commons-codec:1.11": "commons-codec:commons-codec:1.15",
     "commons-codec:commons-codec:1.19.0": "commons-codec:commons-codec:1.15",
@@ -2199,7 +2199,7 @@
       "com.fasterxml.jackson.core.exc",
       "com.fasterxml.jackson.core.filter",
       "com.fasterxml.jackson.core.format",
-      "com.fasterxml.jackson.core.internal.shaded.fdp.v2_22_4",
+      "com.fasterxml.jackson.core.internal.shaded.fdp.v2_23_0",
       "com.fasterxml.jackson.core.io",
       "com.fasterxml.jackson.core.io.schubfach",
       "com.fasterxml.jackson.core.json",
