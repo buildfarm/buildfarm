@@ -13,7 +13,7 @@
     "com.github.docker-java:docker-java-core": 468240944,
     "com.github.fppt:jedis-mock": -1448946474,
     "com.github.jnr:jffi": -769134592,
-    "com.github.jnr:jnr-constants": -750352976,
+    "com.github.jnr:jnr-constants": -70294606,
     "com.github.jnr:jnr-ffi": -1669186116,
     "com.github.jnr:jnr-posix": -660948253,
     "com.github.luben:zstd-jni": 1042493103,
@@ -126,16 +126,16 @@
     "com.github.jnr:jffi": -1023150778,
     "com.github.jnr:jffi:jar:native": -136718591,
     "com.github.jnr:jnr-a64asm": -1767256317,
-    "com.github.jnr:jnr-constants": 1388208067,
+    "com.github.jnr:jnr-constants": -2096062092,
     "com.github.jnr:jnr-ffi": 236194906,
-    "com.github.jnr:jnr-posix": 820762604,
+    "com.github.jnr:jnr-posix": -498112814,
     "com.github.jnr:jnr-x86asm": 1097235222,
     "com.github.kevinstern:software-and-algorithms": -863567887,
     "com.github.luben:zstd-jni": -831281182,
     "com.github.oshi:oshi-common": 446254739,
     "com.github.oshi:oshi-core": 1853479862,
     "com.github.pcj:google-options": 1508027358,
-    "com.github.serceman:jnr-fuse": -2068359312,
+    "com.github.serceman:jnr-fuse": 906476448,
     "com.google.android:annotations": 769933135,
     "com.google.api.grpc:proto-google-common-protos": -851522980,
     "com.google.auth:google-auth-library-credentials": -1234565088,
@@ -431,9 +431,9 @@
     },
     "com.github.jnr:jnr-constants": {
       "shasums": {
-        "jar": "1abad8ddc450d415ee6fc62bfd3c87b9db58e71b8b2e3b04c87570f78f66e526"
+        "jar": "c2a810acca332c0eef9666799b3bbea260b468c3d20828493d69915b852fe34b"
       },
-      "version": "0.11.2"
+      "version": "0.11.4"
     },
     "com.github.jnr:jnr-ffi": {
       "shasums": {
