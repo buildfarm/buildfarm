@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
     - kubernetes/helm-charts/buildfarm/**
+  merge_group:
+    types: [checks_requested]
+    branches: [main]
 
 env:
   CHART_ROOT: kubernetes/helm-charts/buildfarm
