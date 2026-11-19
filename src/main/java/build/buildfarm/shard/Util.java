@@ -14,6 +14,7 @@
 
 package build.buildfarm.shard;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -44,8 +45,11 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @Log
+@NullMarked
 public final class Util {
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.test(st);
@@ -128,14 +132,13 @@ public final class Util {
           }
 
           @Override
-          public void onSuccess(String worker) {
+          public void onSuccess(@Nullable String worker) {
             if (worker != null) {
               foundWorkers.add(worker);
             }
             complete();
           }
 
-          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             fail(Status.fromThrowable(t).asRuntimeException());
@@ -154,8 +157,8 @@ public final class Util {
           instance,
           new FutureCallback<>() {
             @Override
-            public void onSuccess(Boolean found) {
-              foundCallback.onSuccess(found ? worker : null);
+            public void onSuccess(@Nullable Boolean found) {
+              foundCallback.onSuccess(Boolean.TRUE.equals(found) ? worker : null);
             }
 
             @SuppressWarnings("NullableProblems")
@@ -185,8 +188,9 @@ public final class Util {
         missingBlobsFuture,
         new FutureCallback<>() {
           @Override
-          public void onSuccess(Iterable<build.bazel.remote.execution.v2.Digest> missingDigests) {
-            boolean found = Iterables.isEmpty(missingDigests);
+          public void onSuccess(
+              @Nullable Iterable<build.bazel.remote.execution.v2.Digest> missingDigests) {
+            boolean found = Iterables.isEmpty(checkNotNull(missingDigests));
             log.log(
                 Level.FINER,
                 format(

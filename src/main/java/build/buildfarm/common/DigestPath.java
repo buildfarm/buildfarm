@@ -16,5 +16,7 @@ package build.buildfarm.common;
 
 import build.buildfarm.v1test.Digest;
 import java.nio.file.Path;
+import org.jspecify.annotations.NullMarked;
 
+@NullMarked
 public record DigestPath(Digest digest, Path path) {}
