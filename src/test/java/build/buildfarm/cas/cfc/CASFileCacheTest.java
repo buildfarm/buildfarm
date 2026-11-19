@@ -117,13 +117,11 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.stubbing.Answer;
 
-@SuppressWarnings("PMD.TestClassWithoutTestCases")
 class CASFileCacheTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   private CASFileCache fileCache;
   private final Path root;
-  private final boolean storeFileDirsIndexInMemory;
   private Map<Digest, ByteString> blobs;
   private FixedBufferPool zstdBufferPool;
   private ExecutorService putService;
@@ -138,9 +136,8 @@ class CASFileCacheTest {
 
   private ConcurrentMap<String, Entry> storage;
 
-  protected CASFileCacheTest(Path fileSystemRoot, boolean storeFileDirsIndexInMemory) {
+  protected CASFileCacheTest(Path fileSystemRoot) {
     this.root = fileSystemRoot.resolve("cache");
-    this.storeFileDirsIndexInMemory = storeFileDirsIndexInMemory;
   }
 
   private static final long TEST_BLOCK_SIZE = 4096;
@@ -2024,7 +2021,7 @@ class CASFileCacheTest {
   @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class NativeFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public NativeFileDirsIndexInMemoryCASFileCacheTest() throws IOException {
-      super(createTempDirectory(), /* storeFileDirsIndexInMemory= */ true);
+      super(createTempDirectory());
     }
 
     private static Path createTempDirectory() throws IOException {
@@ -2039,7 +2036,7 @@ class CASFileCacheTest {
   @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class NativeFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
     public NativeFileDirsIndexInSqliteCASFileCacheTest() throws IOException {
-      super(createTempDirectory(), /* storeFileDirsIndexInMemory= */ false);
+      super(createTempDirectory());
     }
 
     private static Path createTempDirectory() throws IOException {
@@ -2061,8 +2058,7 @@ class CASFileCacheTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null),
-          /* storeFileDirsIndexInMemory= */ true);
+              null));
     }
   }
 
@@ -2077,8 +2073,7 @@ class CASFileCacheTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null),
-          /* storeFileDirsIndexInMemory= */ false);
+              null));
     }
   }
 
@@ -2093,8 +2088,7 @@ class CASFileCacheTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null),
-          /* storeFileDirsIndexInMemory= */ true);
+              null));
     }
   }
 
@@ -2109,8 +2103,7 @@ class CASFileCacheTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null),
-          /* storeFileDirsIndexInMemory= */ false);
+              null));
     }
   }
 
@@ -2125,8 +2118,7 @@ class CASFileCacheTest {
                           .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
                           .build())
                   .getRootDirectories(),
-              null),
-          /* storeFileDirsIndexInMemory= */ true);
+              null));
     }
   }
 
@@ -2141,8 +2133,7 @@ class CASFileCacheTest {
                           .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
                           .build())
                   .getRootDirectories(),
-              null),
-          /* storeFileDirsIndexInMemory= */ false);
+              null));
     }
   }
 
