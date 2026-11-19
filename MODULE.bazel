@@ -104,7 +104,7 @@ maven.install(
         "com.github.oshi:oshi-core:6.12.0",
         "com.github.pcj:google-options:1.0.0",
         "com.github.serceman:jnr-fuse:0.5.8",
-        "com.google.api.grpc:proto-google-common-protos:2.61.1",
+        "com.google.api.grpc:proto-google-common-protos:2.82.0",
         "com.google.auth:google-auth-library-credentials",  # Version is specified via the BOM below
         "com.google.auth:google-auth-library-oauth2-http",  # Version is specified via the BOM below
         "com.google.code.findbugs:jsr305:3.0.2",
@@ -114,8 +114,8 @@ maven.install(
         "com.google.guava:failureaccess:1.0.3",
         "com.google.guava:guava:33.7.2-jre",
         "com.google.j2objc:j2objc-annotations:3.1",
-        "com.google.protobuf:protobuf-java:4.32.1",
-        "com.google.protobuf:protobuf-java-util:4.32.1",
+        "com.google.protobuf:protobuf-java:4.36.2",
+        "com.google.protobuf:protobuf-java-util:4.36.2",
         "com.owteam.engUtils:netrc:2.0.1",
         "commons-io:commons-io:2.22.0",
         "info.picocli:picocli:4.7.7",
