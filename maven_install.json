@@ -20,7 +20,7 @@
     "com.github.oshi:oshi-core": -1600608347,
     "com.github.pcj:google-options": -562301404,
     "com.github.serceman:jnr-fuse": 40392477,
-    "com.google.api.grpc:proto-google-common-protos": 1487076480,
+    "com.google.api.grpc:proto-google-common-protos": 1755745022,
     "com.google.auth:google-auth-library-bom": -1197536341,
     "com.google.auth:google-auth-library-credentials": 82286699,
     "com.google.auth:google-auth-library-oauth2-http": 991267597,
@@ -32,8 +32,8 @@
     "com.google.guava:guava": 671676083,
     "com.google.j2objc:j2objc-annotations": -26400317,
     "com.google.jimfs:jimfs": 335886905,
-    "com.google.protobuf:protobuf-java": 535961753,
-    "com.google.protobuf:protobuf-java-util": 1298272668,
+    "com.google.protobuf:protobuf-java": 130636446,
+    "com.google.protobuf:protobuf-java-util": 892947361,
     "com.google.truth:truth": 874936572,
     "com.owteam.engUtils:netrc": -564438396,
     "commons-io:commons-io": 1305681826,
@@ -137,7 +137,7 @@
     "com.github.pcj:google-options": -918604326,
     "com.github.serceman:jnr-fuse": 906476448,
     "com.google.android:annotations": 769933135,
-    "com.google.api.grpc:proto-google-common-protos": -851522980,
+    "com.google.api.grpc:proto-google-common-protos": -834027448,
     "com.google.auth:google-auth-library-credentials": -1234565088,
     "com.google.auth:google-auth-library-oauth2-http": -285556432,
     "com.google.auto.service:auto-service-annotations": -1142839511,
@@ -148,7 +148,7 @@
     "com.google.errorprone:error_prone_annotation": 637836532,
     "com.google.errorprone:error_prone_annotations": -2000806941,
     "com.google.errorprone:error_prone_check_api": -1436212313,
-    "com.google.errorprone:error_prone_core": -374308856,
+    "com.google.errorprone:error_prone_core": 629947779,
     "com.google.googlejavaformat:google-java-format": -1023461956,
     "com.google.guava:failureaccess": -56291903,
     "com.google.guava:guava": -1079189681,
@@ -157,8 +157,8 @@
     "com.google.http-client:google-http-client-gson": -1750771414,
     "com.google.j2objc:j2objc-annotations": -2074422376,
     "com.google.jimfs:jimfs": 1508016591,
-    "com.google.protobuf:protobuf-java": -7996066,
-    "com.google.protobuf:protobuf-java-util": -1684246757,
+    "com.google.protobuf:protobuf-java": 1679593551,
+    "com.google.protobuf:protobuf-java-util": -71017775,
     "com.google.truth:truth": 1290878285,
     "com.kohlschutter.junixsocket:junixsocket-common": -853957865,
     "com.kohlschutter.junixsocket:junixsocket-native-common": 654854807,
@@ -179,9 +179,9 @@
     "io.grpc:grpc-inprocess": -351288045,
     "io.grpc:grpc-netty": -2055989717,
     "io.grpc:grpc-netty-shaded": -1988594516,
-    "io.grpc:grpc-protobuf": 1681029770,
+    "io.grpc:grpc-protobuf": 1533575675,
     "io.grpc:grpc-protobuf-lite": 1204423528,
-    "io.grpc:grpc-services": -522033473,
+    "io.grpc:grpc-services": -1834175904,
     "io.grpc:grpc-stub": 96749057,
     "io.grpc:grpc-testing": 344008050,
     "io.grpc:grpc-util": 1618056700,
@@ -500,9 +500,9 @@
     },
     "com.google.api.grpc:proto-google-common-protos": {
       "shasums": {
-        "jar": "dd8f29e813d2b27a4d5e9ae34c90dd17af3e98af3f445556815516b39eeaf366"
+        "jar": "3b65da59f807ea6b4f27335c41b8fe669e5aa6df85b54a109b891ab56965fc3e"
       },
-      "version": "2.61.1"
+      "version": "2.82.0"
     },
     "com.google.auth:google-auth-library-credentials": {
       "shasums": {
@@ -620,15 +620,15 @@
     },
     "com.google.protobuf:protobuf-java": {
       "shasums": {
-        "jar": "8c99e4d971338bafb0b0b1d1cea9b1bbb3dc9630eb9c25109e4c7c27bca832cb"
+        "jar": "0773e72eaf375e1285df330575bfec5bda5da674d544d0e142a17f89c8f754da"
       },
-      "version": "4.32.1"
+      "version": "4.36.2"
     },
     "com.google.protobuf:protobuf-java-util": {
       "shasums": {
-        "jar": "65bd990b8a3d5625cee9910a4256d00eb780c3961eda5b422a0945ace09dcafd"
+        "jar": "b67a109066cf06f60bb447a6cbcc6709b94d1a5a41ced84330d68e8023e8e0c5"
       },
-      "version": "4.32.1"
+      "version": "4.36.2"
     },
     "com.google.truth:truth": {
       "shasums": {
@@ -1679,8 +1679,6 @@
       "com.google.code.findbugs:jsr305",
       "com.google.code.gson:gson",
       "com.google.errorprone:error_prone_annotations",
-      "com.google.guava:guava",
-      "com.google.j2objc:j2objc-annotations",
       "com.google.protobuf:protobuf-java"
     ],
     "com.google.truth:truth": [
