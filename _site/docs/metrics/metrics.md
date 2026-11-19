@@ -160,6 +160,10 @@ Histogram for amount of time CAS entries live on L1 storage before expiration (s
 
 Gauge of the total number of entries in the worker's CAS
 
+**cas_unreferenced_entry_count**
+
+Gauge of the number of unreferenced entries in the worker's CAS
+
 **cas_copy_fallback**
 Counter for the number of times the CAS performed a file copy because hardlinking failed
 
