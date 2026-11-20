@@ -397,6 +397,11 @@ public class BalancedRedisQueue<E> {
     return name + "_dequeue";
   }
 
+  /** Returns the queue name exactly as it appears in {@link QueueStatus}. */
+  public String getStatusName() {
+    return RedisHashtags.hashedName(name, originalHashtag);
+  }
+
   // annoying that there's no inject/accumulate
   private static long size(Iterable<Long> sizes) {
     long size = 0;
@@ -462,7 +467,7 @@ public class BalancedRedisQueue<E> {
       public QueueStatus get() {
         List<Long> sizes = sizeSuppliers.stream().map(Supplier::get).collect(Collectors.toList());
         return QueueStatus.newBuilder()
-            .setName(RedisHashtags.hashedName(name, originalHashtag))
+            .setName(getStatusName())
             .setSize(sizes.stream().mapToLong(Long::longValue).sum())
             .addAllInternalSizes(sizes)
             .build();
