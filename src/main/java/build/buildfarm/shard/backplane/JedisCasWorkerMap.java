@@ -18,11 +18,17 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.redis.ScanCount;
 import build.buildfarm.v1test.Digest;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import redis.clients.jedis.AbstractPipeline;
+import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.exceptions.JedisException;
 
 /**
  * @class JedisCasWorkerMap
@@ -76,13 +82,17 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   @Override
   public void adjust(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) {
     String key = redisCasKey(blobDigest);
-    for (String workerName : addWorkers) {
-      jedis.sadd(key, workerName);
+    try (AbstractPipeline pipeline = jedis.pipelined()) {
+      List<Response<?>> responses = new ArrayList<>();
+      if (!addWorkers.isEmpty()) {
+        responses.add(pipeline.sadd(key, addWorkers.toArray(String[]::new)));
+      }
+      if (!removeWorkers.isEmpty()) {
+        responses.add(pipeline.srem(key, removeWorkers.toArray(String[]::new)));
+      }
+      responses.add(pipeline.expire(key, keyExpiration_s));
+      syncAndCheck(pipeline, responses);
     }
-    for (String workerName : removeWorkers) {
-      jedis.srem(key, workerName);
-    }
-    jedis.expire(key, keyExpiration_s);
   }
 
   /**
@@ -96,8 +106,11 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   @Override
   public void add(Digest blobDigest, String workerName) {
     String key = redisCasKey(blobDigest);
-    jedis.sadd(key, workerName);
-    jedis.expire(key, keyExpiration_s);
+    try (AbstractPipeline pipeline = jedis.pipelined()) {
+      Response<Long> addResponse = pipeline.sadd(key, workerName);
+      Response<Long> expireResponse = pipeline.expire(key, keyExpiration_s);
+      syncAndCheck(pipeline, List.of(addResponse, expireResponse));
+    }
   }
 
   /**
@@ -110,17 +123,15 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    */
   @Override
   public void addAll(Iterable<Digest> blobDigests, String workerName) {
-    try (AbstractPipeline p = jedis.pipelined()) {
-      int chunkCount = 0;
-      for (Digest blobDigest : blobDigests) {
-        String key = redisCasKey(blobDigest);
-        p.sadd(key, workerName);
-        p.expire(key, keyExpiration_s);
-        chunkCount++;
-        if (chunkCount >= PIPELINE_CHUNK_MAX) {
-          p.sync();
-          chunkCount = 0;
+    for (List<Digest> chunk : Iterables.partition(blobDigests, PIPELINE_CHUNK_MAX)) {
+      try (AbstractPipeline pipeline = jedis.pipelined()) {
+        List<Response<?>> responses = new ArrayList<>();
+        for (Digest blobDigest : chunk) {
+          String key = redisCasKey(blobDigest);
+          responses.add(pipeline.sadd(key, workerName));
+          responses.add(pipeline.expire(key, keyExpiration_s));
         }
+        syncAndCheck(pipeline, responses);
       }
     }
   }
@@ -148,16 +159,14 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    */
   @Override
   public void removeAll(Iterable<Digest> blobDigests, String workerName) {
-    try (AbstractPipeline p = jedis.pipelined()) {
-      int chunkCount = 0;
-      for (Digest blobDigest : blobDigests) {
-        String key = redisCasKey(blobDigest);
-        p.srem(key, workerName);
-        chunkCount++;
-        if (chunkCount >= PIPELINE_CHUNK_MAX) {
-          p.sync();
-          chunkCount = 0;
+    for (List<Digest> chunk : Iterables.partition(blobDigests, PIPELINE_CHUNK_MAX)) {
+      try (AbstractPipeline pipeline = jedis.pipelined()) {
+        List<Response<?>> responses = new ArrayList<>();
+        for (Digest blobDigest : chunk) {
+          String key = redisCasKey(blobDigest);
+          responses.add(pipeline.srem(key, workerName));
         }
+        syncAndCheck(pipeline, responses);
       }
     }
   }
@@ -173,8 +182,12 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   @Override
   public String getAny(Digest blobDigest) {
     String key = redisCasKey(blobDigest);
-    jedis.expire(key, keyExpiration_s);
-    return jedis.srandmember(key);
+    try (AbstractPipeline pipeline = jedis.pipelined()) {
+      Response<Long> expiration = pipeline.expire(key, keyExpiration_s);
+      Response<String> workers = pipeline.srandmember(key);
+      syncAndCheck(pipeline, List.of(expiration, workers));
+      return workers.get();
+    }
   }
 
   /**
@@ -188,8 +201,12 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   @Override
   public Set<String> get(Digest blobDigest) {
     String key = redisCasKey(blobDigest);
-    jedis.expire(key, keyExpiration_s);
-    return jedis.smembers(key);
+    try (AbstractPipeline pipeline = jedis.pipelined()) {
+      Response<Long> expiration = pipeline.expire(key, keyExpiration_s);
+      Response<Set<String>> workers = pipeline.smembers(key);
+      syncAndCheck(pipeline, List.of(expiration, workers));
+      return workers.get();
+    }
   }
 
   @Override
@@ -209,14 +226,20 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   @Override
   public Map<Digest, Set<String>> getMap(Iterable<Digest> blobDigests) {
     ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
-    for (Digest blobDigest : blobDigests) {
-      String key = redisCasKey(blobDigest);
-      Set<String> workers = jedis.smembers(key);
-
-      if (workers.isEmpty()) {
-        continue;
+    for (List<Digest> chunk : Iterables.partition(blobDigests, PIPELINE_CHUNK_MAX)) {
+      try (AbstractPipeline pipeline = jedis.pipelined()) {
+        Map<Digest, Response<Set<String>>> responses = new HashMap<>();
+        for (Digest blobDigest : chunk) {
+          responses.put(blobDigest, pipeline.smembers(redisCasKey(blobDigest)));
+        }
+        pipeline.sync();
+        for (Map.Entry<Digest, Response<Set<String>>> entry : responses.entrySet()) {
+          Set<String> workers = entry.getValue().get();
+          if (!workers.isEmpty()) {
+            blobDigestsWorkers.put(entry.getKey(), workers);
+          }
+        }
       }
-      blobDigestsWorkers.put(blobDigest, workers);
     }
     return blobDigestsWorkers.build();
   }
@@ -234,9 +257,35 @@ public class JedisCasWorkerMap implements CasWorkerMap {
 
   @Override
   public void setExpire(Iterable<Digest> blobDigests) {
-    for (Digest blobDigest : blobDigests) {
-      String key = redisCasKey(blobDigest);
-      jedis.expire(key, keyExpiration_s);
+    for (List<Digest> chunk : Iterables.partition(blobDigests, PIPELINE_CHUNK_MAX)) {
+      try (AbstractPipeline pipeline = jedis.pipelined()) {
+        List<Response<?>> responses = new ArrayList<>();
+        for (Digest blobDigest : chunk) {
+          responses.add(pipeline.expire(redisCasKey(blobDigest), keyExpiration_s));
+        }
+        syncAndCheck(pipeline, responses);
+      }
+    }
+  }
+
+  /** Synchronizes the pipeline and aggregates response failures. */
+  private static void syncAndCheck(
+      AbstractPipeline pipeline, List<? extends Response<?>> responses) {
+    pipeline.sync();
+    List<RuntimeException> failures = new ArrayList<>();
+    // Command errors are surfaced only when you call response.get()
+    for (Response<?> response : responses) {
+      try {
+        response.get();
+      } catch (RuntimeException e) {
+        failures.add(e);
+      }
+    }
+    if (!failures.isEmpty()) {
+      JedisException exception =
+          new JedisException("Pipeline failed with " + failures.size() + " response errors");
+      failures.forEach(exception::addSuppressed);
+      throw exception;
     }
   }
 
