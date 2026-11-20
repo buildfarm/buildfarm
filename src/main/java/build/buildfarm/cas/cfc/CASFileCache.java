@@ -451,6 +451,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private void saveLRU() {
+    if (db == null) {
+        return;
+    }
     List<SizeEntry> list = lruSizeEntryList();
     try {
       synchronized (lru) {
