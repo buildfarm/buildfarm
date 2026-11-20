@@ -15,6 +15,7 @@
 package build.buildfarm.shard.backplane;
 
 import static build.buildfarm.common.io.Utils.formatIOError;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.RedisClient;
@@ -34,6 +35,8 @@ import redis.clients.jedis.exceptions.JedisException;
 
 @Log
 class RedisShardSubscription implements Runnable {
+  private static final long RECONNECT_DELAY_SECONDS = 1;
+
   private final RedisShardSubscriber subscriber;
   private final InterruptingRunnable onUnsubscribe;
   private final Consumer<UnifiedJedis> onReset;
@@ -140,16 +143,28 @@ class RedisShardSubscription implements Runnable {
     }
   }
 
-  private void mainLoop() throws IOException {
+  private void mainLoop() throws IOException, InterruptedException {
     boolean first = true;
-    while (subscriptionState.get() != SubscriptionState.STOPPED_BUT_SUBSCRIBED
-        && subscriptionState.get() != SubscriptionState.FULLY_STOPPED) {
+    while (!isStopped()) {
       if (!first) {
-        log.log(Level.SEVERE, "unexpected subscribe return, reconnecting...");
+        log.log(
+            Level.WARNING,
+            "unexpected subscribe return; reconnecting in {0} second",
+            RECONNECT_DELAY_SECONDS);
+        SECONDS.sleep(RECONNECT_DELAY_SECONDS);
+        if (isStopped()) {
+          return;
+        }
       }
       iterate(!first);
       first = false;
     }
+  }
+
+  private boolean isStopped() {
+    SubscriptionState state = subscriptionState.get();
+    return state == SubscriptionState.STOPPED_BUT_SUBSCRIBED
+        || state == SubscriptionState.FULLY_STOPPED;
   }
 
   public void stop(long timeoutMillis) {
@@ -192,6 +207,9 @@ class RedisShardSubscription implements Runnable {
     try {
       mainLoop();
     } catch (Exception e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
       log.log(Level.SEVERE, "RedisShardSubscription: Calling onUnsubscribe...", e);
       try {
         onUnsubscribe.runInterruptibly();

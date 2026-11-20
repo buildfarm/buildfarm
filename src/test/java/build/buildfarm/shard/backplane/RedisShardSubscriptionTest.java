@@ -39,6 +39,10 @@ import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.junit.After;
@@ -96,6 +100,102 @@ public class RedisShardSubscriptionTest {
     if (server != null) {
       server.stop();
       server = null;
+    }
+  }
+
+  @Test(timeout = 5000)
+  public void reconnectWaitsAfterUnexpectedSubscribeReturn() throws Exception {
+    RedisClient client = mock(RedisClient.class);
+    InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
+    AtomicInteger attempts = new AtomicInteger();
+    AtomicLong firstAttempt = new AtomicLong();
+    doAnswer(
+            invocation -> {
+              if (attempts.getAndIncrement() == 0) {
+                firstAttempt.set(System.nanoTime());
+                return null;
+              }
+              assertThat(System.nanoTime() - firstAttempt.get())
+                  .isAtLeast(TimeUnit.SECONDS.toNanos(1));
+              throw new IOException("stop after the second attempt");
+            })
+        .when(client)
+        .run(any());
+    RedisShardSubscription subscription =
+        new RedisShardSubscription(
+            mock(RedisShardSubscriber.class),
+            onUnsubscribe,
+            jedis -> {},
+            ImmutableList::of,
+            client);
+
+    subscription.run();
+
+    verify(client, times(2)).run(any());
+    verify(onUnsubscribe).runInterruptibly();
+  }
+
+  @Test(timeout = 5000)
+  public void interruptDuringReconnectDelayStopsWithoutRetrying() throws Exception {
+    RedisClient client = mock(RedisClient.class);
+    InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
+    doAnswer(
+            invocation -> {
+              Thread.currentThread().interrupt();
+              return null;
+            })
+        .when(client)
+        .run(any());
+    RedisShardSubscription subscription =
+        new RedisShardSubscription(
+            mock(RedisShardSubscriber.class),
+            onUnsubscribe,
+            jedis -> {},
+            ImmutableList::of,
+            client);
+    AtomicBoolean interrupted = new AtomicBoolean();
+    Thread thread =
+        new Thread(
+            () -> {
+              subscription.run();
+              interrupted.set(Thread.currentThread().isInterrupted());
+            });
+    thread.start();
+    thread.join(3000);
+
+    assertThat(thread.isAlive()).isFalse();
+    assertThat(interrupted.get()).isTrue();
+    verify(client).run(any());
+    verify(onUnsubscribe).runInterruptibly();
+  }
+
+  @Test(timeout = 5000)
+  public void stopDuringReconnectDelayDoesNotMakeAnotherAttempt() throws Exception {
+    RedisClient client = mock(RedisClient.class);
+    InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
+    RedisShardSubscription subscription =
+        new RedisShardSubscription(
+            mock(RedisShardSubscriber.class),
+            onUnsubscribe,
+            jedis -> {},
+            ImmutableList::of,
+            client);
+    Thread thread = new Thread(subscription);
+    thread.start();
+    try {
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+      while (thread.getState() != Thread.State.TIMED_WAITING && System.nanoTime() < deadline) {
+        Thread.yield();
+      }
+      assertThat(thread.getState()).isEqualTo(Thread.State.TIMED_WAITING);
+      subscription.stop();
+      thread.join(2000);
+      assertThat(thread.isAlive()).isFalse();
+      verify(client).run(any());
+      verifyNoInteractions(onUnsubscribe);
+    } finally {
+      thread.interrupt();
+      thread.join(1000);
     }
   }
 
