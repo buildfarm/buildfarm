@@ -42,6 +42,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import io.prometheus.client.Histogram;
 import java.io.IOException;
@@ -65,7 +66,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
   private final Runnable requestNext;
-  private final StreamObserver<WriteResponse> responseObserver;
+  private final ServerCallStreamObserver<WriteResponse> responseObserver;
   private final CancellableContext withCancellation;
 
   private boolean initialized = false;
@@ -92,7 +93,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       Runnable requestNext,
-      StreamObserver<WriteResponse> responseObserver) {
+      ServerCallStreamObserver<WriteResponse> responseObserver) {
     this.instance = instance;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
@@ -194,6 +195,12 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
         log.log(
             Level.FINEST, format("delivering committed_size for %s of %d", name, committedSize));
         responseObserver.onNext(response);
+        // Before sending END_STREAM, we make as large a request as we can in order to drain the
+        // client's queued data. That way the client's END_STREAM makes it to us. If we don't do
+        // this, then the client's END_STREAM can get blocked behind queued data frames that will
+        // never send because we stopped accepting data. That can result in a half closed stream
+        // that leaks the off-heap byte buffers netty allocated for those data frames.
+        responseObserver.request(Integer.MAX_VALUE);
         responseObserver.onCompleted();
       } catch (Exception e) {
         log.log(Level.SEVERE, format("error delivering committed_size to %s", name), e);
@@ -293,6 +300,8 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       if (isEntryLimitException) {
         t = Status.OUT_OF_RANGE.withDescription(t.getMessage()).asException();
       }
+      // We do not need to drain the client's data here because onError sends RST_STREAM, which
+      // hard closes the stream on both sides.
       responseObserver.onError(t);
       if (isEntryLimitException) {
         RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
