@@ -1366,6 +1366,14 @@ class CASFileCacheTest {
         new UnsupportedWrite() {
           boolean canReset = false;
 
+          // WritesHelper.streamIntoWriteFuture probes isComplete() before calling getOutput(). We
+          // need isComplete to return false so the helper proceeds to getOutput() where this
+          // mock's InterruptedException triggers for this test.
+          @Override
+          public boolean isComplete() {
+            return false;
+          }
+
           @Override
           public FeedbackOutputStream getOutput(
               long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
