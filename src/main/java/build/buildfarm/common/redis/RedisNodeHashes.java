@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.redis;
 
+import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 import static redis.clients.jedis.Protocol.CLUSTER_HASHSLOTS;
 
@@ -103,7 +104,10 @@ public class RedisNodeHashes {
   private static Iterable<List<List<Long>>> getNodeSlotRanges(UnifiedJedis jedis) {
     if (jedis instanceof JedisCluster) {
       // get slot range information for each shard
-      return transform(getClusterShards((JedisCluster) jedis), ClusterShardInfo::getSlots);
+      // Failed primaries are reported as shards without assigned slots.
+      return transform(
+          filter(getClusterShards((JedisCluster) jedis), shard -> !shard.getSlots().isEmpty()),
+          ClusterShardInfo::getSlots);
     } else {
       return SINGLETON_NODE_SLOT_RANGES;
     }
