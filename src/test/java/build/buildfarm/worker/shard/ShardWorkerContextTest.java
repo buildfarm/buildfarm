@@ -1,10 +1,10 @@
-// Copyright 2019 The Buildfarm Authors. All rights reserved.
+// Copyright 2020-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,9 +45,11 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.WorkerEventObserver;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Jimfs;
 import com.google.protobuf.Duration;
@@ -55,6 +57,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -76,6 +79,8 @@ public class ShardWorkerContextTest {
 
   @Mock private CasWriter writer;
 
+  @Mock private WorkerEventObserver workerEventObserver;
+
   @Before
   public void setUp() throws Exception {
     configs.getServer().setInstanceType(SHARD);
@@ -89,6 +94,11 @@ public class ShardWorkerContextTest {
     configs.getBackplane().setQueues(queues);
 
     MockitoAnnotations.initMocks(this);
+  }
+
+  @After
+  public void tearDown() {
+    verifyNoMoreInteractions(workerEventObserver);
   }
 
   WorkerContext createTestContext() {
@@ -106,18 +116,16 @@ public class ShardWorkerContextTest {
         ImmutableList.of("test"),
         /* operationPollPeriod= */ Duration.getDefaultInstance(),
         /* operationPoller= */ (queueEntry, stage, requeueAt) -> false,
-        /* inlineContentLimit= */
         /* inputFetchStageWidth= */ 0,
         /* executeStageWidth= */ 0,
         /* reportResultStageWidth= */ 1,
         /* inputFetchDeadline= */ 60,
+        /* reportResultDeadline= */ 60,
         backplane,
         execFileSystem,
         inputStreamFactory,
         policies,
         instance,
-        /* deadlineAfter= */
-        /* deadlineAfterUnits= */
         /* defaultActionTimeout= */ Duration.getDefaultInstance(),
         /* maximumActionTimeout= */ Duration.getDefaultInstance(),
         /* defaultMaxCores= */ 0,
@@ -126,8 +134,21 @@ public class ShardWorkerContextTest {
         /* allowBringYourOwnContainer= */ false,
         /* errorOperationRemainingResources= */ false,
         /* errorOperationOutputSizeExceeded= */ false,
+        /* marketExecution= */ false,
+        /* ignoreMarketExecutionMnemonics= */ ImmutableSet.of(),
         resourceSet,
-        writer);
+        writer,
+        workerEventObserver);
+  }
+
+  @Test
+  public void executionPolicyInterpolationsIncludeOperationCgroup() {
+    WorkerContext context = createTestContext();
+
+    assertThat(
+            context.getExecutionPolicyInterpolations(
+                "projects/example/operations/01J8P3ZJ4C7E8N9Y0K2M"))
+        .containsExactly("cgroup", "executions/operations/01J8P3ZJ4C7E8N9Y0K2M");
   }
 
   @SuppressWarnings("unchecked")

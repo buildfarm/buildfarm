@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2025-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -240,6 +240,8 @@ public class LegacyDirectoryCFC extends CASFileCache {
     ExecutorService pool = BuildfarmExecutors.getComputeCachePool();
 
     ImmutableList.Builder<Path> invalidDirectories = new ImmutableList.Builder<>();
+    CacheLoadProgress progress =
+        new CacheLoadProgress("Populating directories", cacheScanResults.computeDirs().size());
 
     for (Path path : cacheScanResults.computeDirs()) {
       DigestUtil digestUtil = parseDirectoryDigestUtil(path.getFileName().toString());
@@ -268,11 +270,13 @@ public class LegacyDirectoryCFC extends CASFileCache {
               }
             } catch (Exception e) {
               log.log(Level.SEVERE, "error processing directory " + path.toString(), e);
+            } finally {
+              progress.complete();
             }
           });
     }
 
-    joinThreads(pool, "Populating Directories...");
+    joinThreads(pool, progress);
 
     return invalidDirectories.build();
   }

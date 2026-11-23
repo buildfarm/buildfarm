@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025 The Buildfarm Authors. All rights reserved.
+# Copyright 2021-2026 The Buildfarm Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,19 +53,19 @@ download_missing_tools () {
 # Run the unused_deps tool to create a list of buildozer commands
 # Certain commands are removed based on a configuration to avoid runtime issues.
 create_buildozer_commands () {
-    $LOCAL_DEPS_TOOL //src/... > /tmp/unused_deps_results;
-    grep "^buildozer" /tmp/unused_deps_results > /tmp/unused_deps_filtered;
+    $LOCAL_DEPS_TOOL //src/... > /tmp/unused_deps_results
+    grep "^buildozer" /tmp/unused_deps_results > /tmp/unused_deps_filtered
     for i in "${keep_depenencies[@]}"
     do
-        escaped_keyword=$(printf '%s\n' "$i" | sed -e 's/[]\/$*.^[]/\\&/g');
-        sed -i '/'$escaped_keyword'/d' /tmp/unused_deps_filtered;
+        escaped_keyword=$(printf '%s\n' "$i" | sed -e 's/[]\/$*.^[]/\\&/g')
+        sed -i '/'$escaped_keyword'/d' /tmp/unused_deps_filtered
     done
     awk '{print "./" $0}' /tmp/unused_deps_filtered > /tmp/buildozer_commands.sh
     chmod +x /tmp/buildozer_commands.sh
 }
 
-download_missing_tools;
-create_buildozer_commands;
+download_missing_tools
+create_buildozer_commands
 
 # Check whether any dependencies changes need to be made.
 # This is intended to be done by the CI.

@@ -1,10 +1,10 @@
-// Copyright 2018 The Buildfarm Authors. All rights reserved.
+// Copyright 2020-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@ import static java.lang.Thread.State.WAITING;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
@@ -52,10 +53,12 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.EvenMoreFiles;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.v1test.Digest;
+import com.github.luben.zstd.Zstd;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -67,6 +70,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
 import io.grpc.Deadline;
 import io.grpc.Status;
 import java.io.IOException;
@@ -74,14 +78,23 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -91,6 +104,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -108,6 +125,7 @@ class CASFileCacheTest {
   private final Path root;
   private final boolean storeFileDirsIndexInMemory;
   private Map<Digest, ByteString> blobs;
+  private FixedBufferPool zstdBufferPool;
   private ExecutorService putService;
 
   @Mock private Consumer<Digest> onPut;
@@ -123,6 +141,13 @@ class CASFileCacheTest {
   protected CASFileCacheTest(Path fileSystemRoot, boolean storeFileDirsIndexInMemory) {
     this.root = fileSystemRoot.resolve("cache");
     this.storeFileDirsIndexInMemory = storeFileDirsIndexInMemory;
+  }
+
+  private static final long TEST_BLOCK_SIZE = 4096;
+
+  // Convenience method to call estimateSizeOnDisk with the test's block size
+  private static long estimateSizeOnDisk(long logicalSize) {
+    return CASFileCache.estimateSizeOnDisk(logicalSize, TEST_BLOCK_SIZE, /* isHardlink= */ false);
   }
 
   @Before
@@ -147,19 +172,20 @@ class CASFileCacheTest {
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
+    // A single buffer, and a borrow timeout of zero, so that one open zstd write exhausts the
+    // pool and the next borrow fails at once. Every other test here writes IDENTITY and never
+    // touches it.
+    zstdBufferPool = new FixedBufferPool(/* capacity= */ 1, Duration.ZERO);
     fileCache =
-        new LegacyDirectoryCFC(
+        new DirectoryEntryCFC(
             root,
-            /* maxSizeInBytes= */ 1024,
-            /* maxEntrySizeInBytes= */ 1024,
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
             /* hexBucketLevels= */ 1,
-            storeFileDirsIndexInMemory,
-            /* execRootFallback= */ false,
             expireService,
             /* accessRecorder= */ directExecutor(),
             storage,
-            /* directoriesIndexDbName= */ ":memory:",
-            /* zstdBufferPool= */ null,
+            zstdBufferPool,
             onPut,
             onExpire,
             delegate,
@@ -174,6 +200,8 @@ class CASFileCacheTest {
             });
     // do this so that we can remove the cache root dir
     fileCache.initializeRootDirectory();
+    // Force a known block size so tests are more hermetic and don't depend on the host filesystem
+    fileCache.setBlockSizeForTesting(TEST_BLOCK_SIZE);
   }
 
   @After
@@ -188,6 +216,7 @@ class CASFileCacheTest {
     if (!shutdownAndAwaitTermination(expireService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down expire service");
     }
+    zstdBufferPool.close();
     Directories.remove(root, fileStore);
   }
 
@@ -295,8 +324,250 @@ class CASFileCacheTest {
   }
 
   @Test
+  public void putDirectoryDoesNotPublishAfterContextCancellation() throws Exception {
+    ByteString file = ByteString.copyFromUtf8("Peanut Butter");
+    Digest fileDigest = DIGEST_UTIL.compute(file);
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("file")
+                    .setDigest(DigestUtil.toDigest(fileDigest))
+                    .build())
+            .build();
+    Digest directoryDigest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(DigestUtil.toDigest(directoryDigest), directory);
+    CountDownLatch fileReadStarted = new CountDownLatch(1);
+    CountDownLatch releaseFileRead = new CountDownLatch(1);
+    DirectoryEntryCFC directoryCache =
+        new DirectoryEntryCFC(
+            root.resolve("directory-entry"),
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            directExecutor(),
+            Maps.newConcurrentMap(),
+            zstdBufferPool,
+            onPut,
+            onExpire,
+            delegate,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              assertThat(compressor).isEqualTo(Compressor.Value.IDENTITY);
+              assertThat(digest).isEqualTo(fileDigest);
+              return new InputStream() {
+                private final InputStream delegate = file.substring((int) offset).newInput();
+
+                @Override
+                public int read() throws IOException {
+                  awaitRelease();
+                  return delegate.read();
+                }
+
+                @Override
+                public int read(byte[] buffer, int off, int len) throws IOException {
+                  awaitRelease();
+                  return delegate.read(buffer, off, len);
+                }
+
+                private void awaitRelease() throws IOException {
+                  fileReadStarted.countDown();
+                  try {
+                    releaseFileRead.await();
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                  }
+                }
+              };
+            });
+    directoryCache.initializeRootDirectory();
+
+    Context.CancellableContext context = Context.current().withCancellation();
+    Context previous = context.attach();
+    try {
+      ListenableFuture<CASFileCache.PathResult> directoryFuture =
+          directoryCache.putDirectory(directoryDigest, directoriesIndex, putService);
+      assertThat(fileReadStarted.await(5, SECONDS)).isTrue();
+
+      context.cancel(null);
+      releaseFileRead.countDown();
+
+      assertThrows(ExecutionException.class, () -> directoryFuture.get(5, SECONDS));
+      assertThat(Files.exists(directoryCache.getDirectoryPath(directoryDigest))).isFalse();
+    } finally {
+      context.detach(previous);
+      context.cancel(null);
+      releaseFileRead.countDown();
+    }
+  }
+
+  @Test
+  public void putDirectoryDoesNotPublishAfterOwnerContextCancellation() throws Exception {
+    Directory childDirectory = Directory.getDefaultInstance();
+    Digest childDirectoryDigest = DIGEST_UTIL.compute(childDirectory);
+    Directory directory =
+        Directory.newBuilder()
+            .addDirectories(
+                DirectoryNode.newBuilder()
+                    .setName("child")
+                    .setDigest(DigestUtil.toDigest(childDirectoryDigest))
+                    .build())
+            .build();
+    Digest directoryDigest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(
+            DigestUtil.toDigest(directoryDigest), directory,
+            DigestUtil.toDigest(childDirectoryDigest), childDirectory);
+    DirectoryEntryCFC directoryCache =
+        new DirectoryEntryCFC(
+            root.resolve("directory-entry"),
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            directExecutor(),
+            Maps.newConcurrentMap(),
+            zstdBufferPool,
+            onPut,
+            onExpire,
+            delegate,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              throw new AssertionError("an empty directory should not fetch a file");
+            });
+    directoryCache.initializeRootDirectory();
+
+    QueuedExecutorService service = new QueuedExecutorService();
+    Path directoryPath = directoryCache.getDirectoryPath(directoryDigest);
+    Context.CancellableContext context = Context.current().withCancellation();
+    Context previous = context.attach();
+    ListenableFuture<CASFileCache.PathResult> directoryFuture =
+        directoryCache.putDirectory(directoryDigest, directoriesIndex, service);
+    context.detach(previous);
+    Path temporaryDirectory;
+    try (DirectoryStream<Path> paths =
+        Files.newDirectoryStream(
+            directoryPath.getParent(), directoryPath.getFileName() + ".tmp.*")) {
+      temporaryDirectory = Iterables.getOnlyElement(paths);
+    }
+
+    // Empty directories queue only fetch completion and limited before the rename continuation.
+    service.runNext();
+    service.runNext();
+    assertThat(Files.isDirectory(temporaryDirectory.resolve("child"))).isTrue();
+
+    context.cancel(null);
+    service.runAll();
+
+    assertThat(directoryFuture.isDone()).isTrue();
+    assertThrows(ExecutionException.class, directoryFuture::get);
+    assertThat(Files.exists(directoryPath)).isFalse();
+    assertThat(Files.exists(temporaryDirectory)).isFalse();
+  }
+
+  @Test
+  public void putDirectorySharedFetchDoesNotPublishAfterOwnerContextCancellation()
+      throws Exception {
+    ByteString file = ByteString.copyFromUtf8("Peanut Butter");
+    Digest fileDigest = DIGEST_UTIL.compute(file);
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("file")
+                    .setDigest(DigestUtil.toDigest(fileDigest))
+                    .build())
+            .build();
+    Digest directoryDigest = DIGEST_UTIL.compute(directory);
+    Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex =
+        ImmutableMap.of(DigestUtil.toDigest(directoryDigest), directory);
+    java.util.concurrent.CountDownLatch fileReadStarted =
+        new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch releaseFileRead =
+        new java.util.concurrent.CountDownLatch(1);
+    AtomicInteger inputStreams = new AtomicInteger();
+    DirectoryEntryCFC directoryCache =
+        new DirectoryEntryCFC(
+            root.resolve("directory-entry"),
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            directExecutor(),
+            Maps.newConcurrentMap(),
+            zstdBufferPool,
+            onPut,
+            onExpire,
+            delegate,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              assertThat(compressor).isEqualTo(Compressor.Value.IDENTITY);
+              assertThat(digest).isEqualTo(fileDigest);
+              inputStreams.incrementAndGet();
+              return new InputStream() {
+                private final InputStream delegate = file.substring((int) offset).newInput();
+
+                @Override
+                public int read() throws IOException {
+                  awaitRelease();
+                  return delegate.read();
+                }
+
+                @Override
+                public int read(byte[] buffer, int off, int len) throws IOException {
+                  awaitRelease();
+                  return delegate.read(buffer, off, len);
+                }
+
+                private void awaitRelease() throws IOException {
+                  fileReadStarted.countDown();
+                  try {
+                    releaseFileRead.await();
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                  }
+                }
+              };
+            });
+    directoryCache.initializeRootDirectory();
+
+    Context.CancellableContext context = Context.current().withCancellation();
+    Context previous = context.attach();
+    boolean attached = true;
+    try {
+      ListenableFuture<CASFileCache.PathResult> ownerFuture =
+          directoryCache.putDirectory(directoryDigest, directoriesIndex, putService);
+      assertThat(fileReadStarted.await(5, SECONDS)).isTrue();
+
+      context.detach(previous);
+      attached = false;
+      ListenableFuture<CASFileCache.PathResult> followerFuture =
+          directoryCache.putDirectory(directoryDigest, directoriesIndex, putService);
+      assertThat(inputStreams.get()).isEqualTo(1);
+      assertThat(followerFuture.isDone()).isFalse();
+
+      context.cancel(null);
+      releaseFileRead.countDown();
+
+      assertThrows(ExecutionException.class, () -> ownerFuture.get(5, SECONDS));
+      assertThrows(ExecutionException.class, () -> followerFuture.get(5, SECONDS));
+      assertThat(Files.exists(directoryCache.getDirectoryPath(directoryDigest))).isFalse();
+    } finally {
+      if (attached) {
+        context.detach(previous);
+      }
+      context.cancel(null);
+      releaseFileRead.countDown();
+    }
+  }
+
+  @Test
   public void expireUnreferencedEntryRemovesBlobFile() throws IOException, InterruptedException {
-    byte[] bigData = new byte[1000];
+    byte[] bigData = new byte[22000]; // on-disk: 24576 bytes (6 blocks), fills the 24576-byte cache
     ByteString bigBlob = ByteString.copyFrom(bigData);
     Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
     blobs.put(bigDigest, bigBlob);
@@ -304,7 +575,7 @@ class CASFileCacheTest {
 
     decrementReference(bigPath);
 
-    byte[] strawData = new byte[30]; // take us beyond our 1024 limit
+    byte[] strawData = new byte[30]; // on-disk: 4096, takes us beyond 24576-byte cache limit
     ByteString strawBlob = ByteString.copyFrom(strawData);
     Digest strawDigest = DIGEST_UTIL.compute(strawBlob);
     blobs.put(strawDigest, strawBlob);
@@ -321,6 +592,26 @@ class CASFileCacheTest {
     fileCache.start(false).get();
 
     assertThat(storage).isEmpty();
+  }
+
+  @Test
+  public void cacheLoadProgressReportsCompletedEntries() {
+    CASFileCache.CacheLoadProgress progress =
+        new CASFileCache.CacheLoadProgress("Scanning cache root", 4);
+
+    progress.complete();
+    progress.complete();
+
+    assertThat(progress.message()).isEqualTo("Scanning cache root: 2/4 entries complete (50.0%)");
+  }
+
+  @Test
+  public void cacheLoadProgressReportsEmptyPhaseAsComplete() {
+    CASFileCache.CacheLoadProgress progress =
+        new CASFileCache.CacheLoadProgress("Deleting invalid files", 0);
+
+    assertThat(progress.message())
+        .isEqualTo("Deleting invalid files: 0/0 entries complete (100.0%)");
   }
 
   @Test
@@ -344,8 +635,8 @@ class CASFileCacheTest {
     FileStore fileStore = Files.getFileStore(root);
     ByteString blob = ByteString.copyFromUtf8("blob");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
-    Path path = fileCache.getPath(fileCache.getKey(blobDigest, false));
-    Path execPath = fileCache.getPath(fileCache.getKey(blobDigest, true));
+    Path path = fileCache.getPath(blobDigest, fileCache.getKey(blobDigest, false));
+    Path execPath = fileCache.getPath(blobDigest, fileCache.getKey(blobDigest, true));
     Files.write(path, blob.toByteArray());
     EvenMoreFiles.setReadOnlyPerms(path, false, fileStore);
     Files.write(execPath, blob.toByteArray());
@@ -363,12 +654,44 @@ class CASFileCacheTest {
   }
 
   @Test
+  public void startLoadsExistingBlobWithBlockAlignedSize() throws Exception {
+    // Simulate a restart: write blobs directly to disk, then start() the cache.
+    // Verify that sizeInBytes reflects block-aligned on-disk sizes, not logical sizes.
+    FileStore fileStore = Files.getFileStore(root);
+
+    // Two blobs with different sizes, both smaller than one block.
+    ByteString blob1 = ByteString.copyFromUtf8("small");
+    Digest digest1 = DIGEST_UTIL.compute(blob1);
+    Path path1 = fileCache.getPath(digest1, fileCache.getKey(digest1, false));
+    Files.write(path1, blob1.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(path1, false, fileStore);
+
+    ByteString blob2 = ByteString.copyFromUtf8("another small blob");
+    Digest digest2 = DIGEST_UTIL.compute(blob2);
+    Path path2 = fileCache.getPath(digest2, fileCache.getKey(digest2, false));
+    Files.write(path2, blob2.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(path2, false, fileStore);
+
+    fileCache.start(false).get();
+
+    assertThat(storage.size()).isEqualTo(2);
+    // Account using the filesystem block size discovered during start(). This varies by platform
+    // (for example, the Windows CI filesystem reports 512-byte blocks).
+    assertThat(fileCache.size())
+        .isEqualTo(
+            CASFileCache.estimateSizeOnDisk(
+                    blob1.size(), fileCache.blockSize, /* isHardlink= */ false)
+                + CASFileCache.estimateSizeOnDisk(
+                    blob2.size(), fileCache.blockSize, /* isHardlink= */ false));
+  }
+
+  @Test
   public void startSkipsLoadingExistingBlob() throws Exception {
     FileStore fileStore = Files.getFileStore(root);
     ByteString blob = ByteString.copyFromUtf8("blob");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
-    Path path = fileCache.getPath(fileCache.getKey(blobDigest, false));
-    Path execPath = fileCache.getPath(fileCache.getKey(blobDigest, true));
+    Path path = fileCache.getPath(blobDigest, fileCache.getKey(blobDigest, false));
+    Path execPath = fileCache.getPath(blobDigest, fileCache.getKey(blobDigest, true));
     Files.write(path, blob.toByteArray());
     EvenMoreFiles.setReadOnlyPerms(path, false, fileStore);
     Files.write(execPath, blob.toByteArray());
@@ -389,7 +712,8 @@ class CASFileCacheTest {
     Path invalidDigest = root.resolve("00").resolve("digest");
     ByteString validBlob = ByteString.copyFromUtf8("valid");
     Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
-    Path invalidExec = fileCache.getPath(CASFileCache.getKey(validDigest, false) + "_regular");
+    Path invalidExec =
+        fileCache.getPath(validDigest, CASFileCache.getKey(validDigest, false) + "_regular");
 
     Files.write(tooFewComponents, ImmutableList.of("Too Few Components"), StandardCharsets.UTF_8);
     Files.write(tooManyComponents, ImmutableList.of("Too Many Components"), StandardCharsets.UTF_8);
@@ -428,7 +752,7 @@ class CASFileCacheTest {
   @Test
   public void expireEntryWaitsForUnreferencedEntry()
       throws ExecutionException, IOException, InterruptedException {
-    byte[] bigData = new byte[1023];
+    byte[] bigData = new byte[22000]; // on-disk: 24576 bytes (6 blocks), fills the 24576-byte cache
     Arrays.fill(bigData, (byte) 1);
     ByteString bigContent = ByteString.copyFrom(bigData);
     Digest bigDigest = DIGEST_UTIL.compute(bigContent);
@@ -460,6 +784,226 @@ class CASFileCacheTest {
         throw new RuntimeException("could not shut down service");
       }
     }
+  }
+
+  @Test
+  public void waitForLastUnreferencedEntrySkipsWalkAtInfoLevel()
+      throws ExecutionException, IOException, InterruptedException {
+    try (LogCapture capture = new LogCapture(CASFileCache.class, Level.INFO)) {
+      runOverflowingPutAndAwaitWaitCycle(capture);
+
+      List<LogRecord> records = capture.snapshot();
+      assertThat(records).isNotEmpty();
+      // Production path emits only the new lightweight INFO summary; the detailed walk
+      // (header / per-unreferenced-entry / min/max summary) is now FINE-only and must
+      // not appear at INFO.
+      assertThat(records.stream().anyMatch(r -> formatted(r).contains("waiting:"))).isTrue();
+      assertThat(records.stream().noneMatch(r -> formatted(r).contains("header("))).isTrue();
+      assertThat(records.stream().noneMatch(r -> formatted(r).contains("unreferenced entry(")))
+          .isTrue();
+      assertThat(
+              records.stream().noneMatch(r -> formatted(r).contains("unreferenced list is empty")))
+          .isTrue();
+    }
+  }
+
+  @Test
+  public void waitForLastUnreferencedEntryEmitsDetailAtFineLevel()
+      throws ExecutionException, IOException, InterruptedException {
+    try (LogCapture capture = new LogCapture(CASFileCache.class, Level.FINE)) {
+      runOverflowingPutAndAwaitWaitCycle(capture);
+
+      List<LogRecord> records = capture.snapshot();
+      assertThat(records).isNotEmpty();
+      // FINE level reproduces the original detailed walk: a "header(" line per
+      // iteration plus a "unreferenced list is empty ... min(..) max(..)" summary
+      // per iteration. Production INFO summary line must NOT appear at FINE because
+      // the two paths are mutually exclusive.
+      assertThat(records.stream().anyMatch(r -> formatted(r).contains("header("))).isTrue();
+      assertThat(
+              records.stream().anyMatch(r -> formatted(r).contains("unreferenced list is empty")))
+          .isTrue();
+      assertThat(records.stream().noneMatch(r -> formatted(r).contains("waiting:"))).isTrue();
+    }
+  }
+
+  // Fills the cache with one referenced entry, then submits a second put that will park
+  // inside waitForLastUnreferencedEntry (LRU is empty while the first entry is held).
+  // Awaits at least one captured log record so the assertions see the wait-cycle output,
+  // then releases the held entry and drains the put.
+  private void runOverflowingPutAndAwaitWaitCycle(LogCapture capture)
+      throws ExecutionException, IOException, InterruptedException {
+    // Six 4096-byte blocks fill the 24576-byte cache, forcing the next put to wait.
+    byte[] bigData = new byte[22000];
+    ByteString bigBlob = ByteString.copyFrom(bigData);
+    Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
+    blobs.put(bigDigest, bigBlob);
+    Path bigPath = fileCache.put(bigDigest, /* isExecutable= */ false).path();
+
+    ExecutorService service = newSingleThreadExecutor();
+    Future<Void> putFuture =
+        service.submit(
+            () -> {
+              ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
+              Digest digest = DIGEST_UTIL.compute(content);
+              blobs.put(digest, content);
+              fileCache.put(digest, /* isExecutable= */ false);
+              return null;
+            });
+    try {
+      capture.awaitRecord(SECONDS.toNanos(5));
+      decrementReference(bigPath);
+      putFuture.get();
+    } finally {
+      if (!shutdownAndAwaitTermination(service, 1, SECONDS)) {
+        throw new RuntimeException("could not shut down service");
+      }
+    }
+  }
+
+  @Test
+  public void waitForLastUnreferencedEntryStillThrowsWhenStorageEmpty()
+      throws InterruptedException {
+    // Storage starts empty in the test fixture; the LRU header is unlinked so the
+    // method enters the wait loop and immediately throws on the empty-storage check.
+    IllegalStateException thrown = null;
+    synchronized (fileCache) {
+      try {
+        fileCache.waitForLastUnreferencedEntry(1024L);
+      } catch (IllegalStateException e) {
+        thrown = e;
+      }
+    }
+    assertThat(thrown).isNotNull();
+    assertThat(thrown).hasMessageThat().contains("there are no keys to wait for expiration on");
+  }
+
+  @Test
+  public void waitForLastUnreferencedEntryExitsOnSizeDropBelowLimit()
+      throws IOException, InterruptedException {
+    // Keep the only stored entry referenced so eviction has no LRU candidate.
+    byte[] bigData = new byte[1000];
+    ByteString bigBlob = ByteString.copyFrom(bigData);
+    Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
+    blobs.put(bigDigest, bigBlob);
+    Path bigPath = fileCache.put(bigDigest, /* isExecutable= */ false).path();
+
+    // An unfinished write reserves the remaining five blocks without adding an LRU entry.
+    Digest incompleteDigest = DIGEST_UTIL.compute(ByteString.copyFrom(new byte[20000]));
+    CancellableOutputStream incompleteOut =
+        (CancellableOutputStream) getWrite(incompleteDigest).getOutput(1, SECONDS, () -> {});
+    assertThat(fileCache.size()).isEqualTo(fileCache.maxSize());
+
+    ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
+    Digest digest = DIGEST_UTIL.compute(content);
+    blobs.put(digest, content);
+
+    AtomicReference<Path> result = new AtomicReference<>();
+    AtomicReference<Throwable> error = new AtomicReference<>();
+    Thread caller =
+        new Thread(
+            () -> {
+              try {
+                result.set(fileCache.put(digest, /* isExecutable= */ false).path());
+              } catch (Throwable t) {
+                error.set(t);
+              }
+            });
+    caller.start();
+    boolean cancelled = false;
+    try {
+      // The new put reserves a block, then waits because all stored entries are referenced.
+      long deadline = System.nanoTime() + SECONDS.toNanos(5);
+      while (caller.getState() != WAITING && System.nanoTime() < deadline) {
+        Thread.yield();
+      }
+      assertThat(caller.getState()).isEqualTo(WAITING);
+      synchronized (fileCache) {
+        assertThat(fileCache.size()).isEqualTo(fileCache.maxSize() + TEST_BLOCK_SIZE);
+      }
+
+      // Cancellation releases the reservation and notifies the waiter. The put must
+      // finish via the size-drop branch without needing to evict the referenced entry.
+      cancelled = true;
+      incompleteOut.cancel();
+      caller.join(SECONDS.toMillis(5));
+      assertThat(caller.isAlive()).isFalse();
+      assertThat(error.get()).isNull();
+      assertThat(result.get()).isNotNull();
+      assertThat(Files.exists(result.get())).isTrue();
+      assertThat(Files.exists(bigPath)).isTrue();
+      assertThat(storage).hasSize(2);
+      assertThat(fileCache.size()).isEqualTo(2 * TEST_BLOCK_SIZE);
+    } finally {
+      if (caller.isAlive()) {
+        caller.interrupt();
+      }
+      caller.join(SECONDS.toMillis(5));
+      if (!cancelled) {
+        incompleteOut.cancel();
+      }
+    }
+  }
+
+  /** Captures JUL log records for a target logger at a configured level. */
+  private static final class LogCapture implements AutoCloseable {
+    private final Logger logger;
+    private final Handler handler;
+    private final Level previousLevel;
+    private final boolean previousUseParentHandlers;
+    private final List<LogRecord> records = new CopyOnWriteArrayList<>();
+
+    LogCapture(Class<?> targetClass, Level level) {
+      this.logger = Logger.getLogger(targetClass.getName());
+      this.previousLevel = logger.getLevel();
+      this.previousUseParentHandlers = logger.getUseParentHandlers();
+      this.handler =
+          new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+              records.add(record);
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+          };
+      handler.setLevel(Level.ALL);
+      logger.setLevel(level);
+      logger.setUseParentHandlers(false);
+      logger.addHandler(handler);
+    }
+
+    void awaitRecord(long timeoutNanos) throws InterruptedException {
+      long deadline = System.nanoTime() + timeoutNanos;
+      while (records.isEmpty()) {
+        if (System.nanoTime() >= deadline) {
+          throw new AssertionError(
+              "no log record arrived within " + NANOSECONDS.toMillis(timeoutNanos) + "ms");
+        }
+        MICROSECONDS.sleep(100);
+      }
+    }
+
+    List<LogRecord> snapshot() {
+      return new ArrayList<>(records);
+    }
+
+    @Override
+    public void close() {
+      logger.removeHandler(handler);
+      logger.setLevel(previousLevel);
+      logger.setUseParentHandlers(previousUseParentHandlers);
+    }
+  }
+
+  // CASFileCache pre-formats log messages with String.format, so LogRecord.getParameters()
+  // is always null and getMessage() is the final string.
+  private static String formatted(LogRecord r) {
+    String msg = r.getMessage();
+    return msg == null ? "" : msg;
   }
 
   @Test
@@ -526,8 +1070,52 @@ class CASFileCacheTest {
   }
 
   Write getWrite(Digest digest) throws IOException {
+    return getWrite(Compressor.Value.IDENTITY, digest);
+  }
+
+  Write getWrite(Compressor.Value compressor, Digest digest) throws IOException {
     return fileCache.getWrite(
-        Compressor.Value.IDENTITY, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+        compressor, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+  }
+
+  private static ByteString zstd(ByteString content) {
+    return ByteString.copyFrom(Zstd.compress(content.toByteArray()));
+  }
+
+  // A zstd write holds a pool buffer for the life of its output stream. With one buffer in the
+  // pool, the second getOutput fails inside the ZstdDecompressingOutputStream constructor, which
+  // runs after CASFileCache has already published the write's closedFuture. Nothing else closes
+  // that stream, so unless getOutput cleans up, the retry below waits on closedFuture forever.
+  @Test
+  public void zstdWriteRecoversFromAnExhaustedBufferPool() throws Exception {
+    ByteString heldContent = ByteString.copyFromUtf8("held blob");
+    ByteString retriedContent = ByteString.copyFromUtf8("retried blob");
+    Digest retriedDigest = DIGEST_UTIL.compute(retriedContent);
+    Write held = getWrite(Compressor.Value.ZSTD, DIGEST_UTIL.compute(heldContent));
+    Write retried = getWrite(Compressor.Value.ZSTD, retriedDigest);
+
+    OutputStream heldOut = held.getOutput(1, SECONDS, () -> {});
+    assertThrows(IOException.class, () -> retried.getOutput(1, SECONDS, () -> {}));
+    zstd(heldContent).writeTo(heldOut);
+    heldOut.close();
+
+    ExecutorService retryService = newSingleThreadExecutor();
+    try {
+      Future<?> retry =
+          retryService.submit(
+              () -> {
+                try (OutputStream out = retried.getOutput(1, SECONDS, () -> {})) {
+                  zstd(retriedContent).writeTo(out);
+                }
+                return null;
+              });
+      // A wedged closedFuture blocks this get, and shutdownNow below unblocks the wait.
+      retry.get(5, SECONDS);
+    } finally {
+      shutdownAndAwaitTermination(retryService, 1, SECONDS);
+    }
+
+    assertThat(storage.get(fileCache.getKey(retriedDigest, false))).isNotNull();
   }
 
   @Test
@@ -544,7 +1132,7 @@ class CASFileCacheTest {
     assertThat(notified.get()).isTrue();
     String key = fileCache.getKey(digest, false);
     assertThat(storage.get(key)).isNotNull();
-    try (InputStream in = Files.newInputStream(fileCache.getPath(key))) {
+    try (InputStream in = Files.newInputStream(fileCache.getPath(digest, key))) {
       assertThat(ByteString.readFrom(in)).isEqualTo(content);
     }
   }
@@ -561,14 +1149,14 @@ class CASFileCacheTest {
     incompleteWrite.getFuture().addListener(() -> notified.set(true), directExecutor());
     OutputStream incompleteOut = incompleteWrite.getOutput(1, SECONDS, () -> {});
     try (OutputStream out = completingWrite.getOutput(1, SECONDS, () -> {})) {
-      assertThat(fileCache.size()).isEqualTo(digest.getSize() * 2);
+      assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()) * 2);
       content.writeTo(out);
     }
     assertThat(notified.get()).isTrue();
     if (!shutdownAndAwaitTermination(expireService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down expire service");
     }
-    assertThat(fileCache.size()).isEqualTo(digest.getSize());
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()));
     assertThat(incompleteWrite.getCommittedSize()).isEqualTo(digest.getSize());
     assertThat(incompleteWrite.isComplete()).isTrue();
     incompleteOut.close(); // redundant
@@ -583,7 +1171,7 @@ class CASFileCacheTest {
     OutputStream out = cancellingWrite.getOutput(1, SECONDS, () -> {});
     assertThat(out).isInstanceOf(CancellableOutputStream.class);
     CancellableOutputStream cancelOut = (CancellableOutputStream) out;
-    assertThat(fileCache.size()).isEqualTo(digest.getSize());
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()));
     cancelOut.cancel();
     assertThat(fileCache.size()).isEqualTo(0);
     assertThat(cancellingWrite.getCommittedSize()).isEqualTo(0);
@@ -601,7 +1189,7 @@ class CASFileCacheTest {
     OutputStream out = cancellingWrite.getOutput(1, SECONDS, () -> {});
     assertThat(out).isInstanceOf(CancellableOutputStream.class);
     CancellableOutputStream cancelOut = (CancellableOutputStream) out;
-    assertThat(fileCache.size()).isEqualTo(digest.getSize());
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()));
     content.substring(0, 6).writeTo(out);
     assertThat(cancellingWrite.getCommittedSize()).isEqualTo(6);
     assertThat(cancellingWrite.isComplete()).isFalse();
@@ -612,7 +1200,7 @@ class CASFileCacheTest {
       content.writeTo(restartedOut);
     }
     assertThat(notified.get()).isTrue();
-    assertThat(fileCache.size()).isEqualTo(digest.getSize());
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(digest.getSize()));
     assertThat(cancellingWrite.getCommittedSize()).isEqualTo(digest.getSize());
     assertThat(cancellingWrite.isComplete()).isTrue();
   }
@@ -624,7 +1212,7 @@ class CASFileCacheTest {
 
     UUID writeId = UUID.randomUUID();
     String key = fileCache.getKey(digest, false);
-    Path writePath = fileCache.getPath(key).resolveSibling(key + "." + writeId);
+    Path writePath = fileCache.getPath(digest, key).resolveSibling(key + "." + writeId);
     try (OutputStream out = Files.newOutputStream(writePath)) {
       content.substring(0, 6).writeTo(out);
     }
@@ -710,7 +1298,7 @@ class CASFileCacheTest {
     fileCache.put(blob);
     String key = fileCache.getKey(blob.getDigest(), /* isExecutable= */ false);
     // putCreatesFile verifies this
-    Files.delete(fileCache.getPath(key));
+    Files.delete(fileCache.getPath(blob.getDigest(), key));
     // update entry with expired deadline
     storage.get(key).existsDeadline = Deadline.after(0, SECONDS);
 
@@ -764,8 +1352,8 @@ class CASFileCacheTest {
   @Test
   public void expireInterruptCausesExpirySequenceHalt() throws IOException, InterruptedException {
     Blob expiringBlob;
-    try (ByteString.Output out = ByteString.newOutput(1024)) {
-      for (int i = 0; i < 1024; i++) {
+    try (ByteString.Output out = ByteString.newOutput(22000)) {
+      for (int i = 0; i < 22000; i++) {
         out.write(0);
       }
       expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
@@ -822,8 +1410,8 @@ class CASFileCacheTest {
   @Test
   public void delegateWriteCompleteIsNotAnError() throws IOException, InterruptedException {
     Blob expiringBlob;
-    try (ByteString.Output out = ByteString.newOutput(1024)) {
-      for (int i = 0; i < 1024; i++) {
+    try (ByteString.Output out = ByteString.newOutput(22000)) {
+      for (int i = 0; i < 22000; i++) {
         out.write(0);
       }
       expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
@@ -880,8 +1468,8 @@ class CASFileCacheTest {
   public void duplicateExpiredEntrySuppressesDigestExpiration()
       throws IOException, InterruptedException {
     Blob expiringBlob;
-    try (ByteString.Output out = ByteString.newOutput(512)) {
-      for (int i = 0; i < 512; i++) {
+    try (ByteString.Output out = ByteString.newOutput(10000)) {
+      for (int i = 0; i < 10000; i++) {
         out.write(0);
       }
       expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
@@ -903,22 +1491,22 @@ class CASFileCacheTest {
     // assert expiration of non-executable digest
     String expiringKey = fileCache.getKey(expiringBlob.getDigest(), /* isExecutable= */ false);
     assertThat(storage.containsKey(expiringKey)).isFalse();
-    assertThat(Files.exists(fileCache.getPath(expiringKey))).isFalse();
+    assertThat(Files.exists(fileCache.getPath(expiringBlob.getDigest(), expiringKey))).isFalse();
   }
 
   @SuppressWarnings("unchecked")
   @Test
   public void interruptDeferredDuringExpirations() throws IOException, InterruptedException {
     Blob expiringBlob;
-    try (ByteString.Output out = ByteString.newOutput(1024)) {
-      for (int i = 0; i < 1024; i++) {
+    try (ByteString.Output out = ByteString.newOutput(22000)) {
+      for (int i = 0; i < 22000; i++) {
         out.write(0);
       }
       expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
     }
     fileCache.put(expiringBlob);
     // state of CAS
-    //   1024-byte key
+    //   22000-byte key (24576 bytes on disk, fills the cache)
 
     AtomicReference<Throwable> exRef = new AtomicReference<>(null);
     // 0 = not blocking
@@ -1138,17 +1726,14 @@ class CASFileCacheTest {
   @Test
   public void copyExternalInputRetries() throws Exception {
     CASFileCache flakyExternalCAS =
-        new LegacyDirectoryCFC(
+        new DirectoryEntryCFC(
             root,
-            /* maxSizeInBytes= */ 1024,
-            /* maxEntrySizeInBytes= */ 1024,
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
             /* hexBucketLevels= */ 1,
-            storeFileDirsIndexInMemory,
-            /* execRootFallback= */ false,
             expireService,
             /* accessRecorder= */ directExecutor(),
             storage,
-            /* directoriesIndexDbName= */ ":memory:",
             /* zstdBufferPool= */ null,
             /* onPut= */ digest -> {},
             /* onExpire= */ digests -> {},
@@ -1192,6 +1777,7 @@ class CASFileCacheTest {
               }
             });
     flakyExternalCAS.initializeRootDirectory();
+    flakyExternalCAS.setBlockSizeForTesting(TEST_BLOCK_SIZE);
     ByteString blob = ByteString.copyFromUtf8("Flaky Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     blobs.put(blobDigest, blob);
@@ -1201,18 +1787,15 @@ class CASFileCacheTest {
 
   @Test
   public void newInputThrowsNoSuchFileExceptionWithoutDelegate() throws Exception {
-    ContentAddressableStorage undelegatedCAS =
-        new LegacyDirectoryCFC(
+    CASFileCache undelegatedCAS =
+        new DirectoryEntryCFC(
             root,
-            /* maxSizeInBytes= */ 1024,
-            /* maxEntrySizeInBytes= */ 1024,
+            /* maxSizeInBytes= */ 24576,
+            /* maxEntrySizeInBytes= */ 24576,
             /* hexBucketLevels= */ 1,
-            storeFileDirsIndexInMemory,
-            /* execRootFallback= */ false,
             expireService,
             /* accessRecorder= */ directExecutor(),
             storage,
-            /* directoriesIndexDbName= */ ":memory:",
             /* zstdBufferPool= */ null,
             /* onPut= */ digest -> {},
             /* onExpire= */ digests -> {},
@@ -1226,6 +1809,8 @@ class CASFileCacheTest {
               checkArgument(compressor == Compressor.Value.IDENTITY);
               return content.substring((int) offset).newInput();
             });
+    undelegatedCAS.initializeRootDirectory();
+    undelegatedCAS.setBlockSizeForTesting(TEST_BLOCK_SIZE);
     ByteString blob = ByteString.copyFromUtf8("Missing Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     assertThrows(
@@ -1295,6 +1880,97 @@ class CASFileCacheTest {
 
     assertThat(write1.getState()).isEqualTo(TERMINATED);
     assertThat(write2.getState()).isEqualTo(TERMINATED);
+  }
+
+  // -- Block-aligned size tracking tests --
+
+  @Test
+  public void evictionTriggersAtBlockAlignedThreshold() throws IOException, InterruptedException {
+    // A large blob fills the cache (on-disk: 24576 = maxSizeInBytes).
+    // Adding a small blob should trigger eviction.
+    byte[] data1 = new byte[22000]; // on-disk: 24576 = maxSizeInBytes
+    Arrays.fill(data1, (byte) 1);
+    ByteString blob1 = ByteString.copyFrom(data1);
+    Digest digest1 = DIGEST_UTIL.compute(blob1);
+    blobs.put(digest1, blob1);
+    Path path1 = fileCache.put(digest1, false).path();
+    decrementReference(path1);
+
+    assertThat(Files.exists(path1)).isTrue();
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(22000));
+
+    // Second blob triggers eviction: 24576 + 4096 = 28672 > 24576
+    byte[] data2 = new byte[100];
+    Arrays.fill(data2, (byte) 2);
+    ByteString blob2 = ByteString.copyFrom(data2);
+    Digest digest2 = DIGEST_UTIL.compute(blob2);
+    blobs.put(digest2, blob2);
+    fileCache.put(digest2, false);
+
+    // Oldest unreferenced entry (blob1) should be evicted
+    assertThat(Files.exists(path1)).isFalse();
+  }
+
+  @Test
+  public void chargeAndDischargeSizeReturnsToZero() throws IOException, InterruptedException {
+    // Write a blob, dereference it, write a cache-filling blob to evict it, verify size is exact.
+    byte[] data = new byte[100];
+    ByteString blob = ByteString.copyFrom(data);
+    Digest digest = DIGEST_UTIL.compute(blob);
+    blobs.put(digest, blob);
+    Path path = fileCache.put(digest, false).path();
+    decrementReference(path);
+
+    // Write a large blob that forces eviction of the first
+    byte[] bigData = new byte[22000]; // on-disk: 24576 = maxSizeInBytes
+    Arrays.fill(bigData, (byte) 99);
+    ByteString bigBlob = ByteString.copyFrom(bigData);
+    Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
+    blobs.put(bigDigest, bigBlob);
+    fileCache.put(bigDigest, false);
+
+    // First blob should be evicted, only big blob remains
+    assertThat(Files.exists(path)).isFalse();
+    assertThat(fileCache.size()).isEqualTo(estimateSizeOnDisk(22000));
+  }
+
+  @Test
+  public void maxEntrySizeUsesLogicalSizeNotBlockAligned() throws Exception {
+    // To test that maxEntrySizeInBytes compares against logical size (not on-disk size),
+    // we need: logical < maxEntrySizeInBytes < on-disk.
+    // Use maxEntrySizeInBytes=2048, blob=1500 bytes (logical), on-disk=4096.
+    // If the check correctly uses logical size: 1500 < 2048 → accepted.
+    // If it incorrectly used on-disk size: 4096 > 2048 → rejected.
+    CASFileCache smallEntryCache =
+        new DirectoryEntryCFC(
+            root,
+            /* maxSizeInBytes= */ 8192,
+            /* maxEntrySizeInBytes= */ 2048,
+            /* hexBucketLevels= */ 1,
+            expireService,
+            /* accessRecorder= */ directExecutor(),
+            Maps.newConcurrentMap(),
+            /* zstdBufferPool= */ null,
+            /* onPut= */ digest -> {},
+            /* onExpire= */ digests -> {},
+            /* delegate= */ null,
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              ByteString content = blobs.get(digest);
+              checkArgument(content != null, "blob not found: %s", digest);
+              checkArgument(compressor == Compressor.Value.IDENTITY);
+              return content.substring((int) offset).newInput();
+            });
+    smallEntryCache.initializeRootDirectory();
+    smallEntryCache.setBlockSizeForTesting(TEST_BLOCK_SIZE);
+
+    byte[] data = new byte[1500]; // logical: 1500, on-disk: 4096
+    ByteString blob = ByteString.copyFrom(data);
+    Digest digest = DIGEST_UTIL.compute(blob);
+    blobs.put(digest, blob);
+    Path path = smallEntryCache.put(digest, false).path();
+    assertThat(Files.exists(path)).isTrue();
+    assertThat(smallEntryCache.size()).isEqualTo(estimateSizeOnDisk(1500));
   }
 
   static class ConcurrentWriteStreamObserver {
@@ -1467,6 +2143,57 @@ class CASFileCacheTest {
                   .getRootDirectories(),
               null),
           /* storeFileDirsIndexInMemory= */ false);
+    }
+  }
+
+  private static final class QueuedExecutorService extends AbstractExecutorService {
+    private final Deque<Runnable> tasks = new ArrayDeque<>();
+    private boolean shutdown = false;
+
+    @Override
+    public void shutdown() {
+      shutdown = true;
+    }
+
+    @Override
+    public java.util.List<Runnable> shutdownNow() {
+      shutdown = true;
+      java.util.List<Runnable> pendingTasks = ImmutableList.copyOf(tasks);
+      tasks.clear();
+      return pendingTasks;
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return shutdown;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return shutdown && tasks.isEmpty();
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      return isTerminated();
+    }
+
+    @Override
+    public void execute(Runnable command) {
+      if (shutdown) {
+        throw new java.util.concurrent.RejectedExecutionException();
+      }
+      tasks.add(command);
+    }
+
+    void runNext() {
+      tasks.remove().run();
+    }
+
+    void runAll() {
+      while (!tasks.isEmpty()) {
+        runNext();
+      }
     }
   }
 }

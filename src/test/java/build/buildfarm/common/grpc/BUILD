@@ -22,6 +22,7 @@ java_test(
     srcs = glob(["*Test.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
+        "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/test/java/build/buildfarm:test_runner",
         "@buildfarm_maven//:com_google_guava_guava",

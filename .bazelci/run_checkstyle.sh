@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2025 The Buildfarm Authors. All rights reserved.
+# Copyright 2023-2026 The Buildfarm Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,8 +42,8 @@ download_tool () {
         wget -O $LOCAL_DOWNLOAD_NAME $TOOL_URL
 
         #delete the zip and give tool common name.
-        mkdir $TOOL_FOLDER;
-        mv checkstyle.jar $TOOL_FOLDER;
+        mkdir $TOOL_FOLDER
+        mv checkstyle.jar $TOOL_FOLDER
     fi
 }
 
@@ -75,7 +75,7 @@ main () {
     if [ "${RUN_STATIC_ANALYSIS_CHECKS:-false}" = true ]; then
         run_static_analysis_checks
         analyze_static_analysis_results
-    fi;
+    fi
 
 }
 

@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2017-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,6 @@ import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.shard.ServerInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.services.ActionCacheService;
 import build.buildfarm.server.services.CapabilitiesService;
@@ -38,6 +37,7 @@ import build.buildfarm.server.services.OperationQueueService;
 import build.buildfarm.server.services.OperationsService;
 import build.buildfarm.server.services.PublishBuildEventService;
 import build.buildfarm.server.services.WorkerProfileService;
+import build.buildfarm.shard.instance.ServerInstance;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
@@ -79,6 +79,7 @@ public class BuildFarmServer extends LoggingMain {
   private AtomicBoolean released = new AtomicBoolean(true);
   private InvocationsCollector invocationsCollector;
   private Thread invocationsCollectorThread;
+  private final PrometheusPublisher prometheusPublisher = new PrometheusPublisher();
 
   BuildFarmServer() {
     super("BuildFarmServer");
@@ -127,6 +128,7 @@ public class BuildFarmServer extends LoggingMain {
     released.set(false);
     // FIXME change to instance = ...; instance.start();
     ServerInstance serverInstance = createInstance();
+    serverInstance.setPrometheusPublisher(prometheusPublisher);
     instance = serverInstance;
 
     healthStatusManager = new HealthStatusManager();
@@ -186,7 +188,7 @@ public class BuildFarmServer extends LoggingMain {
 
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
+    prometheusPublisher.startHttpServer(configs.getPrometheusPort());
     healthCheckMetric.labels("start").inc();
   }
 
@@ -212,7 +214,7 @@ public class BuildFarmServer extends LoggingMain {
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     }
-    PrometheusPublisher.stopHttpServer();
+    prometheusPublisher.stopHttpServer();
     healthCheckMetric.labels("stop").inc();
     try {
       initiateShutdown();

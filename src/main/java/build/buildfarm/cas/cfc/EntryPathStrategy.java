@@ -1,10 +1,10 @@
-// Copyright 2020 The Buildfarm Authors. All rights reserved.
+// Copyright 2020-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,11 +14,13 @@
 
 package build.buildfarm.cas.cfc;
 
+import build.buildfarm.v1test.Digest;
 import java.nio.file.Path;
 
 interface EntryPathStrategy extends Iterable<Path> {
-  // key must begin with a hexdigest
-  Path getPath(String key);
+  // Resolves the on-disk path for an entry. The leaf is fileName; any hash bucketing is derived
+  // from digest.getHash(), the bare hex hash the fileName was computed from.
+  Path getPath(Digest digest, String fileName);
 
   // BFS of all directories involved from a root
   Iterable<Path> branchDirectories();

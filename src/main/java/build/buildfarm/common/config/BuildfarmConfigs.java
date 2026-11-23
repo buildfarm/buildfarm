@@ -1,19 +1,32 @@
+// Copyright 2022-2026 The Buildfarm Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.common.config;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.ExecutionWrapperProperties;
 import build.buildfarm.common.SystemProcessors;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +52,8 @@ public final class BuildfarmConfigs {
 
   private static final long DEFAULT_CAS_SIZE = 2147483648L; // 2 * 1024 * 1024 * 1024
 
+  @VisibleForTesting static final int DEFAULT_MAX_SIZE_PERCENT = 90;
+
   private static final class ImportConstruct extends AbstractConstruct {
     String configsBasePath;
 
@@ -50,12 +65,13 @@ public final class BuildfarmConfigs {
     public Object construct(Node node) {
       final ScalarNode scalarNode = (ScalarNode) node;
       final String value = scalarNode.getValue();
-      try {
-        final InputStream input = new FileInputStream(new File(configsBasePath + "/" + value));
+      try (InputStream input = Files.newInputStream(Path.of(configsBasePath + "/" + value))) {
         final Yaml yaml = new Yaml(constructor);
         return yaml.load(input);
-      } catch (FileNotFoundException ex) {
+      } catch (NoSuchFileException ex) {
         throw new RuntimeException("Could not find config file: " + value);
+      } catch (IOException ex) {
+        throw new RuntimeException("Could not read config file: " + value, ex);
       }
     }
   }
@@ -208,15 +224,16 @@ public final class BuildfarmConfigs {
     adjustRedisUri(configs);
   }
 
-  private static void adjustWorkerConfigs(BuildfarmConfigs configs) {
+  private static void adjustWorkerConfigs(BuildfarmConfigs configs) throws ConfigurationException {
     configs
         .getWorker()
         .setPublicName(
             adjustPublicName(configs.getWorker().getPublicName(), configs.getWorker().getPort()));
     adjustRedisUri(configs);
+    adjustCompressedBlobTransfer(configs);
 
-    // Automatically set disk space to 90% of available space on the worker volume.
-    // User configured value in .yaml will always take presedence.
+    // Automatically set disk space to maxSizePercent of the worker volume.
+    // User configured value in .yaml will always take precedence.
     for (Cas storage : configs.getWorker().getStorages()) {
       deriveCasStorage(storage);
     }
@@ -239,11 +256,9 @@ public final class BuildfarmConfigs {
     }
 
     if (configs.getWorker().getExecuteStageWidth() == 0) {
-      configs
-          .getWorker()
-          .setExecuteStageWidth(
-              Math.max(
-                  1, SystemProcessors.get() - configs.getWorker().getExecuteStageWidthOffset()));
+      int processorCount = SystemProcessors.get();
+      int widthOffset = configs.getWorker().getExecuteStageWidthOffset();
+      configs.getWorker().setExecuteStageWidth(Math.max(1, processorCount - widthOffset));
       log.info(
           String.format(
               "executeStageWidth modified to %d", configs.getWorker().getExecuteStageWidth()));
@@ -289,6 +304,20 @@ public final class BuildfarmConfigs {
     return publicName;
   }
 
+  private static void adjustCompressedBlobTransfer(BuildfarmConfigs configs) {
+    // use environment override (useful for containerized deployment)
+    if (!Strings.isNullOrEmpty(System.getenv("COMPRESSED_BLOB_TRANSFER"))) {
+      configs
+          .getWorker()
+          .setCompressedBlobTransfer(
+              Boolean.parseBoolean(System.getenv("COMPRESSED_BLOB_TRANSFER")));
+      log.info(
+          String.format(
+              "compressedBlobTransfer modified to %b",
+              configs.getWorker().isCompressedBlobTransfer()));
+    }
+  }
+
   private static void adjustRedisUri(BuildfarmConfigs configs) {
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
@@ -298,14 +327,36 @@ public final class BuildfarmConfigs {
     }
   }
 
-  private static void deriveCasStorage(Cas storage) {
+  @VisibleForTesting
+  static void validateCasStorageSizeConfig(Cas storage) throws ConfigurationException {
+    long maxSizeBytes = storage.getMaxSizeBytes();
+    Integer maxSizePercent = storage.getMaxSizePercent();
+    if (maxSizeBytes < 0) {
+      throw new ConfigurationException("maxSizeBytes must be non-negative, got: " + maxSizeBytes);
+    }
+    if (maxSizeBytes != 0 && maxSizePercent != null) {
+      throw new ConfigurationException(
+          "maxSizeBytes and maxSizePercent cannot both be set; please use one or the other");
+    }
+    if (maxSizePercent != null && (maxSizePercent <= 0 || maxSizePercent > 100)) {
+      throw new ConfigurationException(
+          "maxSizePercent must be between 1 and 100, got: " + maxSizePercent);
+    }
+  }
+
+  @VisibleForTesting
+  static void deriveCasStorage(Cas storage) throws ConfigurationException {
+    validateCasStorageSizeConfig(storage);
     if (storage.getMaxSizeBytes() == 0) {
+      Integer configuredPercent = storage.getMaxSizePercent();
+      int maxSizePercent = configuredPercent != null ? configuredPercent : DEFAULT_MAX_SIZE_PERCENT;
       try {
         storage.setMaxSizeBytes(
             (long)
                 (BuildfarmConfigs.getInstance().getWorker().getValidRoot().toFile().getTotalSpace()
-                    * 0.9));
+                    * (maxSizePercent / 100.0)));
       } catch (Exception e) {
+        log.warning("Failed to determine filesystem size, falling back to default CAS size: " + e);
         storage.setMaxSizeBytes(DEFAULT_CAS_SIZE);
       }
       log.info(String.format("CAS size changed to %d", storage.getMaxSizeBytes()));

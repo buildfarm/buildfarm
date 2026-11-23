@@ -23,16 +23,16 @@ jobs:
         language: [java-kotlin]
 
     steps:
-    - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86   # 0.19.0
+    - uses: bazel-contrib/setup-bazel@f34d6a05eae3c24acab7fa54587492daeaeffdab   # 0.19.2
       with:
           # Avoid downloading Bazel every time.
         bazelisk-cache: true
 
     - name: Checkout repository
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@c10b8064de6f491fea524254123dbe5e09572f13   # v4.35.1
+      uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066   # v4.39.3
       with:
         languages: ${{ matrix.language }}
         build-mode: manual
@@ -47,12 +47,12 @@ jobs:
         # See also: https://docs.github.com/en/enterprise-cloud@latest/code-security/codeql-cli/getting-started-with-the-codeql-cli/preparing-your-code-for-codeql-analysis#specifying-build-commands
       run: |
         bazel version
-        bazel build \
+        bazel build --config=strict \
           --spawn_strategy=local --nouse_action_cache \
           //src/main/java/build/buildfarm:buildfarm-server \
           //src/main/java/build/buildfarm:buildfarm-shard-worker
         bazel shutdown
 
-    - uses: github/codeql-action/analyze@c10b8064de6f491fea524254123dbe5e09572f13   # v4.35.1
+    - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066   # v4.39.3
       with:
         category: /language:${{ matrix.language }}

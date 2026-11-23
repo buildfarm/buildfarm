@@ -1,10 +1,10 @@
-// Copyright 2018 The Buildfarm Authors. All rights reserved.
+// Copyright 2023-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,9 +23,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.cas.cfc.PutDirectoryException;
@@ -96,15 +94,14 @@ public class InputFetcherTest {
           public Path createExecDir(
               String operationName,
               Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
-              DigestFunction.Value digestFunction,
-              Action action,
+              Digest inputRootDigest,
               Command command,
               UserPrincipal owner,
               WorkerExecutedMetadata.Builder workerExecutedMetadata)
               throws IOException {
             Path root = Path.of(operationName);
             throw new ExecDirException(
-                Path.of(operationName),
+                root,
                 ImmutableList.of(
                     new ViolationException(
                         Digest.getDefaultInstance(),

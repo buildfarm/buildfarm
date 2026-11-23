@@ -42,6 +42,7 @@ server:
     commandCacheMaxEntries: 10000
     digestToActionCacheMaxEntries: 10000
     recentServedExecutionsCacheMaxEntries: 10000
+    actionCacheMaxEntries: 10000
   admin:
     deploymentEnvironment: AWS
     clusterEndpoint: grpc://localhost
@@ -132,6 +133,7 @@ worker:
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
+  reportResultDeadline: 60
   reportResultStageWidth: 1
   linkExecFileSystem: true
   linkInputDirectories: true
@@ -156,6 +158,8 @@ worker:
     selectForTmpFs: false
   createSymlinkOutputs: false
   zstdBufferPoolSize: 2048
+  zstdBufferPoolBorrowTimeoutMillis: -1
+  compressedBlobTransfer: false
   executionPolicies:
   - name: test
     prioritized: false

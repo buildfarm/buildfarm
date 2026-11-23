@@ -16,9 +16,23 @@
 set -e
 set -o pipefail
 
-# This script is to be called within a built container reflecting the changes of a PR
-# We start the server and the worker, and test that they can complete builds for a bazel client.
-cd buildfarm;
+# Clean up function to stop services on exit
+buildfarm_cleanup() {
+    set +e
+    echo "Stopping buildfarm services..."
+    if [ -n "$SERVER_PID" ]; then
+        kill "$SERVER_PID" 2>/dev/null
+        wait "$SERVER_PID" 2>/dev/null
+    else
+        echo "No server pid..."
+    fi
+    if [ -n "$WORKER_PID" ]; then
+        kill "$WORKER_PID" 2>/dev/null
+        wait "$WORKER_PID" 2>/dev/null
+    else
+        echo "No server pid..."
+    fi
+}
 
 #Various targets to be tested
 BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
@@ -30,6 +44,16 @@ BUILDFARM_WORKER_CONFIG=$BUILDFARM_CONFIG
 
 GRPC_LOGS1="/tmp/parsed-grpc.log"
 GRPC_LOGS2="/tmp/parsed-grpc2.log"
+RAW_GRPC_LOGS1=${RAW_GRPC_LOGS1:-src/test/many/grpc.log}
+RAW_GRPC_LOGS2=${RAW_GRPC_LOGS2:-src/test/many/grpc2.log}
+if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
+    RAW_GRPC_LOGS_UPLOAD="$CDC_ARTIFACTS/upload.grpc.log"
+    GRPC_LOGS_UPLOAD="$CDC_ARTIFACTS/upload.grpc.json"
+    RAW_GRPC_LOGS1="$CDC_ARTIFACTS/cold.grpc.log"
+    RAW_GRPC_LOGS2="$CDC_ARTIFACTS/cached.grpc.log"
+    GRPC_LOGS1="$CDC_ARTIFACTS/cold.grpc.json"
+    GRPC_LOGS2="$CDC_ARTIFACTS/cached.grpc.json"
+fi
 
 ensure_server_is_up(){
     # We cannot do a test build until the server is properly started.
@@ -43,7 +67,7 @@ ensure_server_is_up(){
     MAX_COUNT=5
 
     # Wait for the server to start
-    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]];
+    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]]
     do
         echo "Waiting for Server to start..."
         sleep ${SLEEP_TIME}
@@ -59,7 +83,7 @@ ensure_server_is_up(){
        if [ ! -n "$(ps -p $SERVER_PID -o pid=)" ]; then
           echo "Server crashed."
           break
-       fi;
+       fi
     done
 }
 
@@ -75,7 +99,7 @@ ensure_worker_is_up(){
     MAX_COUNT=5
 
     # Wait for the server to start
-    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]];
+    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]]
     do
         echo "Waiting for Worker to start..."
         sleep ${SLEEP_TIME}
@@ -91,7 +115,7 @@ ensure_worker_is_up(){
        if [ ! -n "$(ps -p $WORKER_PID -o pid=)" ]; then
           echo "Worker crashed."
           break
-       fi;
+       fi
     done
 }
 
@@ -101,13 +125,13 @@ check_for_crashes(){
         if [ ! -n "$(ps -p $SERVER_PID -o pid=)" ]; then
 	    echo "Server crashed."
             cat server.log
-            exit -1;
-	fi;
+            exit -1
+	fi
         if [ ! -n "$(ps -p $WORKER_PID -o pid=)" ]; then
 	    echo "Worker crashed."
             cat worker.log
-            exit -1;
-	fi;
+            exit -1
+	fi
     done
 }
 
@@ -115,7 +139,7 @@ start_server_and_worker(){
   echo "Testing with Shard Instances."
 
   # Build first to create more predictable run time.
-  ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
+  ./bazel build --config=strict $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
 
   # Build execution wrappers if needed (for linux-sandbox, process-wrapper, etc.)
   # These are required when using sandboxing features.
@@ -200,13 +224,13 @@ start_server_and_worker(){
   fi
 
   # Start the server.
-  ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
+  ./bazel run --config=strict $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
   SERVER_PID=$!
 
   ensure_server_is_up
 
   # Start the worker.
-  ./bazel run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
+  ./bazel run --config=strict $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
   WORKER_PID=$!
 
   ensure_worker_is_up
@@ -216,25 +240,37 @@ init_grpc_parser(){
     if [ "${CACHE_TEST:-false}" = true ]; then
         echo "Fetch tools_remote from git"
 
-        git clone https://github.com/bazelbuild/tools_remote.git
-        cd tools_remote;
+        git clone https://github.com/buildfarm/tools_remote.git
+        pushd tools_remote
         git reset --hard $SHA1_TOOLS_REMOTE
         ../bazel build //:remote_client
-        cd /buildfarm;
+        popd
     fi
 }
 parse_grpc_logs(){
     if [ "${CACHE_TEST:-false}" = true ]; then
         echo "Parse grpc log"
-        ./tools_remote/bazel-bin/remote_client --grpc_log src/test/many/grpc.log printlog --format_json > $GRPC_LOGS1
-        ./tools_remote/bazel-bin/remote_client --grpc_log src/test/many/grpc2.log printlog --format_json > $GRPC_LOGS2
-        calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
+        ./tools_remote/bazel-bin/remote_client --grpc_log "$RAW_GRPC_LOGS1" printlog --format_json > "$GRPC_LOGS1"
+        ./tools_remote/bazel-bin/remote_client --grpc_log "$RAW_GRPC_LOGS2" printlog --format_json > "$GRPC_LOGS2"
+        if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
+            ./tools_remote/bazel-bin/remote_client --grpc_log "$RAW_GRPC_LOGS_UPLOAD" printlog --format_json > "$GRPC_LOGS_UPLOAD"
+            calculate_cache_statistics "$GRPC_LOGS_UPLOAD" "$GRPC_LOGS1" "$GRPC_LOGS2"
+        else
+            calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
+        fi
     fi
 }
 
+# Trap EXIT, SIGINT, and SIGTERM
+trap buildfarm_cleanup EXIT INT TERM
+
 calculate_cache_statistics(){
     echo "Calculating cache statistics..."
-    ./.bazelci/ingest_grpc_logs.py $1 $2
+    if [ "${CACHE_EXPECTATIONS:-baseline}" = cdc ]; then
+        python3 ./.bazelci/ingest_grpc_logs.py --cdc-manifest "$CDC_ARTIFACTS/manifest.json" "$1" "$2" "$3"
+    else
+        python3 ./.bazelci/ingest_grpc_logs.py "$1" "$2"
+    fi
 }
 start_server_and_worker
 

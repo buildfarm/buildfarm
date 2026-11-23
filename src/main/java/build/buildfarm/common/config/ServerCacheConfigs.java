@@ -1,10 +1,10 @@
-// Copyright 2023 The Buildfarm Authors. All rights reserved.
+// Copyright 2023-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,4 +52,11 @@ public class ServerCacheConfigs {
    * @details This will not dictate the max memory used.
    */
   private long recentServedExecutionsCacheMaxEntries = 64 * 1024;
+
+  /**
+   * @field actionCacheMaxEntries
+   * @brief The max number of entries that the action cache will hold.
+   * @details This will not dictate the max memory used.
+   */
+  private long actionCacheMaxEntries = 1_000_000;
 }

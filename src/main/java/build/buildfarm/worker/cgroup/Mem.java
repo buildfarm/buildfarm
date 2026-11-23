@@ -1,10 +1,10 @@
-// Copyright 2021 The Buildfarm Authors. All rights reserved.
+// Copyright 2021-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,9 @@
 
 package build.buildfarm.worker.cgroup;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Map;
 
 public class Mem extends Controller {
   Mem(Group group) {
@@ -26,23 +28,33 @@ public class Mem extends Controller {
     return "memory";
   }
 
+  @Override
+  public Map<String, Long> sample() {
+    return ImmutableMap.of();
+  }
+
   public long getMemoryLimit() throws IOException {
     open();
-    return readLong("memory.limit_in_bytes");
+    return readLong("memory.max");
   }
 
   public void setMemoryLimit(long limitBytes) throws IOException {
     open();
-    writeLong("memory.limit_in_bytes", limitBytes);
+    writeLong("memory.max", limitBytes);
   }
 
   public long getMemorySwapLimit() throws IOException {
     open();
-    return readLong("memory.memsw.limit_in_bytes");
+    return readLong("memory.swap.max");
   }
 
   public void setMemorySwapLimit(long limitBytes) throws IOException {
     open();
-    writeLong("memory.memsw.limit_in_bytes", limitBytes);
+    writeLong("memory.swap.max", limitBytes);
+  }
+
+  @Override
+  public void setCpu(int cpu_us) {
+    throw new UnsupportedOperationException();
   }
 }

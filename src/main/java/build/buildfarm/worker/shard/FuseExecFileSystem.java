@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2017-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,13 +16,10 @@ package build.buildfarm.worker.shard;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.ExecFileSystem;
@@ -84,15 +81,13 @@ class FuseExecFileSystem implements ExecFileSystem {
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
-      DigestFunction.Value digestFunction,
-      Action action,
+      Digest inputRootDigest,
       Command command,
       UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
     // FIXME insist that the FUSE perform permission checks against the owner
-    fuseCAS.createInputRoot(
-        operationName, DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction));
+    fuseCAS.createInputRoot(operationName, inputRootDigest);
     return root.resolve(operationName);
   }
 

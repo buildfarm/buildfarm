@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2024-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,15 +27,12 @@ import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.cas.cfc.CASFileCache.PathResult;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.Dirent;
 import build.buildfarm.v1test.Digest;
@@ -79,6 +76,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
   protected final ExecutorService removeDirectoryService;
   private final ExecutorService accessRecorder;
   protected FileStore fileStore; // initialized with start
+  protected final WorkerEventObserver workerEventObserver;
 
   public CFCExecFileSystem(
       Path root,
@@ -87,7 +85,8 @@ public class CFCExecFileSystem implements ExecFileSystem {
       boolean allowSymlinkTargetAbsolute,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
-      ExecutorService fetchService) {
+      ExecutorService fetchService,
+      WorkerEventObserver workerEventObserver) {
     this.root = root;
     this.fileCache = fileCache;
     this.owners = owners;
@@ -95,6 +94,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
     this.fetchService = fetchService;
+    this.workerEventObserver = workerEventObserver;
   }
 
   @Override
@@ -297,6 +297,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
     }
 
     protected void fetchedBytes(long size) {
+      workerEventObserver.onFetched(size);
       synchronized (workerExecutedMetadata) {
         workerExecutedMetadata.setFetchedBytes(size + workerExecutedMetadata.getFetchedBytes());
       }
@@ -340,8 +341,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
   public Path createExecDir(
       String operationName,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
-      DigestFunction.Value digestFunction,
-      Action action,
+      Digest inputRootDigest,
       Command command,
       @Nullable UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
@@ -354,8 +354,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
     log.log(Level.FINER, operationName + " walking execTree");
     ExecTree execTree = new ExecTree(directoriesIndex);
     ExecFileVisitor visitor = new ExecFileVisitor(workerExecutedMetadata);
-    execTree.walk(
-        execDir, DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction), visitor);
+    execTree.walk(execDir, inputRootDigest, visitor);
 
     // TODO refactor into single future that produces all exceptions in a list
     Iterable<ListenableFuture<Void>> fetchedFutures = visitor.futures();

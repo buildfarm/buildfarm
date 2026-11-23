@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2022-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,7 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.config.Cas.TYPE.MEMORY;
 import static build.buildfarm.common.config.Server.INSTANCE_TYPE.SHARD;
+import static build.buildfarm.instance.Instance.SENTINEL_PAGE_TOKEN;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
@@ -57,6 +58,7 @@ import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.HashCode;
@@ -208,10 +210,18 @@ public class BuildFarmServerIntegrationTest {
     OperationsGrpc.OperationsBlockingStub operationsStub =
         OperationsGrpc.newBlockingStub(inProcessChannel);
 
-    ListOperationsResponse listResponse = operationsStub.listOperations(listRequest);
+    Iterable<Operation> operations = ImmutableList.of();
+    for (; ; ) {
+      ListOperationsResponse listResponse = operationsStub.listOperations(listRequest);
+      operations = Iterables.concat(operations, listResponse.getOperationsList());
+      String pageToken = listResponse.getNextPageToken();
+      listRequest = listRequest.toBuilder().setPageToken(pageToken).build();
+      if (pageToken.equals(SENTINEL_PAGE_TOKEN)) {
+        break;
+      }
+    }
 
-    assertThat(Iterables.transform(listResponse.getOperationsList(), Operation::getName))
-        .contains(operation.getName());
+    assertThat(Iterables.transform(operations, Operation::getName)).contains(operation.getName());
 
     CancelOperationRequest cancelRequest =
         CancelOperationRequest.newBuilder().setName(operation.getName()).build();
@@ -219,9 +229,18 @@ public class BuildFarmServerIntegrationTest {
     operationsStub.cancelOperation(cancelRequest);
 
     // should now be gone
-    listResponse = operationsStub.listOperations(listRequest);
+    operations = ImmutableList.of();
+    for (; ; ) {
+      ListOperationsResponse listResponse = operationsStub.listOperations(listRequest);
+      operations = Iterables.concat(operations, listResponse.getOperationsList());
+      String pageToken = listResponse.getNextPageToken();
+      listRequest = listRequest.toBuilder().setPageToken(pageToken).build();
+      if (pageToken.equals(SENTINEL_PAGE_TOKEN)) {
+        break;
+      }
+    }
 
-    assertThat(listResponse.getOperationsList()).doesNotContain(operation.getName());
+    assertThat(operations).doesNotContain(operation.getName());
   }
 
   @Test

@@ -18,39 +18,46 @@
 # All of the needed buildfarm services are initialized (redis, server, worker).
 # We ensure that the system can build a set of bazel targets.
 
-# Run redis container
-docker run --rm -d --name buildfarm-redis --network host redis:7.2.4 --bind localhost
+# Define Redis details
+REDIS_VERSION="7.2.4"
+REDIS_DIR="redis-${REDIS_VERSION}"
 
-# Build a container for buildfarm services
+# Download and compile Redis if not already present
+if [ ! -d "$REDIS_DIR" ]; then
+    echo "Downloading and compiling Redis ${REDIS_VERSION}..."
+    curl -sSL "https://github.com/redis/redis/archive/refs/tags/${REDIS_VERSION}.tar.gz" | tar -xz
+    make -C "$REDIS_DIR" -j$(nproc)
+fi
+
+# Clean up function to stop services on exit
+cleanup() {
+    echo "Stopping services..."
+    # Gracefully stop Redis, then force kill if needed
+    if [ -n "$REDIS_PID" ]; then
+        ./"${REDIS_DIR}/src/redis-cli" shutdown 2>/dev/null || kill "$REDIS_PID" 2>/dev/null
+    fi
+    wait "$REDIS_PID" "$PID2" 2>/dev/null
+    echo "All services stopped."
+}
+
+# Trap EXIT, SIGINT, and SIGTERM
+trap cleanup EXIT INT TERM
+
+# Start Redis 7.2.4 in the background
+./"${REDIS_DIR}/src/redis-server" --port 6379 &
+REDIS_PID=$!
+
+if [ -z "$BAZEL" ]
+then
+    BAZEL=bazel
+fi
 # Only copy bazel if it doesn't exist (allow pre-existing bazel to be used)
 if [ ! -f bazel ] || [ ! -x bazel ]; then
-  cp `which bazel` bazel
-fi
-docker build -t buildfarm .
-
-# Start the servies and do a test build
-# Use more memory for tests that need to build execution wrappers
-MEMORY_LIMIT=""
-CGROUP_OPTIONS=""
-if [[ "$BUILDFARM_CONFIG" == *"cgroups-sandbox"* ]]; then
-  MEMORY_LIMIT="--memory=16g"
-  # For cgroups v2 + linux-sandbox: need privileged mode for namespace operations
-  # Multiplex workers are disabled in test script to avoid IPC hangs with sandboxing
-  CGROUP_OPTIONS="--privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw"
+    cp `which $BAZEL` bazel
 fi
 
-docker run --rm \
-    -v /tmp:/tmp \
-    --network host  \
-    $MEMORY_LIMIT \
-    $CGROUP_OPTIONS \
-    --env RUN_TEST=$RUN_TEST \
-    --env TEST_ARG1=$TEST_ARG1 \
-    --env EXECUTION_STAGE_WIDTH=$EXECUTION_STAGE_WIDTH \
-    --env BUILDFARM_CONFIG=$BUILDFARM_CONFIG \
-    buildfarm buildfarm/.bazelci/test_buildfarm_container.sh
-status=$?
-
-docker stop buildfarm-redis
-
-exit $status
+RUN_TEST=$RUN_TEST \
+TEST_ARG1=$TEST_ARG1 \
+EXECUTION_STAGE_WIDTH=$EXECUTION_STAGE_WIDTH \
+BUILDFARM_CONFIG=$BUILDFARM_CONFIG \
+    .bazelci/test_buildfarm_container.sh

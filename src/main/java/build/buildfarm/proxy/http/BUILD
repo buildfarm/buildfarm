@@ -10,7 +10,6 @@ java_library(
         "//src/main/java/build/buildfarm/common/resources",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
-        "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@buildfarm_maven//:com_github_pcj_google_options",
         "@buildfarm_maven//:com_google_auth_google_auth_library_credentials",
         "@buildfarm_maven//:com_google_auth_google_auth_library_oauth2_http",
@@ -42,6 +41,7 @@ java_library(
         "@googleapis//google/bytestream:bytestream_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",
         "@io_grpc_grpc_proto//:health_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

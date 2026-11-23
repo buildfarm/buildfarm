@@ -1,10 +1,10 @@
-// Copyright 2025 The Buildfarm Authors. All rights reserved.
+// Copyright 2022-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,6 +46,7 @@ public class Worker {
   private int executeStageWidthOffset = 0;
   private int inputFetchStageWidth = 0;
   private int inputFetchDeadline = 60;
+  private int reportResultDeadline = 60;
   private int reportResultStageWidth = 1;
   private boolean linkExecFileSystem = true;
   private boolean linkInputDirectories = true;
@@ -62,7 +63,10 @@ public class Worker {
   private SandboxSettings sandboxSettings = new SandboxSettings();
   private boolean createSymlinkOutputs = false;
   private int zstdBufferPoolSize = 2048; /* * ZSTD_DStreamInSize (current is 128k) == 256MiB */
+  private int zstdBufferPoolBorrowTimeoutMillis = -1; /* negative waits without a bound */
+  private boolean compressedBlobTransfer = false;
   private Set<String> persistentWorkerActionMnemonicAllowlist = Set.of("*");
+  private Set<String> ignoreMarketExecutionMnemonics = Set.of("TestRunner");
   // These limited resources are only for the individual worker.
   // An example would be hardware resources such as GPUs.
   // If you want GPU actions to run exclusively, define a single GPU resource.
@@ -71,6 +75,8 @@ public class Worker {
   private boolean errorOperationOutputSizeExceeded = false;
   private boolean legacyDirectoryFileCache = false;
   private boolean absolutizeCommandProgram = isWindows();
+  private boolean executionMarket = false;
+  private String openTelemetryURL = "";
 
   public List<ExecutionPolicy> getExecutionPolicies() {
     return executionPolicies;

@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2024-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,8 +23,10 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
+import com.google.common.collect.ImmutableMap;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
+import java.util.Map;
 
 public final class ExecutionContext {
   final ExecuteResponse.Builder executeResponse;
@@ -38,6 +40,8 @@ public final class ExecutionContext {
   final QueueEntry queueEntry;
   public final Claim claim;
   final WorkerExecutedMetadata.Builder workerExecutedMetadata;
+  final boolean marketExecution;
+  final Map<String, String> executionPolicyInterpolations;
 
   private ExecutionContext(
       ExecuteResponse.Builder executeResponse,
@@ -50,7 +54,9 @@ public final class ExecutionContext {
       Tree tree,
       QueueEntry queueEntry,
       Claim claim,
-      WorkerExecutedMetadata.Builder workerExecutedMetadata) {
+      WorkerExecutedMetadata.Builder workerExecutedMetadata,
+      boolean marketExecution,
+      Map<String, String> executionPolicyInterpolations) {
     this.executeResponse = executeResponse;
     this.operation = operation;
     this.metadata = metadata;
@@ -62,6 +68,8 @@ public final class ExecutionContext {
     this.queueEntry = queueEntry;
     this.claim = claim;
     this.workerExecutedMetadata = workerExecutedMetadata;
+    this.marketExecution = marketExecution;
+    this.executionPolicyInterpolations = executionPolicyInterpolations;
   }
 
   public static final class Builder {
@@ -76,6 +84,8 @@ public final class ExecutionContext {
     private QueueEntry queueEntry;
     private Claim claim;
     private WorkerExecutedMetadata.Builder workerExecutedMetadata;
+    private boolean marketExecution;
+    private Map<String, String> executionPolicyInterpolations;
 
     private Builder(
         ExecuteResponse.Builder executeResponse,
@@ -88,7 +98,9 @@ public final class ExecutionContext {
         Tree tree,
         QueueEntry queueEntry,
         Claim claim,
-        WorkerExecutedMetadata.Builder workerExecutedMetadata) {
+        WorkerExecutedMetadata.Builder workerExecutedMetadata,
+        boolean marketExecution,
+        Map<String, String> executionPolicyInterpolations) {
       this.executeResponse = executeResponse;
       this.operation = operation;
       this.metadata = metadata;
@@ -100,6 +112,8 @@ public final class ExecutionContext {
       this.queueEntry = queueEntry;
       this.claim = claim;
       this.workerExecutedMetadata = workerExecutedMetadata;
+      this.marketExecution = marketExecution;
+      this.executionPolicyInterpolations = executionPolicyInterpolations;
     }
 
     public Builder setOperation(Operation operation) {
@@ -147,6 +161,17 @@ public final class ExecutionContext {
       return this;
     }
 
+    public Builder setMarketExecution(boolean marketExecution) {
+      this.marketExecution = marketExecution;
+      return this;
+    }
+
+    public Builder setExecutionPolicyInterpolations(
+        Map<String, String> executionPolicyInterpolations) {
+      this.executionPolicyInterpolations = ImmutableMap.copyOf(executionPolicyInterpolations);
+      return this;
+    }
+
     public ExecutionContext build() {
       return new ExecutionContext(
           executeResponse,
@@ -159,7 +184,9 @@ public final class ExecutionContext {
           tree,
           queueEntry,
           claim,
-          workerExecutedMetadata);
+          workerExecutedMetadata,
+          marketExecution,
+          executionPolicyInterpolations);
     }
   }
 
@@ -175,7 +202,9 @@ public final class ExecutionContext {
         /* tree= */ null,
         /* queueEntry= */ null,
         /* claim= */ null,
-        /* workerExecutedMetadata= */ WorkerExecutedMetadata.newBuilder());
+        /* workerExecutedMetadata= */ WorkerExecutedMetadata.newBuilder(),
+        /* marketExecution= */ false,
+        /* executionPolicyInterpolations= */ ImmutableMap.of());
   }
 
   public Builder toBuilder() {
@@ -190,6 +219,8 @@ public final class ExecutionContext {
         tree,
         queueEntry,
         claim,
-        workerExecutedMetadata);
+        workerExecutedMetadata,
+        marketExecution,
+        executionPolicyInterpolations);
   }
 }

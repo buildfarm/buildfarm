@@ -1,10 +1,10 @@
-// Copyright 2024 The Buildfarm Authors. All rights reserved.
+// Copyright 2025-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@ import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
 import static build.buildfarm.common.io.Directories.makeWritable;
 import static build.buildfarm.common.io.EvenMoreFiles.setReadOnlyPerms;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.Futures.catchingAsync;
+import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.successfulAsList;
@@ -41,8 +41,10 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import io.grpc.Context;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.io.InputStream;
@@ -68,7 +70,8 @@ import org.jspecify.annotations.Nullable;
 
 @Log
 public class DirectoryEntryCFC extends CASFileCache {
-  private final Cache<Digest, ListenableFuture<Void>> fetchers = CacheBuilder.newBuilder().build();
+  private final Cache<Digest, ListenableFuture<Boolean>> fetchers =
+      CacheBuilder.newBuilder().build();
 
   public DirectoryEntryCFC(
       Path root,
@@ -108,9 +111,17 @@ public class DirectoryEntryCFC extends CASFileCache {
           path,
           new SimpleFileVisitor<>() {
             @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+              blobSizeInBytes.addAndGet(
+                  estimateSizeOnDisk(attrs.size(), blockSize, /* isHardlink= */ false));
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
               if (attrs.isRegularFile()) {
-                blobSizeInBytes.addAndGet(attrs.size());
+                blobSizeInBytes.addAndGet(
+                    estimateSizeOnDisk(attrs.size(), blockSize, /* isHardlink= */ false));
               }
               return FileVisitResult.CONTINUE;
             }
@@ -127,8 +138,8 @@ public class DirectoryEntryCFC extends CASFileCache {
           if (e.decrementReference(header)) {
             unreferencedEntryCount++;
           }
+          sizeInBytes += estimateSizeOnDisk(e.size, blockSize, /* isHardlink= */ false);
         }
-        sizeInBytes += e.size;
       }
     } catch (Exception e) {
       log.log(Level.SEVERE, "error processing directory " + path.toString(), e);
@@ -145,24 +156,33 @@ public class DirectoryEntryCFC extends CASFileCache {
     ExecutorService pool = BuildfarmExecutors.getComputeCachePool();
 
     ImmutableList.Builder<Path> invalidDirectories = new ImmutableList.Builder<>();
+    CacheLoadProgress progress =
+        new CacheLoadProgress("Populating directories", cacheScanResults.computeDirs().size());
 
     for (Path path : cacheScanResults.computeDirs()) {
-      pool.execute(() -> computeDirectory(path, invalidDirectories));
+      pool.execute(
+          () -> {
+            try {
+              computeDirectory(path, invalidDirectories);
+            } finally {
+              progress.complete();
+            }
+          });
     }
 
-    joinThreads(pool, "Populating Directories...");
+    joinThreads(pool, progress);
 
     return invalidDirectories.build();
   }
 
   @Override
-  protected void deleteExpiredKey(String expiredKey) throws IOException {
+  protected void deleteExpiredKey(Digest digest, String expiredKey) throws IOException {
     if (expiredKey.endsWith("_dir")) {
-      Path path = getRemovingPath(expiredKey);
+      Path path = getRemovingPath(digest, expiredKey);
       Directories.remove(path, fileStore);
       // accounting for expiration metric?
     } else {
-      super.deleteExpiredKey(expiredKey);
+      super.deleteExpiredKey(digest, expiredKey);
     }
   }
 
@@ -196,6 +216,7 @@ public class DirectoryEntryCFC extends CASFileCache {
       Digest digest,
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       ExecutorService service) {
+    Context context = Context.current();
     String suffix = UUID.randomUUID().toString();
     Path filename = path.getFileName();
     String tmpFilename = filename + ".tmp." + suffix;
@@ -206,34 +227,63 @@ public class DirectoryEntryCFC extends CASFileCache {
         transformAsync(
             fetched,
             weight -> {
+              if (Context.current().isCancelled()) {
+                return immediateFailedFuture(Context.current().cancellationCause());
+              }
               disableAllWriteAccess(tmpPath, fileStore, /* excludeTopLevel= */ true);
               return immediateFuture(null);
             },
-            service);
+            context.fixedContextExecutor(service));
     ListenableFuture<Void> renamed =
         transformAsync(
             limited,
             result -> {
+              if (Context.current().isCancelled()) {
+                return immediateFailedFuture(Context.current().cancellationCause());
+              }
               Files.move(tmpPath, path);
               makeWritable(path, /* writable= */ false, fileStore);
               return immediateFuture(result);
             },
-            service);
-    ListenableFuture<Void> rolled =
-        catchingAsync(
-            renamed,
-            Throwable.class,
-            e -> {
-              try {
-                Directories.remove(tmpPath, fileStore);
-              } catch (IOException removeException) {
-                e.addSuppressed(removeException);
-              }
-              return immediateFailedFuture(e);
-            },
-            service);
+            context.fixedContextExecutor(service));
+    Context.CancellationListener cleanupOnCancellation =
+        cancelledContext -> {
+          Context previous = Context.ROOT.attach();
+          try {
+            try {
+              Directories.remove(tmpPath, fileStore);
+            } catch (IOException e) {
+              log.log(Level.WARNING, "error removing cancelled directory fetch " + tmpPath, e);
+            }
+          } finally {
+            Context.ROOT.detach(previous);
+          }
+        };
+    context.addListener(cleanupOnCancellation, directExecutor());
+    addCallback(
+        renamed,
+        new FutureCallback<>() {
+          @Override
+          public void onSuccess(@Nullable Void result) {
+            context.removeListener(cleanupOnCancellation);
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            if (context.isCancelled()) {
+              return;
+            }
+            context.removeListener(cleanupOnCancellation);
+            try {
+              Directories.remove(tmpPath, fileStore);
+            } catch (IOException removeException) {
+              t.addSuppressed(removeException);
+            }
+          }
+        },
+        directExecutor());
     return transformAsync(
-        rolled,
+        renamed,
         result -> {
           String key = filename.toString();
           long blobSizeInBytes = getCompleted(fetched);
@@ -252,7 +302,6 @@ public class DirectoryEntryCFC extends CASFileCache {
           }
           Entry e = new Entry(key, blobSizeInBytes, Deadline.after(10, HOURS));
           safeStorageInsertion(key, e);
-          fetchers.invalidate(digest);
           return immediateFuture(result);
         },
         service);
@@ -266,16 +315,18 @@ public class DirectoryEntryCFC extends CASFileCache {
     ImmutableList.Builder<ListenableFuture<Path>> putFuturesBuilder = ImmutableList.builder();
     AtomicLong weight = new AtomicLong();
     try {
-      fetchDirectory(
-          path,
-          digest,
-          directoriesIndex,
-          (dst, src, size, isExecutable) -> {
-            copyLocalFileAndDereference(dst, src, isExecutable);
-            weight.addAndGet(size);
-          },
-          putFuturesBuilder,
-          service);
+      long dirOverhead =
+          fetchDirectory(
+              path,
+              digest,
+              directoriesIndex,
+              (dst, src, size, isExecutable) -> {
+                copyLocalFileAndDereference(dst, src, isExecutable);
+                weight.addAndGet(estimateSizeOnDisk(size, blockSize, /* isHardlink= */ false));
+              },
+              putFuturesBuilder,
+              service);
+      weight.addAndGet(dirOverhead);
     } catch (Exception e) {
       return immediateFailedFuture(e);
     }
@@ -289,6 +340,9 @@ public class DirectoryEntryCFC extends CASFileCache {
           ImmutableList.Builder<Throwable> failures = ImmutableList.builder();
           boolean failed = false;
           for (int i = 0; i < paths.size(); i++) {
+            if (Context.current().isCancelled()) {
+              return immediateFailedFuture(Context.current().cancellationCause());
+            }
             Path putPath = paths.get(i);
             if (putPath == null) {
               failed = true;
@@ -324,17 +378,8 @@ public class DirectoryEntryCFC extends CASFileCache {
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
-    // we must acquire a reference to this entry before delivering it to the client
-    // unfortunately that means that it will be placed onto the LRU queue briefly
-    // we could probably retry the whole procedure in that case, but maybe there is
-    // simply too much contention at that point
-    //
-    // to correct this, we could find a way to identify the fetching thread and perform
-    // the dereference only after all of the callbacks have been satisfied. Very funky
-    // future stuff would need to be in place.
-    //
-    // we can play games with the immediacy of the callback though
-    ListenableFuture<Void> fetch;
+    // A newly inserted entry owns the fetch creator's reference; followers acquire their own.
+    ListenableFuture<Boolean> fetch;
     // true if we were the creator of the fetch
     AtomicBoolean owner = new AtomicBoolean();
     try {
@@ -343,21 +388,34 @@ public class DirectoryEntryCFC extends CASFileCache {
               digest,
               () -> {
                 owner.set(true);
-                return add(path, digest, directoriesIndex, service);
+                if (referenceIfExists(key)) {
+                  return immediateFuture(false);
+                }
+                return transform(
+                    add(path, digest, directoriesIndex, service), result -> true, directExecutor());
               });
     } catch (ExecutionException e) {
       return immediateFailedFuture(e);
     }
-    // we wil need to increment the reference count, as we did not call the future creator
-    if (!owner.get()) {
+    // Register cleanup after get has stored the future, including synchronous completion/failure.
+    ListenableFuture<Boolean> pendingFetch = fetch;
+    if (owner.get()) {
+      fetch.addListener(() -> fetchers.asMap().remove(digest, pendingFetch), directExecutor());
+    } else {
+      // Followers acquire their own reference; the creator already owns one.
       fetch =
           transformAsync(
               fetch,
               result -> {
-                // completely unacceptable if it does not exist or is not available for reference
-                // here
+                // The owner's reference may have been released and evicted before this callback.
                 try {
-                  checkState(referenceIfExists(key));
+                  if (!referenceIfExists(key)) {
+                    fetchers.asMap().remove(digest, pendingFetch);
+                    return transform(
+                        putDirectory(digest, directoriesIndex, service),
+                        PathResult::isMissed,
+                        directExecutor());
+                  }
                 } catch (IOException e) {
                   return immediateFailedFuture(e);
                 }
@@ -365,7 +423,7 @@ public class DirectoryEntryCFC extends CASFileCache {
               },
               directExecutor());
     }
-    return transform(fetch, result -> new PathResult(path, true), directExecutor());
+    return transform(fetch, missed -> new PathResult(path, missed), directExecutor());
   }
 
   @Override

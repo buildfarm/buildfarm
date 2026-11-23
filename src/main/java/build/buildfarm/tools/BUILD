@@ -53,7 +53,6 @@ java_binary(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
-        "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
         "@buildfarm_maven//:info_picocli_picocli",
@@ -67,6 +66,7 @@ java_binary(
         "@googleapis//google/longrunning:longrunning_java_proto",
         "@googleapis//google/longrunning:operations_proto",
         "@googleapis//google/rpc:rpc_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
@@ -84,7 +84,6 @@ java_binary(
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
-        "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
         "@buildfarm_maven//:info_picocli_picocli",
@@ -98,6 +97,7 @@ java_binary(
         "@googleapis//google/longrunning:longrunning_java_proto",
         "@googleapis//google/longrunning:operations_proto",
         "@googleapis//google/rpc:rpc_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
@@ -205,13 +205,17 @@ java_binary(
         "@buildfarm_maven//:io_grpc_grpc_core",
         "@buildfarm_maven//:io_grpc_grpc_protobuf",
         "@buildfarm_maven//:io_grpc_grpc_stub",
+        "@buildfarm_maven//:org_slf4j_slf4j_simple",
         "@googleapis//google/rpc:rpc_java_proto",
     ],
 )
 
 java_binary(
     name = "bf-workerprofile",
-    srcs = ["WorkerProfile.java"],
+    srcs = [
+        "CliConstants.java",
+        "WorkerProfile.java",
+    ],
     data = [
         "//examples:example_properties",
     ],
@@ -228,6 +232,7 @@ java_binary(
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",
+        "@buildfarm_maven//:info_picocli_picocli",
         "@buildfarm_maven//:io_grpc_grpc_api",
         "@buildfarm_maven//:io_grpc_grpc_context",
         "@buildfarm_maven//:io_grpc_grpc_core",
@@ -359,6 +364,34 @@ java_binary(
         "@buildfarm_maven//:io_grpc_grpc_core",
         "@buildfarm_maven//:io_grpc_grpc_protobuf",
         "@buildfarm_maven//:io_grpc_grpc_stub",
+    ],
+)
+
+java_binary(
+    name = "bf-link-scanner",
+    srcs = ["LinkDirectoryScanner.java"],
+    main_class = "build.buildfarm.tools.LinkDirectoryScanner",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/server/services",
+        "//src/main/java/build/buildfarm/worker",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
+        "@buildfarm_maven//:com_google_guava_guava",
+        "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+        "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",
+        "@buildfarm_maven//:info_picocli_picocli",
+        "@buildfarm_maven//:io_grpc_grpc_api",
+        "@buildfarm_maven//:io_grpc_grpc_context",
+        "@buildfarm_maven//:io_grpc_grpc_core",
+        "@buildfarm_maven//:io_grpc_grpc_protobuf",
+        "@buildfarm_maven//:io_grpc_grpc_stub",
+        "@googleapis//google/longrunning:longrunning_java_proto",
+        "@googleapis//google/rpc:rpc_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 

@@ -1,10 +1,10 @@
-// Copyright 2025 The Buildfarm Authors. All rights reserved.
+// Copyright 2025-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -79,6 +79,12 @@ class Bfssh implements Callable<Integer> {
       description = "Send an execution to a specific worker",
       arity = "1")
   private List<String> workers = ImmutableList.of();
+
+  @Option(
+      names = {"-c", "--cores"},
+      description = "Request a number of cores for an executions",
+      defaultValue = "0")
+  public int cores;
 
   private static Digest uploadAction(
       Instance instance,
@@ -171,7 +177,7 @@ class Bfssh implements Callable<Integer> {
     ExecutorService printExecutor = newSingleThreadExecutor();
     try {
       Iterable<ListenableFuture<ExecuteResponse>> responses =
-          runOnWorkers(stub, digestUtil, targetWorkers, cmdArgs, requestMetadata);
+          runOnWorkers(stub, digestUtil, targetWorkers, cores, cmdArgs, requestMetadata);
       return printResponses(
           stub, responses, digestUtil.getDigestFunction(), requestMetadata, printExecutor);
     } finally {
@@ -246,6 +252,7 @@ class Bfssh implements Callable<Integer> {
       Instance stub,
       DigestUtil digestUtil,
       Iterable<String> workers,
+      int cores,
       Iterable<String> args,
       RequestMetadata requestMetadata)
       throws Exception {
@@ -254,6 +261,9 @@ class Bfssh implements Callable<Integer> {
       Platform.Builder platform = Platform.newBuilder();
       if (!worker.isEmpty()) {
         platform.addPropertiesBuilder().setName("Worker").setValue(worker);
+      }
+      if (cores > 0) {
+        platform.addPropertiesBuilder().setName("cores").setValue(Integer.toString(cores));
       }
 
       Digest actionDigest = uploadAction(stub, digestUtil, args, platform.build(), requestMetadata);

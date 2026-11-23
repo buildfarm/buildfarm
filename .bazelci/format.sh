@@ -66,7 +66,7 @@ run_java_formatter () {
     fi
 
      # Get all the files to format and format them
-    files=$(find src/* persistentworkers/* -type f -name "*.java")
+    files=$(find src/* -type f -name "*.java")
 
     # Check whether any formatting changes need to be made.
     # This is intended to be done by the CI.
@@ -112,12 +112,12 @@ run_hawkeye() {
 
 if [ "${FORMAT_JAVA:-false}" = true ]; then
     run_java_formatter "$@"
-fi;
+fi
 
 if [ "${FORMAT_BUILD:-false}" = true ]; then
     run_buildifier "$@"
-fi;
+fi
 
 if [ "${FORMAT_HAWKEYE:-false}" = true ]; then
     run_hawkeye "$@"
-fi;
+fi

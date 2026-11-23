@@ -1,10 +1,10 @@
-// Copyright 2019 The Buildfarm Authors. All rights reserved.
+// Copyright 2018-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,7 @@ import lombok.Getter;
 
 public abstract class SuperscalarPipelineStage extends PipelineStage {
   private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
-  protected Set<String> operationNames = new HashSet<>();
+  protected final Set<String> operationNames = new HashSet<>();
   @Getter protected int width;
 
   protected final BlockingQueue<Object> claims;
@@ -83,10 +83,17 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     throw new UnsupportedOperationException("use getOperationNames on superscalar stages");
   }
 
+  @Override
+  public boolean isEmpty() {
+    return getSlotUsage() == 0;
+  }
+
+  @Override
   public int getSlotUsage() {
     return executor.getActiveCount();
   }
 
+  @Override
   public Iterable<String> getOperationNames() {
     synchronized (operationNames) {
       return new HashSet<>(operationNames);

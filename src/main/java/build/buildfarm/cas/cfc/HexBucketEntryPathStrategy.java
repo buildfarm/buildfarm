@@ -1,18 +1,31 @@
+// Copyright 2020-2026 The Buildfarm Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.cas.cfc;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
 
+import build.buildfarm.v1test.Digest;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.regex.Pattern;
 
 class HexBucketEntryPathStrategy implements EntryPathStrategy {
   private static final int MAX_LEVEL = 4;
   private final Path path;
   private final int levels;
-  private final Pattern pattern;
 
   private static long depthMaxCounter(int depth) {
     return (1L << (depth * 8)) - 1;
@@ -22,18 +35,21 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
     checkState(levels <= MAX_LEVEL);
     this.path = path;
     this.levels = levels;
-    String match = format("[0-9a-f]{%d}.*", levels * 2);
-    pattern = Pattern.compile(match);
   }
 
   @Override
-  public Path getPath(String key) {
-    checkState(levels == 0 || pattern.matcher(key).matches());
+  public Path getPath(Digest digest, String fileName) {
+    // Bucket on the digest's hash, which is always the bare hex the fileName was computed from.
+    // Taking it from the digest rather than parsing fileName keeps bucketing oblivious to the
+    // `<digestfn>_` prefix (e.g. `blake3_`) and the `_exec`/`_dir` suffixes a fileName may carry.
     Path keyPath = path;
-    for (int i = 0; i < levels; i++) {
-      keyPath = keyPath.resolve(key.substring(i * 2, i * 2 + 2));
+    if (levels > 0) {
+      String hash = digest.getHash();
+      for (int i = 0; i < levels; i++) {
+        keyPath = keyPath.resolve(hash.substring(i * 2, i * 2 + 2));
+      }
     }
-    return keyPath.resolve(key);
+    return keyPath.resolve(fileName);
   }
 
   @Override

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025 The Buildfarm Authors. All rights reserved.
+# Copyright 2021-2026 The Buildfarm Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,5 +16,5 @@
 set -o xtrace
 
 # Build bazel targets with buildfarm
-cd src/test/many;
+cd src/test/many
 MANY_CC_BINARIES=50 MANY_CC_LIBRARIES=2 MANY_CC_LIBRARY_SOURCES=1 ../../../bazel build :cc --remote_executor=grpc://localhost:8980 $1

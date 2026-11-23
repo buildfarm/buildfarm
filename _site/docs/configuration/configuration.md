@@ -127,6 +127,9 @@ server:
 | commandCacheMaxEntries                | Long, _64 * 1024_             | The max number of entries that the command cache will hold.          |
 | digestToActionCacheMaxEntries         | Long, _64 * 1024_             | The max number of entries that the digest-to-action cache will hold. |
 | recentServedExecutionsCacheMaxEntries | Long, _64 * 1024_             | The max number of entries that the executions cache will hold.       |
+| actionCacheMaxEntries                 | Long, _1000000_               | The max number of entries that the action cache will hold.           |
+
+These are in-memory Caffeine caches of deserialized Directory, Command, and Action messages. The limits are entry counts, not a heap cap, so a large Directory still costs memory per slot. Start at the defaults (`64 * 1024`, 65536). Size them for the hot metadata set: large enough to avoid thrash, small enough that unused entries expire. If a heap dump shows `directoryCache` or `commandCache` dominating, or JVM heap briefly hits 100%, lower the values. Millions of entries (for example `6553600`) are far above the default and commonly cause heap pressure. Compare a representative full-execution build on a fresh server at the current size versus a reduced size; if wall time is unchanged, the extra entries are not helping.
 
 Example:
 
@@ -137,6 +140,7 @@ server:
     commandCacheMaxEntries: 10000
     digestToActionCacheMaxEntries: 10000
     recentServedExecutionsCacheMaxEntries: 10000
+    actionCacheMaxEntries: 10000
 ```
 
 ### Admin
@@ -299,11 +303,14 @@ backplane:
 | executeStageWidthOffset           | Integer, _0_                  |                       | Offset number of CPU cores available for execution (to allow for use by other processes)                                                                                                                                                                                                                                 |
 | inputFetchStageWidth              | Integer, _0_                  |                       | Number of concurrently available slots to fetch inputs (0 = system calculated based on CPU cores)                                                                                                                                                                                                                        |
 | inputFetchDeadline                | Integer, _60_                 |                       | Limit on time (seconds) for input fetch stage to fetch inputs                                                                                                                                                                                                                                                            |
+| reportResultDeadline               | Integer, _60_                 |                       | Limit on time (seconds) for the result reporting stage to report an action result                                                                                                                                                                                                                                        |
 | reportResultStageWidth            | Integer, _1_                  |                       | Number of concurrently available slots to write results and clean up execution directories                                                                                                                                                                                                                               |
 | linkExecFileSystem                | boolean, _true_               |                       | Use hard links instead of file copies to populate execution directories. Disable on Windows to compensate for shared hard-link deletion semantics for running executables.                                                                                                                                               |
 | linkInputDirectories              | boolean, _true_               |                       | Use an input directory creation strategy which creates a single directory tree at the highest level containing no output paths of any kind, and symlinks that directory into an action's execroot, saving large amounts of time spent manufacturing the same read-only input hierirchy over multiple actions' executions |
 | execOwner                         | String, _null_                |                       | Create exec trees containing directories that are owned by this user                                                                                                                                                                                                                                                     |
 | execOwners                        | List of Strings               |                       | Create exec trees containing directories that are owned by these users, unique to each execution. Must contain at least the sum of {`inputFetchStageWidth`, `executeStageWidth`, `reportResultStageWidth`} owners. If this option is specified and not empty, `execOwner` is ignored                                     |
+| executionMarket                   | boolean, _false_              |                       | Sell and Buy CPU with usage demand for executions. All executions receive a single core to start, and cpu is depleted from a pool of execution slot size, with granularity of 1/1000th of a core at 100ms quantums.                                                                                                      |
+| ignoreMarketExecutionMnemonics    | List of Strings, _TestRunner_ |                       | A list of action mnemonics from Execute's RequestMetadata that will not participate in the executionMarket                                                                                                                                                                                                               |
 | hexBucketLevels                   | Integer, _0_                  |                       | Number of levels to create for directory storage by leading byte of the hash                                                                                                                                                                                                                                             |
 | defaultMaxCores                   | Integer, _0_                  |                       | Constrain all executions to this logical core count unless otherwise specified via min/max-cores (0 = no limit)                                                                                                                                                                                                          |
 | limitGlobalExecution              | boolean, _false_              |                       | Constrain all executions to a pool of logical cores specified in executeStageWidth                                                                                                                                                                                                                                       |
@@ -315,6 +322,8 @@ backplane:
 | gracefulShutdownSeconds           | Integer, 0                    |                       | Time in seconds to allow for operations in flight to finish when shutdown signal is received                                                                                                                                                                                                                             |
 | createSymlinkOutputs              | boolean, _false_              |                       | Creates SymlinkNodes for symbolic links discovered in output paths for actions. No verification of the symlink target path occurs. Buildstream, for example, requires this.                                                                                                                                              |
 | zstdBufferPoolSize                | Integer, _2048_               |                       | Specifies the maximum number of zstd data buffers that may be in use concurrently by the filesystem CAS. Increase to improve compressed blob throughput, decrease to reduce memory usage.                                                                                                                                |
+| zstdBufferPoolBorrowTimeoutMillis | Integer, _-1_                 |                       | Specifies how long a zstd transfer waits for a free data buffer. A negative value waits without a limit. A value of `0` fails a transfer that cannot take a free buffer at once.                                                                                                                                         |
+| compressedBlobTransfer            | boolean, _false_              | COMPRESSED_BLOB_TRANSFER | Use zstd compression when transferring blobs to/from remote storages |
 | persistentWorkerActionMnemonicAllowlist | Set<String>, _"*"_      |                       | Controls which Action Mnemonics can run with a persistent worker. Use `*` for wildcard.                                                                                                                                                                                                                                  |
 
 ```yaml
@@ -392,8 +401,8 @@ worker:
 
 ### Resources
 
-A list of limited resources that are available to the worker to be depleted by actions which execute containing a "resource:<name>": "N" property.
-The dequeueMatchSettings may also further limit executions to contain "resource:<name>" in properties, with either a specific limited resource count as the only accepted value for the action property. The use case here is one where executions are not allowed to request any value other than the one specified. There are no operators currently for asserting an execution requests 'less than' a particular number of resources.
+A list of limited resources that are available to the worker to be depleted by actions which execute containing a "resources:<name>": "N" property. This is the prefix bazel uses for extra resources in `tags` and `exec_properties`. The singular "resource:<name>" spelling is also accepted for backwards compatibility.
+The dequeueMatchSettings may also further limit executions to contain "resources:<name>" in properties, with either a specific limited resource count as the only accepted value for the action property. The use case here is one where executions are not allowed to request any value other than the one specified. There are no operators currently for asserting an execution requests 'less than' a particular number of resources.
 
 The default resource type is SEMAPHORE.
 The expected use case is that a resource is _internally_ allocated and managed by an execution, and the exhaustion prevents executions from starting which would block or fault if they could not consume the resource. Common examples include licensed software with tokens, and this mechanism can work for singleton resources like one gpu on a worker.
@@ -414,7 +423,7 @@ Example:
 worker:
   dequeueMatchSettings:
     properties:
-      - name: "resource:special-compiler-license"
+      - name: "resources:special-compiler-license"
         value: "1" # only actions which request one compiler license at a time will be accepted
   resources:
     name: "special-compiler-license"
@@ -429,7 +438,8 @@ Unless specified, options are only relevant for FILESYSTEM type
 |------------------------------|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
 | type                         | _FILESYSTEM_, GRPC            | Type of CAS used                                                                                                                                   |
 | path                         | String, _cache_               | Local cache location relative to the 'root', or absolute                                                                                           |
-| maxSizeBytes                 | Integer, _0_                  | Limit for contents of files retained from CAS in the cache, value of 0 means to auto-configure to 90% of _root_/_path_ underlying filesystem space |
+| maxSizeBytes                 | Integer, _0_                  | Limit in bytes for contents of files retained from CAS in the cache. Mutually exclusive with maxSizePercent. A value of 0 means to use maxSizePercent instead. |
+| maxSizePercent               | Integer (1-100), _unset_      | Limit in percent of the _root_/_path_ underlying filesystem space for contents of files retained from CAS in the cache. Mutually exclusive with maxSizeBytes. If neither size is set, 90% is used. |
 | fileDirectoriesIndexInMemory | boolean, _false_              | Determines if the file directories bidirectional mapping should be stored in memory or in sqlite                                                  |
 | skipLoad                     | boolean, _false_              | Determines if transient data on the worker should be loaded into CAS on worker startup (affects startup time)                                |
 | target                       | String, _null_                | For GRPC CAS type, target for external CAS endpoint                                                                                                |
@@ -444,6 +454,16 @@ worker:
     - type: FILESYSTEM
       path: "cache"
       maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+```
+
+This definition will create a filesystem-based CAS file cache that uses 75% of the filesystem for CAS storage.
+
+```yaml
+worker:
+  storages:
+    - type: FILESYSTEM
+      path: "cache"
+      maxSizePercent: 75
 ```
 
 This definition elides FILESYSTEM configuration with '...', will read-through an external GRPC CAS supporting the REAPI CAS Services into its storage, and will attempt to write expiring entries into the GRPC CAS (i.e. pushing new entries into the head of a worker LRU list will drop the entries from the tail into the GRPC CAS).
@@ -498,9 +518,11 @@ worker:
           - "<platform-property-name>"
 ```
 
-`arg1` and `arg2` are interpreted literally. `<platform-property-value>` will be substituted with the value of a property named `"platform-property-name"` from a Command's Platform _or_ the requested pool resources for the execution. If a matching property or pool resource is not found for a specified name, the entire wrapper will be discarded and have no effect on the execution.
+`arg1` and `arg2` are interpreted literally. `<platform-property-name>` will be substituted with the value of a property named `"platform-property-name"` from an Action's Platform or the requested pool resources for the execution. If a matching interpolation is not found for a specified name, the entire wrapper will be discarded and have no effect on the execution.
 
 `<exec-owner>` is an automatically provided pool resource when `execOwner` or `execOwners` is specified, and will contain the value of the execution's owner selected for exec tree creation.
+
+`<cgroup>` is a reserved worker-provided interpolation containing the action's relative cgroup v2 hierarchy, `executions/operations/<operation-id>`. It is available regardless of whether the worker's built-in cgroup limits are enabled and cannot be overridden by an action platform property.
 
 An execution with `as-nobody`, `unshare`, and `linux-sandbox` execution policies enabled would produce a command line like:
 ```sh

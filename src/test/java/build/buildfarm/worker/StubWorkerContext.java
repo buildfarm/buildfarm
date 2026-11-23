@@ -1,10 +1,10 @@
-// Copyright 2018 The Buildfarm Authors. All rights reserved.
+// Copyright 2017-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,11 +14,9 @@
 
 package build.buildfarm.worker;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -30,6 +28,7 @@ import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
@@ -85,6 +84,11 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
+  public Map<String, String> getExecutionPolicyInterpolations(String operationName) {
+    return ImmutableMap.of();
+  }
+
+  @Override
   public int getInputFetchStageWidth() {
     throw new UnsupportedOperationException();
   }
@@ -101,6 +105,11 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public int getInputFetchDeadline() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int getReportResultDeadline() {
     throw new UnsupportedOperationException();
   }
 
@@ -143,8 +152,7 @@ class StubWorkerContext implements WorkerContext {
   public Path createExecDir(
       String operationName,
       Map<Digest, Directory> directoriesIndex,
-      DigestFunction.Value digestFunction,
-      Action action,
+      build.buildfarm.v1test.Digest inputRootDigest,
       Command command,
       UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)

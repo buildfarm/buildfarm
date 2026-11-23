@@ -47,7 +47,7 @@ For each property key-value in the operation's platform, an operation is REJECTE
   Or The key is `min-mem` and the integer value is greater than the number of bytes of RAM on the worker.
   Or if the key exists in the `DequeueMatchSettings` platform with neither the value nor a `*` in the corresponding DMS platform key's values,
   Or if the `allowUnmatched` setting is `false`.
-For each resource requested in the operation's platform with the resource: prefix, the action is rejected if:
+For each resource requested in the operation's platform with the resources: prefix (or the legacy resource: prefix), the action is rejected if:
   The resource amount cannot currently be satisfied with the associated resource capacity count
 
 There are special predefined execution property names which resolve to dynamic configuration for the worker to match against:

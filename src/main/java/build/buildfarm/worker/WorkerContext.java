@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2017-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,13 +14,12 @@
 
 package build.buildfarm.worker;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
@@ -44,10 +43,18 @@ import org.jspecify.annotations.Nullable;
 
 public interface WorkerContext {
   interface IOResource extends AutoCloseable {
+    /**
+     * This close() must be implemented idempotently Several closes in sequence will be called in
+     * order to release resources early with finally-completion for safety.
+     */
     @Override
     void close() throws IOException;
 
     boolean isReferenced();
+
+    Map<String, Long> sample();
+
+    void setCpu(int cores_us) throws IOException;
   }
 
   String getName();
@@ -74,11 +81,15 @@ public interface WorkerContext {
 
   List<ExecutionPolicy> getExecutionPolicies(String name);
 
+  Map<String, String> getExecutionPolicyInterpolations(String operationName);
+
   int getExecuteStageWidth();
 
   int getInputFetchStageWidth();
 
   int getInputFetchDeadline();
+
+  int getReportResultDeadline();
 
   int getReportResultStageWidth();
 
@@ -100,8 +111,7 @@ public interface WorkerContext {
   Path createExecDir(
       String operationName,
       Map<Digest, Directory> directoriesIndex,
-      DigestFunction.Value digestFunction,
-      Action action,
+      build.buildfarm.v1test.Digest inputRootDigest,
       Command command,
       @Nullable UserPrincipal owner,
       WorkerExecutedMetadata.Builder workerExecutedMetadata)
@@ -173,4 +183,13 @@ public interface WorkerContext {
   int commandExecutionClaims(Command command);
 
   ResourceLimits commandExecutionSettings(Command command);
+
+  @Nullable
+  default Market market() {
+    return null;
+  }
+
+  default boolean shouldMarketExecution(RequestMetadata requestMetadata) {
+    return false;
+  }
 }

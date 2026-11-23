@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2017-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.Getter;
@@ -49,6 +50,10 @@ public abstract class PipelineStage implements Runnable {
     return false;
   }
 
+  public boolean isEmpty() {
+    return !claimed;
+  }
+
   protected void runInterruptible() throws InterruptedException {
     while (!output.isClosed() || isClaimed()) {
       iterate();
@@ -57,6 +62,17 @@ public abstract class PipelineStage implements Runnable {
 
   public @Nullable String getOperationName() {
     return operationName;
+  }
+
+  public Iterable<String> getOperationNames() {
+    if (operationName != null) {
+      return ImmutableList.of(operationName);
+    }
+    return ImmutableList.of();
+  }
+
+  public int getSlotUsage() {
+    return operationName != null ? 1 : 0;
   }
 
   @Override

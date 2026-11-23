@@ -18,11 +18,15 @@ test --nojava_header_compilation
 test --enable_runfiles
 test --test_tag_filters=-redis,-integration
 
-# Stop recompiling protoc.
-# https://fzakaria.com/2024/10/23/bazel-knowledge-mind-your-path.html
+# Use protobuf's upstream prebuilt protoc toolchain rather than compiling it.
 build --incompatible_strict_action_env
+build --@protobuf//bazel/toolchains:prefer_prebuilt_protoc
 
-common --enable_bzlmod
+# Fail fast if an external protobuf or gRPC C++ source build is introduced.
+common:strict --per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
+common:strict --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
+common:strict --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
+common:strict --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
 
 # See also https://bazel.build/external/lockfile.
 common --lockfile_mode=off
@@ -38,6 +42,3 @@ build:windows --sandbox_add_mount_pair=C:\Temp
 # To continue using it until then, use the flag --define=protobuf_allow_msvc=true.
 # For feedback or discussion, see github.com/protocolbuffers/protobuf/issues/20085.
 build:windows --define=protobuf_allow_msvc=true
-
-# Planned to be default in Bazel 9; see https://github.com/bazelbuild/bazel/issues/22080
-common --incompatible_disable_native_repo_rules

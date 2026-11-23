@@ -1,10 +1,10 @@
-// Copyright 2023 The Buildfarm Authors. All rights reserved.
+// Copyright 2023-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,25 +27,11 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SystemProcessorsTest {
   // Function under test: get
-  // Reason for testing: functions do not throw and return nonzero results.
+  // Reason for testing: function does not throw and returns a nonzero result.
   // Failure explanation: The implementation can not correctly derive.
   @Test
-  public void getCheckImplValuesAreNotZero() {
+  public void getReturnsNonZero() {
     // ASSERT
-    assertThat(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.JAVA_RUNTIME))
-        .isGreaterThan(0);
-    assertThat(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.OSHI)).isGreaterThan(0);
-  }
-
-  // Function under test: get
-  // Reason for testing: functions chooses highest value.
-  // Failure explanation: The implementation does not choose highest value.
-  @Test
-  public void getCheckBestValueIsChosen() {
-    // ASSERT
-    assertThat(SystemProcessors.get())
-        .isAtLeast(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.JAVA_RUNTIME));
-    assertThat(SystemProcessors.get())
-        .isAtLeast(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.OSHI));
+    assertThat(SystemProcessors.get()).isGreaterThan(0);
   }
 }

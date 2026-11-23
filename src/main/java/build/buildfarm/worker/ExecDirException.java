@@ -1,10 +1,10 @@
-// Copyright 2023 The Buildfarm Authors. All rights reserved.
+// Copyright 2023-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -60,13 +60,26 @@ public class ExecDirException extends IOException {
 
     static void toViolation(
         Violation.Builder violation, Throwable cause, Path path, boolean isExecutable) {
-      if (cause instanceof NoSuchFileException || cause instanceof BlobNotFoundException) {
+      // A BlobNotFoundException may be wrapped, possibly at multiple layers, by the stream class
+      // reporting exceptions (e.g. an IOException from a rejected retry). Seek it in the cause
+      // chain rather than relying on the immediate type, so the violation is reported as MISSING
+      // rather than as an INVALID precondition failure.
+      if (cause instanceof NoSuchFileException || hasBlobNotFoundCause(cause)) {
         violation
             .setType(VIOLATION_TYPE_MISSING)
             .setDescription(getDescription(path, isExecutable));
       } else {
         violation.setType(VIOLATION_TYPE_INVALID).setDescription(cause.getMessage());
       }
+    }
+
+    private static boolean hasBlobNotFoundCause(Throwable cause) {
+      for (Throwable t = cause; t != null; t = t.getCause()) {
+        if (t instanceof BlobNotFoundException) {
+          return true;
+        }
+      }
+      return false;
     }
 
     public Violation getViolation() {

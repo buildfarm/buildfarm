@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2017-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,6 +40,7 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CapabilitiesGrpc;
 import build.bazel.remote.execution.v2.CapabilitiesGrpc.CapabilitiesBlockingStub;
+import build.bazel.remote.execution.v2.ChunkingFunction;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
@@ -61,6 +62,10 @@ import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.SpliceBlobRequest;
+import build.bazel.remote.execution.v2.SpliceBlobResponse;
+import build.bazel.remote.execution.v2.SplitBlobRequest;
+import build.bazel.remote.execution.v2.SplitBlobResponse;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.buildfarm.common.CasIndexResults;
@@ -114,6 +119,7 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -518,26 +524,34 @@ public class StubInstance extends InstanceBase {
   public ListenableFuture<build.buildfarm.v1test.Digest> fetchBlob(
       Iterable<String> uris,
       Map<String, String> headers,
-      build.buildfarm.v1test.Digest expectedDigest,
+      build.buildfarm.v1test.Digest originDigest,
+      build.buildfarm.v1test.Digest casDigest,
       RequestMetadata requestMetadata) {
-    // needs to add expectedDigest, digestFunction, etc
-    FetchBlobRequest request =
+    FetchBlobRequest.Builder request =
         FetchBlobRequest.newBuilder()
             .addAllUris(uris)
-            .setDigestFunction(expectedDigest.getDigestFunction())
-            .build();
+            .setDigestFunction(casDigest.getDigestFunction());
+    if (!originDigest.getHash().isEmpty()) {
+      request
+          .addQualifiersBuilder()
+          .setName("checksum.sri")
+          .setValue(
+              originDigest.getDigestFunction().name().toLowerCase()
+                  + "-"
+                  + BaseEncoding.base64()
+                      .encode(BaseEncoding.base16().lowerCase().decode(originDigest.getHash())));
+    }
 
     return transform(
         deadlined(fetchFutureStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
-            .fetchBlob(request),
+            .fetchBlob(request.build()),
         response -> {
           if (Code.forNumber(response.getStatus().getCode()) != Code.OK) {
             throw StatusProto.toStatusRuntimeException(response.getStatus());
           }
           // other responses, uris, expirations, etc
-          return DigestUtil.fromDigest(
-              response.getBlobDigest(), expectedDigest.getDigestFunction());
+          return DigestUtil.fromDigest(response.getBlobDigest(), casDigest.getDigestFunction());
         },
         directExecutor());
   }
@@ -1021,5 +1035,48 @@ public class StubInstance extends InstanceBase {
         .get()
         .prepareWorkerForGracefulShutdown(
             PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
+  }
+
+  @Override
+  public void splitBlob(
+      build.buildfarm.v1test.Digest digest,
+      ChunkingFunction.Value chunkingFunction,
+      StreamObserver<Digest> responseObserver,
+      RequestMetadata requestMetadata) {
+    throwIfStopped();
+    SplitBlobResponse response =
+        deadlined(casBlockingStub)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata))
+            .splitBlob(
+                SplitBlobRequest.newBuilder()
+                    .setBlobDigest(DigestUtil.toDigest(digest))
+                    .setDigestFunction(digest.getDigestFunction())
+                    .setChunkingFunction(chunkingFunction)
+                    .build());
+    for (Digest chunkDigest : response.getChunkDigestsList()) {
+      responseObserver.onNext(chunkDigest);
+    }
+    responseObserver.onCompleted();
+  }
+
+  @Override
+  public ListenableFuture<Digest> spliceBlob(
+      build.buildfarm.v1test.Digest digest,
+      Iterable<Digest> chunkDigests,
+      ChunkingFunction.Value chunkingFunction,
+      RequestMetadata requestMetadata) {
+    throwIfStopped();
+    return transform(
+        deadlined(casFutureStub)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata))
+            .spliceBlob(
+                SpliceBlobRequest.newBuilder()
+                    .setBlobDigest(DigestUtil.toDigest(digest))
+                    .addAllChunkDigests(chunkDigests)
+                    .setDigestFunction(digest.getDigestFunction())
+                    .setChunkingFunction(chunkingFunction)
+                    .build()),
+        SpliceBlobResponse::getBlobDigest,
+        directExecutor());
   }
 }

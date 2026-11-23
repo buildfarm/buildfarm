@@ -1,10 +1,10 @@
-// Copyright 2022 The Buildfarm Authors. All rights reserved.
+// Copyright 2022-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,12 +23,13 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.shard.Shard;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.shard.Shard;
 import build.buildfarm.v1test.Digest;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
@@ -52,13 +53,18 @@ public class RemoteCasWriter implements CasWriter {
   private final Backplane backplane;
   private final LoadingCache<String, StubInstance> workerStubs;
   private final Retrier retrier;
+  private final boolean compressedBlobTransfer;
   private final Random rand = new Random();
 
   public RemoteCasWriter(
-      Backplane backplane, LoadingCache<String, StubInstance> workerStubs, Retrier retrier) {
+      Backplane backplane,
+      LoadingCache<String, StubInstance> workerStubs,
+      Retrier retrier,
+      boolean compressedBlobTransfer) {
     this.backplane = backplane;
     this.workerStubs = workerStubs;
     this.retrier = retrier;
+    this.compressedBlobTransfer = compressedBlobTransfer;
   }
 
   @Override
@@ -70,7 +76,7 @@ public class RemoteCasWriter implements CasWriter {
 
   private void insertFileToCasMember(Digest digest, Path file)
       throws IOException, InterruptedException {
-    try (InputStream in = Files.newInputStream(file)) {
+    try (InputStream in = maybeCompress(Files.newInputStream(file))) {
       retrier.execute(() -> writeToCasMember(digest, in));
     } catch (RetryException e) {
       Throwable cause = e.getCause();
@@ -100,15 +106,24 @@ public class RemoteCasWriter implements CasWriter {
 
   private Write getCasMemberWrite(Digest digest, String workerName) throws IOException {
     Instance casMember = workerStub(workerName);
+    Compressor.Value compressor =
+        compressedBlobTransfer ? Compressor.Value.ZSTD : Compressor.Value.IDENTITY;
 
     return casMember.getBlobWrite(
-        Compressor.Value.IDENTITY, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+        compressor, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+  }
+
+  private InputStream maybeCompress(InputStream in) throws IOException {
+    if (compressedBlobTransfer) {
+      return new ZstdCompressingInputStream(in);
+    }
+    return in;
   }
 
   @Override
   public void insertBlob(Digest digest, ByteString content)
       throws IOException, InterruptedException {
-    try (InputStream in = content.newInput()) {
+    try (InputStream in = maybeCompress(content.newInput())) {
       retrier.execute(() -> writeToCasMember(digest, in));
     } catch (RetryException e) {
       Throwable cause = e.getCause();
@@ -151,6 +166,10 @@ public class RemoteCasWriter implements CasWriter {
                 FeedbackOutputStream outStream = (FeedbackOutputStream) write;
                 while (outStream.isReady()) {
                   if (!copyBytes(in, outStream, chunkSizeBytes)) {
+                    // Explicitly close the stream to ensure a finish_write is sent.
+                    // This happens automatically when expectedSize bytes are sent,
+                    // but expectedSize can't be known ahead of time for compressed streams.
+                    outStream.close();
                     return;
                   }
                 }

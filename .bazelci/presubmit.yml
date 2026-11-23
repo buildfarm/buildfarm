@@ -34,7 +34,8 @@ tasks:
     - //src/test/java/...:all
     coverage_flags:
     - --combined_report=lcov
-    - --test_tag_filters=-redis,-integration
+    - --config=strict
+    - --test_tag_filters=-redis,-integration,-container
     post_shell_commands:
     - export BUILDFARM_INVOKE_COVERAGE=false
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
@@ -49,7 +50,7 @@ tasks:
     build_flags:
     - --build_tag_filters=-container
     test_flags:
-    - --test_tag_filters=-integration,-redis
+    - --test_tag_filters=-integration,-redis,-container
     test_targets:
     - '...'
   ubuntu2204:
@@ -59,21 +60,14 @@ tasks:
     build_flags:
     - --build_tag_filters=-container
     test_flags:
-    - --test_tag_filters=-integration,-redis
-    test_targets:
-    - '...'
-  ubuntu2004:
-    name: Unit Tests
-    build_targets:
-    - '...'
-    build_flags:
-    - --build_tag_filters=-container
-    test_flags:
-    - --test_tag_filters=-integration,-redis
+    - --test_tag_filters=-integration,-redis,-container
     test_targets:
     - '...'
   macos:
     name: Unit Tests
+    environment:
+      ANDROID_HOME: ''
+      ANDROID_NDK_HOME: ''
     build_flags:
     - --cxxopt=-std=c++14
     - --build_tag_filters=-container
@@ -91,50 +85,44 @@ tasks:
     - '...'
     test_flags:
     - --@rules_jvm_external//settings:stamp_manifest=False
-    - --test_tag_filters=-container,-integration,-redis
+    - --test_tag_filters=-container,-integration,-redis,-container
     test_targets:
     - '...'
   rpm_builds:
     name: Rpm Builds
     platform: rockylinux8
     shell_commands:
-    - bazel build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
+    - bazel build --config=strict //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
   # This will run unit tests that integrate with redis.
   # Outside of this step, similar functionality may be tested with mocks.
   redis_unit_tests:
     name: Redis Unit Tests
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - ./.bazelci/redis_unit_tests.sh
-
-  # We want to run the unit tests again inside of a docker container.
-  # This is because test cases may behave different while in docker due to user permissions.
-  # This is more of a sanity check between a defined docker file and running tests directly on the host.
-  docker_unit_tests:
-    name: Docker Unit Tests
-    platform: ubuntu2004
-    shell_commands:
-    - ./.bazelci/docker_unit_test.sh
 
   # Run server integration tests.
   # It starts the distributed storage backend and buildfarm services.
   # It performs a realistic build on generated cc targets and gating projects.
   integration_test_server:
     name: Server Integration Test
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
-    - ./.bazelci/run_server_test.sh
+    - export RUN_TEST=./.bazelci/run_server_test.sh
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
+    - export EXECUTION_STAGE_WIDTH=10
+    - ./.bazelci/integration_test.sh
 
   # Test that buildfarm can build software using the default configurations.
   # It starts the distributed storage backend and buildfarm services.
   # It performs a realistic build on generated cc targets and gating projects.
   integration_test_many:
     name: Integration Test
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
 
@@ -142,20 +130,20 @@ tasks:
   # More issues can be caught when using the fully defined configuration file.
   integration_test_many_full_config:
     name: Integration Test (Full Config)
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
 
   # Test that buildfarm can work with zstd compression
   compression_test_many_compression:
     name: Integration Test (Shard/Compression)
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export TEST_ARG1=--experimental_remote_cache_compression
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
@@ -165,31 +153,44 @@ tasks:
   # that latencies can be captured.
   cache_check_many:
     name: Cache Check
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export CACHE_TEST=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export TEST_ARG1=--remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--remote_grpc_log='./grpc2.log'
-    - export SHA1_TOOLS_REMOTE=bc6975dcb71d090a7185f323d2905cbf1c926f52
+    - export SHA1_TOOLS_REMOTE=c0623a4cc4a2866c131b842f3d133bcd78eba25b
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/cache_test.sh
 
-  integration_test_absei:
-    name: Abseil Test
+  content_defined_chunking:
+    name: Content Defined Chunking
     platform: ubuntu2004
     shell_commands:
+    - python3 -m unittest discover -s .bazelci -p 'test_ingest_grpc_logs.py'
+    - export CACHE_TEST=true
+    - export CACHE_EXPECTATIONS=cdc
+    - export RUN_TEST=./.bazelci/run_content_defined_chunking_test.sh
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
+    - export SHA1_TOOLS_REMOTE=c0623a4cc4a2866c131b842f3d133bcd78eba25b
+    - export EXECUTION_STAGE_WIDTH=5
+    - ./.bazelci/cache_test.sh
+
+  integration_test_abseil:
+    name: Abseil Test
+    platform: ubuntu2204
+    shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=10
     - ./.bazelci/integration_test.sh
   integration_test_abseil_shard_compression:
     name: Abseil Test (Shard/Compression)
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=10
     - export TEST_ARG1=--experimental_remote_cache_compression
     - ./.bazelci/integration_test.sh
@@ -201,6 +202,6 @@ tasks:
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_cgroups_sandbox_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.cgroups-sandbox.yml"
+    - export BUILDFARM_CONFIG="$PWD/examples/config.cgroups-sandbox.yml"
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh

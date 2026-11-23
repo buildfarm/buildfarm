@@ -1,10 +1,10 @@
-// Copyright 2024 The Buildfarm Authors. All rights reserved.
+// Copyright 2024-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,10 +14,9 @@
 
 package build.buildfarm.common;
 
-import java.nio.file.attribute.UserPrincipal;
+import build.buildfarm.v1test.Resource;
 import java.util.List;
 import java.util.Map.Entry;
-import org.jspecify.annotations.Nullable;
 
 public interface Claim {
   enum Stage {
@@ -25,11 +24,27 @@ public interface Claim {
     REPORT_RESULT_STAGE,
   }
 
+  interface Lease {
+    String name();
+
+    int amount();
+
+    Stage stage();
+
+    static Resource toResource(Lease lease) {
+      return Resource.newBuilder().setName(lease.name()).setAmount(lease.amount()).build();
+    }
+  }
+
   void release(Stage stage);
 
   void release();
 
-  @Nullable UserPrincipal owner();
-
   Iterable<Entry<String, List<Object>>> getPools();
+
+  void add(Lease lease);
+
+  Lease get(String name);
+
+  Iterable<Resource> resources();
 }

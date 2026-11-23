@@ -1,10 +1,10 @@
-// Copyright 2019 The Buildfarm Authors. All rights reserved.
+// Copyright 2024-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,6 @@ import static build.buildfarm.common.base.System.isWindows;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.common.io.ByteStreams;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -77,7 +76,7 @@ public final class JniLoader {
         if (resource == null) {
           throw new UnsatisfiedLinkError("Resource " + resourceName + " not in JAR");
         }
-        try (OutputStream diskFile = new FileOutputStream(tempFile.toString())) {
+        try (OutputStream diskFile = Files.newOutputStream(tempFile)) {
           ByteStreams.copy(resource, diskFile);
         }
       }

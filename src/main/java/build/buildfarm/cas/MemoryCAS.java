@@ -1,10 +1,10 @@
-// Copyright 2017 The Buildfarm Authors. All rights reserved.
+// Copyright 2017-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -293,7 +293,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @SuppressWarnings("PMD.CompareObjectsWithEquals")
   private synchronized boolean add(Blob blob, Runnable onExpiration) {
-    Entry e = storage.get(blob.getDigest().getHash());
+    Entry e = storage.get(DigestUtil.toString(blob.getDigest()));
     if (e != null) {
       if (onExpiration != null) {
         e.addOnExpiration(onExpiration);
@@ -319,7 +319,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     createEntry(blob, onExpiration);
 
-    storage.put(blob.getDigest().getHash(), header.before);
+    storage.put(DigestUtil.toString(blob.getDigest()), header.before);
 
     return true;
   }
@@ -359,7 +359,7 @@ public class MemoryCAS implements ContentAddressableStorage {
             Level.SEVERE, String.format("error delegating %s", DigestUtil.toString(digest)), ioEx);
       }
     }
-    storage.remove(e.key);
+    storage.remove(DigestUtil.toString(digest));
     e.expire();
     sizeInBytes -= digest.getSize();
   }

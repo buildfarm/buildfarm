@@ -6,6 +6,7 @@ java_test(
     size = "small",
     srcs = glob(["**/*.java"]),
     jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
+    resources = ["fastcdc2020/SekienAkashita.jpg.base64"],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/cas",
@@ -14,7 +15,7 @@ java_test(
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "//src/test/java/build/buildfarm/common/grpc",
-        "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@buildfarm_maven//:com_github_luben_zstd_jni",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_jimfs_jimfs",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
@@ -25,9 +26,11 @@ java_test(
         "@buildfarm_maven//:io_grpc_grpc_inprocess",
         "@buildfarm_maven//:io_grpc_grpc_stub",
         "@buildfarm_maven//:io_grpc_grpc_util",
+        "@buildfarm_maven//:org_apache_commons_commons_pool2",
         "@buildfarm_maven//:org_mockito_mockito_core",
         "@googleapis//google/bytestream:bytestream_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

@@ -1,10 +1,10 @@
-// Copyright 2020 The Buildfarm Authors. All rights reserved.
+// Copyright 2020-2026 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+//    https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -115,7 +115,7 @@ abstract class Controller implements IOResource {
     }
   }
 
-  protected int readLong(String propertyName) throws IOException {
+  protected long readLong(String propertyName) throws IOException {
     char[] data = new char[64];
     Path path = getPath().resolve(propertyName);
     int len;
@@ -128,6 +128,6 @@ abstract class Controller implements IOResource {
     if (len == 0 || data[0] == '\n' || data[len - 1] != '\n') {
       throw new NumberFormatException("invalid integer in '" + propertyName + "'");
     }
-    return Integer.parseInt(String.copyValueOf(data, 0, len - 1));
+    return Long.parseLong(String.copyValueOf(data, 0, len - 1));
   }
 }
