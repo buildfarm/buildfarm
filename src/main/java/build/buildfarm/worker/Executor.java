@@ -348,13 +348,6 @@ public class Executor {
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
-    // Apply custom PRIORITIZED execution policies BEFORE built-in wrappers
-    for (ExecutionPolicy policy : policies) {
-      if (policy.isPrioritized() && policy.getExecutionWrapper() != null) {
-        arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
-      }
-    }
-
     UserPrincipal execOwner = null;
     if (executionContext.claim.get(UserPrincipalLease.RESOURCE_NAME)
         instanceof UserPrincipalLease ownerLease) {
@@ -362,9 +355,29 @@ public class Executor {
     }
 
     Code statusCode;
+    // First, add cgroups wrapper which MUST run as root before any privilege-dropping wrappers.
+    // This is required for cgroupsv2 where the wrapper needs to write to cgroup.procs.
+    IOResource cgroupResource =
+        workerContext.applyCgroupsLimitation(
+            executionName, execOwner, arguments, executionContext.command);
+
+    // Apply custom PRIORITIZED execution policies BEFORE built-in wrappers
+    // (e.g., as-nobody for privilege dropping)
+    for (ExecutionPolicy policy : policies) {
+      if (policy.isPrioritized() && policy.getExecutionWrapper() != null) {
+        arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
+      }
+    }
+
+    // Now add the rest of the execution limits (linux-sandbox, as-nobody, etc.)
     try (IOResource resource =
         workerContext.limitExecution(
-            executionName, execOwner, arguments, executionContext.command, workingDirectory)) {
+            executionName,
+            execOwner,
+            arguments,
+            executionContext.command,
+            workingDirectory,
+            cgroupResource)) {
       // Apply all other custom execution policies AFTER built-in wrappers
       for (ExecutionPolicy policy : policies) {
         if (!policy.isPrioritized() && policy.getExecutionWrapper() != null) {

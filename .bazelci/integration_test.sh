@@ -51,7 +51,10 @@ if [ -z "$BAZEL" ]
 then
     BAZEL=bazel
 fi
-cp `which $BAZEL` bazel
+# Only copy bazel if it doesn't exist (allow pre-existing bazel to be used)
+if [ ! -f bazel ] || [ ! -x bazel ]; then
+    cp `which $BAZEL` bazel
+fi
 
 RUN_TEST=$RUN_TEST \
 TEST_ARG1=$TEST_ARG1 \
