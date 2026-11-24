@@ -330,6 +330,10 @@ message DispatchedOperation {
   QueueEntry queue_entry = 1;
 
   int64 requeue_at = 2;
+
+  // The provision queue selected when this operation was dispatched. Persisting the canonical
+  // status name keeps attribution stable if queue configuration changes while the operation runs.
+  string provision_queue_name = 3;
 }
 
 message ProfiledQueuedOperationMetadata {

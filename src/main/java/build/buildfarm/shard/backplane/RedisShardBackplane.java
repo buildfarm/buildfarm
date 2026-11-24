@@ -18,6 +18,7 @@ import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.transform;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
@@ -47,10 +48,12 @@ import build.buildfarm.shard.backplane.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.DispatchedOperation;
+import build.buildfarm.v1test.DispatchedOperationsStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.LabeledCount;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueEntry;
@@ -86,6 +89,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
@@ -104,6 +108,7 @@ public class RedisShardBackplane implements Backplane {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private static final int workerSetMaxAge = 3; // seconds
+  private static final long dispatchedStatusWarnMillis = 1_000;
 
   private final String source; // used in operation change publication
   private final boolean subscribeToBackplane;
@@ -1098,6 +1103,7 @@ public class RedisShardBackplane implements Backplane {
           DispatchedOperation.newBuilder()
               .setQueueEntry(queueEntry)
               .setRequeueAt(requeueAt)
+              .setProvisionQueueName(executionQueueEntry.queue().getStatusName())
               .build();
       state.dispatchedExecutions.insertIfMissing(pipeline, executionName, o);
       state.executionQueue.removeFromDequeue(pipeline, executionQueueEntry);
@@ -1151,8 +1157,13 @@ public class RedisShardBackplane implements Backplane {
 
   boolean pollExecution(
       UnifiedJedis jedis, String executionName, DispatchedOperation dispatchedOperation) {
-    if (state.dispatchedExecutions.exists(jedis, executionName)) {
-      if (!state.dispatchedExecutions.insert(jedis, executionName, dispatchedOperation)) {
+    DispatchedOperation existing = state.dispatchedExecutions.get(jedis, executionName);
+    if (existing != null) {
+      DispatchedOperation refreshed =
+          dispatchedOperation.toBuilder()
+              .setProvisionQueueName(existing.getProvisionQueueName())
+              .build();
+      if (!state.dispatchedExecutions.insert(jedis, executionName, refreshed)) {
         return true;
       }
       /* someone else beat us to the punch, delete our incorrectly added key */
@@ -1312,6 +1323,41 @@ public class RedisShardBackplane implements Backplane {
     return client.call(this::backplaneStatus);
   }
 
+  @VisibleForTesting
+  static DispatchedOperationsStatus dispatchedOperationsStatus(
+      Map<String, DispatchedOperation> dispatchedExecutions) {
+    Map<String, Long> fromQueues = new TreeMap<>();
+    long unattributed = 0;
+    String firstUnattributedOperation = null;
+    for (Map.Entry<String, DispatchedOperation> entry : dispatchedExecutions.entrySet()) {
+      String queueName = entry.getValue().getProvisionQueueName();
+      if (!queueName.isEmpty()) {
+        fromQueues.merge(queueName, 1L, Long::sum);
+      } else {
+        unattributed++;
+        if (firstUnattributedOperation == null) {
+          firstUnattributedOperation = entry.getKey();
+        }
+      }
+    }
+    if (unattributed > 0) {
+      log.log(
+          Level.FINE,
+          format(
+              "Could not attribute %d of %d dispatched operations to the current provision queues;"
+                  + " the persisted queue name is absent; retaining them in dispatched totals"
+                  + " without per-queue attribution (first: %s)",
+              unattributed, dispatchedExecutions.size(), firstUnattributedOperation));
+    }
+
+    DispatchedOperationsStatus.Builder status =
+        DispatchedOperationsStatus.newBuilder().setSize(dispatchedExecutions.size());
+    fromQueues.forEach(
+        (name, size) ->
+            status.addFromQueues(LabeledCount.newBuilder().setName(name).setSize(size).build()));
+    return status.build();
+  }
+
   private BackplaneStatus backplaneStatus(UnifiedJedis jedis) throws IOException {
     Unified unified = (Unified) jedis;
     Set<String> executeWorkers = getExecuteWorkers();
@@ -1333,10 +1379,24 @@ public class RedisShardBackplane implements Backplane {
                             .setWorkerType(WorkerType.EXECUTE.getNumber())
                             .build())
                 .collect(Collectors.toList()));
+    // Queue attribution requires reading the dispatched records, rather than only their count.
+    // No additional action, queued-operation, or CAS lookups are needed.
+    long dispatchedStatusStartNanos = System.nanoTime();
+    Map<String, DispatchedOperation> dispatchedExecutions = state.dispatchedExecutions.asMap(jedis);
+    DispatchedOperationsStatus dispatchedOperations =
+        dispatchedOperationsStatus(dispatchedExecutions);
+    long dispatchedStatusMillis =
+        NANOSECONDS.toMillis(System.nanoTime() - dispatchedStatusStartNanos);
+    Level dispatchedStatusLogLevel =
+        dispatchedStatusMillis >= dispatchedStatusWarnMillis ? Level.WARNING : Level.FINER;
+    log.log(
+        dispatchedStatusLogLevel,
+        format(
+            "Built dispatched operations status from %d records in %d ms",
+            dispatchedExecutions.size(), dispatchedStatusMillis));
     try (AbstractPipeline pipeline = unified.pipelined(pipelineExecutor)) {
       Supplier<QueueStatus> prequeue = state.prequeue.status(pipeline);
       Supplier<OperationQueueStatus> operationQueue = state.executionQueue.status(pipeline);
-      Supplier<Long> dispatchedSize = state.dispatchedExecutions.size(pipeline);
       pipeline.sync();
       return BackplaneStatus.newBuilder()
           .addAllActiveExecuteWorkers(executeWorkers)
@@ -1345,7 +1405,8 @@ public class RedisShardBackplane implements Backplane {
           .addAllWorkers(workers)
           .setPrequeue(prequeue.get())
           .setOperationQueue(operationQueue.get())
-          .setDispatchedSize(dispatchedSize.get())
+          .setDispatchedOperations(dispatchedOperations)
+          .setDispatchedSize(dispatchedOperations.getSize())
           .build();
     }
   }
