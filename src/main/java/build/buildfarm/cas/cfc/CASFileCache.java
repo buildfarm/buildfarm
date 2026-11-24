@@ -151,6 +151,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Gauge.build().name("cas_size").help("CAS size.").register();
   private static final Gauge casEntryCountMetric =
       Gauge.build().name("cas_entry_count").help("Number of entries in the CAS.").register();
+  private static final Gauge casUnreferencedEntryCountMetric =
+      Gauge.build()
+          .name("cas_unreferenced_entry_count")
+          .help("Number of unreferenced entries in the CAS.")
+          .register();
   private static Histogram casTtl =
       Histogram.build()
           .name("cas_ttl_s")
@@ -1433,6 +1438,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 try {
                   casSizeMetric.set(size());
                   casEntryCountMetric.set(entryCount());
+                  casUnreferencedEntryCountMetric.set(unreferencedEntryCount());
                   MINUTES.sleep(5);
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
