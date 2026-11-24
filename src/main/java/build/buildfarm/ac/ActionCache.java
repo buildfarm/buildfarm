@@ -14,16 +14,42 @@
 
 package build.buildfarm.ac;
 
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.common.util.concurrent.ListenableFuture;
+import java.io.IOException;
 
 public interface ActionCache {
   ListenableFuture<ActionResult> get(ActionKey actionKey);
 
-  void put(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
+  ListenableFuture<ActionResult> put(ActionKey actionKey, ActionResult actionResult)
+      throws IOException, InterruptedException;
 
   void invalidate(ActionKey actionKey);
 
+  // should never interact with delegates, might be an internal-only implementation detail
   void readThrough(ActionKey actionKey, ActionResult actionResult);
+
+  default void stop() {}
+
+  // intended as the last cache on a chain of delegation
+  final class NullActionCache implements ActionCache {
+    @Override
+    public ListenableFuture<ActionResult> get(ActionKey actionKey) {
+      return immediateFuture(null);
+    }
+
+    @Override
+    public ListenableFuture<ActionResult> put(ActionKey actionKey, ActionResult actionResult) {
+      return immediateFuture(null);
+    }
+
+    @Override
+    public void invalidate(ActionKey actionKey) {}
+
+    @Override
+    public void readThrough(ActionKey actionKey, ActionResult actionResult) {}
+  }
 }

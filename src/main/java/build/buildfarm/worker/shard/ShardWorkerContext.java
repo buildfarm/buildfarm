@@ -890,7 +890,8 @@ class ShardWorkerContext implements WorkerContext {
     createBackplaneRetrier()
         .execute(
             () -> {
-              instance.putActionResult(actionKey, actionResult);
+              instance.putActionResult(
+                  actionKey, actionResult, RequestMetadata.getDefaultInstance());
               return null;
             });
   }

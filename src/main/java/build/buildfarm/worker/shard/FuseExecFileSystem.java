@@ -32,6 +32,7 @@ import java.nio.file.attribute.UserPrincipal;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 class FuseExecFileSystem implements ExecFileSystem {
   private final Path root;
@@ -51,7 +52,10 @@ class FuseExecFileSystem implements ExecFileSystem {
 
   @Override
   public ListenableFuture<Void> start(
-      Consumer<List<Digest>> onDigests, boolean skipLoad, boolean writable) {
+      Consumer<List<Digest>> onDigests,
+      Predicate<String> isValidRootEntry,
+      boolean skipLoad,
+      boolean writable) {
     // onDigests.accept(storage.getAllDigests());
     return immediateFuture(null);
   }

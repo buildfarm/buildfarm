@@ -34,6 +34,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import io.prometheus.client.Counter;
+import java.io.IOException;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 import org.jspecify.annotations.Nullable;
@@ -154,12 +155,18 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
     ActionResult actionResult = request.getActionResult();
     try {
-      instance.putActionResult(DigestUtil.asActionKey(actionDigest), actionResult);
+      instance.putActionResult(
+          DigestUtil.asActionKey(actionDigest),
+          actionResult,
+          TracingMetadataUtils.fromCurrentContext());
 
       responseObserver.onNext(actionResult);
       responseObserver.onCompleted();
+    } catch (IOException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+      responseObserver.onError(e);
     }
   }
 }

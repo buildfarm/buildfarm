@@ -438,7 +438,8 @@ public class StubInstance extends InstanceBase {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
-  public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+  public void putActionResult(
+      ActionKey actionKey, ActionResult actionResult, RequestMetadata requestMetadata) {
     throwIfStopped();
     // should we be checking the ActionResult return value?
     build.buildfarm.v1test.Digest actionDigest = actionKey.getDigest();

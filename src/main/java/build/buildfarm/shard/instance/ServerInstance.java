@@ -103,7 +103,7 @@ import build.buildfarm.shard.Util;
 import build.buildfarm.shard.WorkerStubs;
 import build.buildfarm.shard.WorkersCallback;
 import build.buildfarm.shard.Writes;
-import build.buildfarm.shard.ac.ShardActionCache;
+import build.buildfarm.shard.ac.WorkerShardActionCache;
 import build.buildfarm.shard.backplane.RedisShardBackplane;
 import build.buildfarm.shard.codec.ShardCodec;
 import build.buildfarm.v1test.BackplaneStatus;
@@ -270,6 +270,7 @@ public class ServerInstance extends NodeInstance {
   private final ActionCache actionCache;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final com.google.common.cache.LoadingCache<String, StubInstance> workerStubs;
+  private final Random rand;
   private final Thread dispatchedMonitor;
   private final Duration maxActionTimeout;
   private AsyncCache<build.buildfarm.v1test.Digest, Directory> directoryCache;
@@ -278,7 +279,6 @@ public class ServerInstance extends NodeInstance {
   private Cache<RequestMetadata, Boolean> recentCacheServedExecutions;
 
   private final Writes writes = new Writes(this::writeInstanceSupplier);
-  private final Random rand = new Random();
   private final int maxCpu;
   private final int maxRequeueAttempts;
 
@@ -326,6 +326,9 @@ public class ServerInstance extends NodeInstance {
         name,
         createBackplane(identifier),
         onStop,
+        WorkerStubs.create(
+            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
+        new Random(),
         /* actionCacheFetchService= */ BuildfarmExecutors.getActionCacheFetchServicePool());
   }
 
@@ -333,14 +336,18 @@ public class ServerInstance extends NodeInstance {
       String name,
       Backplane backplane,
       Runnable onStop,
+      LoadingCache<String, StubInstance> workerStubs,
+      Random rand,
       ListeningExecutorService actionCacheFetchService)
       throws InterruptedException {
     this(
         name,
         backplane,
-        new ShardActionCache(
+        new WorkerShardActionCache(
             configs.getServer().getCaches().getActionCacheMaxEntries(),
             backplane,
+            workerStubs,
+            rand,
             actionCacheFetchService),
         configs.getServer().isRunDispatchedMonitor(),
         configs.getServer().getDispatchedMonitorIntervalSeconds(),
@@ -352,8 +359,8 @@ public class ServerInstance extends NodeInstance {
         configs.getServer().isUseDenyList(),
         configs.getServer().isMergeExecutions(),
         onStop,
-        WorkerStubs.create(
-            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
+        workerStubs,
+        rand,
         actionCacheFetchService,
         configs.getServer().isEnsureOutputsPresent());
   }
@@ -392,6 +399,7 @@ public class ServerInstance extends NodeInstance {
       boolean mergeExecutions,
       Runnable onStop,
       LoadingCache<String, StubInstance> workerStubs,
+      Random rand,
       ListeningExecutorService actionCacheFetchService,
       boolean ensureOutputsPresent) {
     super(
@@ -405,6 +413,7 @@ public class ServerInstance extends NodeInstance {
     this.backplane = backplane;
     this.actionCache = actionCache;
     this.workerStubs = workerStubs;
+    this.rand = rand;
     this.onStop = onStop;
     this.maxEntrySizeBytes = maxEntrySizeBytes;
     this.maxCpu = maxCpu;

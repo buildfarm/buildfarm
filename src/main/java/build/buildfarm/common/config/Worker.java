@@ -38,6 +38,7 @@ public class Worker {
   private String publicName;
   private Capabilities capabilities = new Capabilities();
   private String root = "/tmp/worker";
+  private List<AC> acs = Arrays.asList(new AC());
   private int inlineContentLimit = 1048567; // 1024 * 1024
   private long operationPollPeriod = 1;
   private DequeueMatchSettings dequeueMatchSettings = new DequeueMatchSettings();
