@@ -1,7 +1,7 @@
 # A minimal container for building and running buildfarm services.
 # We copy in the current state of the reposiory to test against PR changes.
 #FROM ubuntu:18.04@sha256:152dc042452c496007f07ca9127571cb9c29697f42acbfad72324b2bb2e43c98
-FROM ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8
+FROM ubuntu:24.04@sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b
 
 # For network stability we allow apt-get to retry.
 # The "80" is required for config priority but its not specifically important.
