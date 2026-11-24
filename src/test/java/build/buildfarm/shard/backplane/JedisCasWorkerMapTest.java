@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -60,8 +62,8 @@ public class JedisCasWorkerMapTest {
     Digest testDigest1 = Digest.newBuilder().setHash("abc").build();
     Digest testDigest2 = Digest.newBuilder().setHash("xyz").build();
 
-    String casKey1 = CAS_PREFIX + ":" + DigestUtil.toString(testDigest1);
-    String casKey2 = CAS_PREFIX + ":" + DigestUtil.toString(testDigest2);
+    String casKey1 = key(testDigest1);
+    String casKey2 = key(testDigest2);
 
     jedis.sadd(casKey1, "worker1");
     jedisCasWorkerMap.setExpire(Arrays.asList(testDigest1, testDigest2));
@@ -70,8 +72,69 @@ public class JedisCasWorkerMapTest {
     assertThat(jedis.ttl(casKey2)).isEqualTo(-2);
   }
 
+  @Test
+  public void testGetResetsTtl() {
+    Digest digest = digest(0);
+    String redisKey = key(digest);
+    jedis.sadd(redisKey, "worker");
+    assertThat(jedisCasWorkerMap.get(digest)).containsExactly("worker");
+    assertThat(jedis.ttl(redisKey)).isGreaterThan(0);
+    assertConnectionsReturned();
+  }
+
+  @Test
+  public void testGetAnyResetsTtl() {
+    Digest digest = digest(0);
+    String redisKey = key(digest);
+    jedis.sadd(redisKey, "worker");
+    jedisCasWorkerMap.getAny(digest);
+    assertThat(jedis.ttl(redisKey)).isGreaterThan(0);
+    assertConnectionsReturned();
+  }
+
+  @Test
+  public void testAdjustResetsTtl() {
+    Digest digest = digest(0);
+    String redisKey = key(digest);
+    jedisCasWorkerMap.add(digest, "original");
+    assertThat(jedis.ttl(redisKey)).isGreaterThan(0);
+    jedis.persist(redisKey);
+    jedisCasWorkerMap.adjust(digest, Set.of("added", "overlap"), Set.of("original", "overlap"));
+    assertThat(jedis.smembers(redisKey)).containsExactly("added");
+    assertThat(jedis.ttl(redisKey)).isGreaterThan(0);
+    jedis.persist(redisKey);
+    jedisCasWorkerMap.adjust(digest, Set.of(), Set.of());
+    assertThat(jedis.ttl(redisKey)).isGreaterThan(0);
+    assertThat(jedis.smembers(redisKey)).containsExactly("added");
+    assertConnectionsReturned();
+  }
+
+  @Test
+  public void testAddAllSetsTtlOnNewKeys() {
+    List<Digest> digests = List.of(digest(0), digest(1));
+    jedisCasWorkerMap.addAll(digests, "worker");
+    for (Digest digest : digests) {
+      assertThat(jedis.smembers(key(digest))).containsExactly("worker");
+      assertThat(jedis.ttl(key(digest))).isGreaterThan(0);
+    }
+    assertConnectionsReturned();
+  }
+
+  private void assertConnectionsReturned() {
+    jedis.getClusterNodes().values().forEach(pool -> assertThat(pool.getNumActive()).isEqualTo(0));
+  }
+
+  private static Digest digest(int index) {
+    return Digest.newBuilder().setHash("blob" + index).build();
+  }
+
+  private static String key(Digest digest) {
+    return CAS_PREFIX + ":" + DigestUtil.toString(digest);
+  }
+
   @After
   public void tearDown() throws IOException {
+    jedis.close();
     redisServer.stop();
   }
 }
