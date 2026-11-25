@@ -54,6 +54,7 @@ public class Backplane {
   private String dispatchingPrefix = "Dispatching";
   private int dispatchingTimeoutMillis = 10000;
   private String dispatchedOperationsHashName = "DispatchedOperations";
+  private String dispatchedMonitorLeaseKey = "DispatchedMonitorLease";
   private String operationChannelPrefix = "OperationChannel";
   private String casPrefix = "ContentAddressableStorage";
   private int casExpire = 604800; // 1 Week

@@ -24,6 +24,7 @@ java_test(
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@buildfarm_maven//:com_github_ben_manes_caffeine_caffeine",
+        "@buildfarm_maven//:com_github_fppt_jedis_mock",
         "@buildfarm_maven//:com_google_guava_guava",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java",
         "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",

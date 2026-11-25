@@ -27,6 +27,7 @@ java_test(
         "@buildfarm_maven//:io_grpc_grpc_core",
         "@buildfarm_maven//:io_grpc_grpc_protobuf",
         "@buildfarm_maven//:io_grpc_grpc_stub",
+        "@buildfarm_maven//:io_prometheus_simpleclient",
         "@buildfarm_maven//:org_mockito_mockito_core",
         "@buildfarm_maven//:redis_clients_jedis",
         "@googleapis//google/longrunning:longrunning_java_proto",

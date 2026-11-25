@@ -52,6 +52,10 @@ Counter for number of operations that failed to requeue
 
 Gauge of the number of dispatched operations
 
+**dispatched_monitor_iterations_total**
+
+Counter of dispatched monitor iterations, labeled by `server` (the server's pod name from `HOSTNAME`, falling back to its public name) and `outcome`: `scanned`, `skipped` (another server holds the dispatched monitor lease) or `scanned_without_lease` (the lease could not be reached, so the server scanned anyway)
+
 
 
 

@@ -15,6 +15,8 @@
 package build.buildfarm.shard.backplane;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -46,13 +48,18 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import build.buildfarm.worker.resources.LocalResourceSet;
+import com.github.fppt.jedismock.RedisServer;
+import com.github.fppt.jedismock.server.ServiceOptions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Range;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -69,7 +76,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.AbstractPipeline;
+import redis.clients.jedis.DefaultJedisClientConfig;
+import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.exceptions.JedisDataException;
+import redis.clients.jedis.params.SetParams;
 
 @RunWith(JUnit4.class)
 public class RedisShardBackplaneTest {
@@ -501,5 +513,129 @@ public class RedisShardBackplaneTest {
             "",
             ShardCodec.DEFAULT_CODEC.worker().print(shardWorker));
     verify(jedis, times(1)).publish(anyString(), anyString());
+  }
+
+  private RedisShardBackplane startBackplaneOn(RedisServer redisServer, String name)
+      throws IOException {
+    UnifiedJedis jedis = connectTo(redisServer);
+    RedisShardBackplane backplane = createBackplane(name);
+    backplane.start(new RedisClient(jedis), new DistributedState(), "startTime/test:0000", n -> {});
+    return backplane;
+  }
+
+  /**
+   * Jedis negotiates RESP3 by default, which jedis-mock does not support, so the client keeps the
+   * server's default protocol.
+   */
+  private static JedisCluster connectTo(RedisServer redisServer) {
+    return new JedisCluster(
+        Collections.singleton(new HostAndPort(redisServer.getHost(), redisServer.getBindPort())),
+        DefaultJedisClientConfig.builder().serverDefaultProtocol().build());
+  }
+
+  private static RedisServer startRedisServer() throws IOException {
+    return RedisServer.newRedisServer(0, InetAddress.getByName("localhost"))
+        .setOptions(ServiceOptions.defaultOptions().withClusterModeEnabled())
+        .start();
+  }
+
+  @Test
+  public void leaseIsExclusiveUntilItExpires() throws Exception {
+    RedisServer redisServer = startRedisServer();
+    try {
+      RedisShardBackplane first = startBackplaneOn(redisServer, "lease-first");
+      RedisShardBackplane second = startBackplaneOn(redisServer, "lease-second");
+
+      assertThat(first.tryAcquireLease("lease", "server-a", /* ttlMillis= */ 200)).isTrue();
+      assertThat(second.tryAcquireLease("lease", "server-b", /* ttlMillis= */ 200)).isFalse();
+      assertThat(first.tryAcquireLease("lease", "server-a", /* ttlMillis= */ 200)).isFalse();
+
+      Thread.sleep(400);
+
+      assertThat(second.tryAcquireLease("lease", "server-b", /* ttlMillis= */ 60000)).isTrue();
+    } finally {
+      redisServer.stop();
+    }
+  }
+
+  @Test
+  public void leaseRecordsHolderAndExpiry() throws Exception {
+    RedisServer redisServer = startRedisServer();
+    try (JedisCluster jedis = connectTo(redisServer)) {
+      RedisShardBackplane backplane = startBackplaneOn(redisServer, "lease-holder");
+
+      assertThat(backplane.tryAcquireLease("lease", "server-a", /* ttlMillis= */ 60000)).isTrue();
+
+      assertThat(jedis.get("lease")).isEqualTo("server-a");
+      assertThat(jedis.pttl("lease")).isIn(Range.openClosed(0L, 60000L));
+    } finally {
+      redisServer.stop();
+    }
+  }
+
+  @Test
+  public void leaseRenewalExtendsOnlyTheHoldersLease() throws Exception {
+    RedisServer redisServer = startRedisServer();
+    try (JedisCluster jedis = connectTo(redisServer)) {
+      RedisShardBackplane backplane = startBackplaneOn(redisServer, "lease-renewal");
+
+      assertThat(backplane.tryAcquireLease("lease", "server-a", /* ttlMillis= */ 1000)).isTrue();
+
+      assertThat(backplane.renewLease("lease", "server-b", /* ttlMillis= */ 60000)).isFalse();
+      assertThat(jedis.pttl("lease")).isAtMost(1000L);
+
+      assertThat(backplane.renewLease("lease", "server-a", /* ttlMillis= */ 60000)).isTrue();
+      assertThat(jedis.pttl("lease")).isIn(Range.openClosed(1000L, 60000L));
+      assertThat(jedis.get("lease")).isEqualTo("server-a");
+    } finally {
+      redisServer.stop();
+    }
+  }
+
+  @Test
+  public void leaseRenewalFailsAfterExpiry() throws Exception {
+    RedisServer redisServer = startRedisServer();
+    try {
+      RedisShardBackplane backplane = startBackplaneOn(redisServer, "lease-expired-renewal");
+
+      assertThat(backplane.tryAcquireLease("lease", "server-a", /* ttlMillis= */ 200)).isTrue();
+      Thread.sleep(400);
+
+      assertThat(backplane.renewLease("lease", "server-a", /* ttlMillis= */ 60000)).isFalse();
+      assertThat(backplane.tryAcquireLease("lease", "server-b", /* ttlMillis= */ 60000)).isTrue();
+    } finally {
+      redisServer.stop();
+    }
+  }
+
+  @Test
+  public void leaseCommandErrorsAreReportedAsIOExceptions() throws Exception {
+    UnifiedJedis jedis = mock(UnifiedJedis.class);
+    when(jedis.set(anyString(), anyString(), any(SetParams.class)))
+        .thenThrow(new JedisDataException("NOPERM this user has no permissions to run 'set'"));
+    when(jedis.eval(anyString(), anyList(), anyList()))
+        .thenThrow(new JedisDataException("NOPERM this user has no permissions to run 'eval'"));
+    RedisShardBackplane backplane = createBackplane("lease-command-errors");
+    backplane.start(
+        new RedisClient(jedis), new DistributedState(), "startTime/test:0000", name -> {});
+
+    assertThrows(
+        IOException.class,
+        () -> backplane.tryAcquireLease("lease", "server-a", /* ttlMillis= */ 1000));
+    assertThrows(
+        IOException.class, () -> backplane.renewLease("lease", "server-a", /* ttlMillis= */ 1000));
+  }
+
+  @Test
+  public void leasesWithDifferentNamesAreIndependent() throws Exception {
+    RedisServer redisServer = startRedisServer();
+    try {
+      RedisShardBackplane backplane = startBackplaneOn(redisServer, "lease-names");
+
+      assertThat(backplane.tryAcquireLease("lease-x", "server-a", /* ttlMillis= */ 60000)).isTrue();
+      assertThat(backplane.tryAcquireLease("lease-y", "server-a", /* ttlMillis= */ 60000)).isTrue();
+    } finally {
+      redisServer.stop();
+    }
   }
 }

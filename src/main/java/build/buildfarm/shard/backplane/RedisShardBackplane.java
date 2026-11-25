@@ -98,6 +98,8 @@ import lombok.extern.java.Log;
 import org.jspecify.annotations.Nullable;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.exceptions.JedisException;
+import redis.clients.jedis.params.SetParams;
 
 @Log
 public class RedisShardBackplane implements Backplane {
@@ -553,6 +555,43 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public boolean isStopped() {
     return client.isClosed();
+  }
+
+  @SuppressWarnings("ConstantConditions")
+  @Override
+  public boolean tryAcquireLease(String name, String holder, long ttlMillis) throws IOException {
+    SetParams params = SetParams.setParams().nx().px(ttlMillis);
+    return "OK".equals(callForLease(jedis -> jedis.set(name, holder, params)));
+  }
+
+  /**
+   * Runs a lease command, reporting command errors that {@link RedisClient#call} passes through
+   * unchanged (such as NOPERM from an ACL that denies EVAL) as {@link IOException}s, so that lease
+   * holders handle them like an unreachable backplane.
+   */
+  private <T> T callForLease(RedisClient.JedisContext<T> withJedis) throws IOException {
+    try {
+      return client.call(withJedis);
+    } catch (JedisException e) {
+      throw new IOException(e);
+    }
+  }
+
+  private static final String RENEW_LEASE_SCRIPT =
+      "if redis.call('get', KEYS[1]) == ARGV[1] then "
+          + "return redis.call('pexpire', KEYS[1], ARGV[2]) "
+          + "else return 0 end";
+
+  @Override
+  public boolean renewLease(String name, String holder, long ttlMillis) throws IOException {
+    Object result =
+        callForLease(
+            jedis ->
+                jedis.eval(
+                    RENEW_LEASE_SCRIPT,
+                    ImmutableList.of(name),
+                    ImmutableList.of(holder, Long.toString(ttlMillis))));
+    return Long.valueOf(1).equals(result);
   }
 
   @Override

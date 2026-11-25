@@ -72,6 +72,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.shard.DispatchedMonitor;
 import build.buildfarm.shard.ac.ShardActionCache;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
@@ -1400,5 +1401,76 @@ public class ServerInstanceTest {
     correlatedInvocationsId =
         instance.indexCorrelatedInvocations(new java.net.URI("https://" + uuid));
     assertThat(correlatedInvocationsId).isEqualTo("https://" + uuid);
+  }
+
+  @Test
+  public void dispatchedMonitorLeaseDisabledAlwaysRuns() throws Exception {
+    DispatchedMonitor.Lease lease =
+        ServerInstance.dispatchedMonitorLease(
+            mockBackplane,
+            /* useLease= */ false,
+            "lease-key",
+            "server-a",
+            /* intervalSeconds= */ 30);
+
+    assertThat(lease.tryAcquire()).isTrue();
+    verify(mockBackplane, never()).tryAcquireLease(anyString(), anyString(), any(Long.class));
+  }
+
+  @Test
+  public void dispatchedMonitorLeaseEnabledLastsOneInterval() throws Exception {
+    when(mockBackplane.tryAcquireLease("lease-key", "server-a", 30000L))
+        .thenReturn(true)
+        .thenReturn(false);
+    DispatchedMonitor.Lease lease =
+        ServerInstance.dispatchedMonitorLease(
+            mockBackplane,
+            /* useLease= */ true,
+            "lease-key",
+            "server-a",
+            /* intervalSeconds= */ 30);
+
+    assertThat(lease.tryAcquire()).isTrue();
+    assertThat(lease.tryAcquire()).isFalse();
+    assertThat(lease.durationMillis()).isEqualTo(30000L);
+  }
+
+  @Test
+  public void dispatchedMonitorLeaseRenewsForOneInterval() throws Exception {
+    when(mockBackplane.renewLease("lease-key", "server-a", 30000L))
+        .thenReturn(true)
+        .thenReturn(false);
+    DispatchedMonitor.Lease lease =
+        ServerInstance.dispatchedMonitorLease(
+            mockBackplane,
+            /* useLease= */ true,
+            "lease-key",
+            "server-a",
+            /* intervalSeconds= */ 30);
+
+    assertThat(lease.renew()).isTrue();
+    assertThat(lease.renew()).isFalse();
+  }
+
+  @Test
+  public void dispatchedMonitorLeaseWithZeroIntervalLastsOneSecond() throws Exception {
+    when(mockBackplane.tryAcquireLease("lease-key", "server-a", 1000L)).thenReturn(true);
+    DispatchedMonitor.Lease lease =
+        ServerInstance.dispatchedMonitorLease(
+            mockBackplane, /* useLease= */ true, "lease-key", "server-a", /* intervalSeconds= */ 0);
+
+    assertThat(lease.tryAcquire()).isTrue();
+  }
+
+  @Test
+  public void podNameIsHostnameWhenSet() {
+    assertThat(ServerInstance.podName("buildfarm-server-7c9f-abcde", "10.0.0.1:8980"))
+        .isEqualTo("buildfarm-server-7c9f-abcde");
+  }
+
+  @Test
+  public void podNameFallsBackToPublicName() {
+    assertThat(ServerInstance.podName(null, "10.0.0.1:8980")).isEqualTo("10.0.0.1:8980");
+    assertThat(ServerInstance.podName("", "10.0.0.1:8980")).isEqualTo("10.0.0.1:8980");
   }
 }
