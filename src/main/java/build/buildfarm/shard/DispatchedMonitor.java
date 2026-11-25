@@ -25,14 +25,20 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.Duration;
+import io.prometheus.client.Counter;
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Monitors dispatched operations and requeues operations that have exceeded their dispatch timeout.
@@ -46,14 +52,100 @@ import lombok.extern.java.Log;
  */
 @Log
 public class DispatchedMonitor implements Runnable {
+  static final String OUTCOME_SCANNED = "scanned";
+  static final String OUTCOME_SKIPPED = "skipped";
+  static final String OUTCOME_SCANNED_WITHOUT_LEASE = "scanned_without_lease";
+
+  private static final Counter iterations =
+      Counter.build()
+          .name("dispatched_monitor_iterations")
+          .labelNames("server", "outcome")
+          .help(
+              "Dispatched monitor iterations by server and outcome: scanned, skipped (lease held"
+                  + " elsewhere) or scanned_without_lease (lease unreachable).")
+          .register();
+
   private final BooleanSupplier shouldStop;
   private final Scannable<DispatchedOperation> location;
   private final BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
   private final int intervalSeconds;
   private final Duration requeueDelay;
+  private final Lease lease;
+  private final String server;
+  // renews a held lease on its own thread, so that slow scanning cannot outlast it
+  private final @Nullable ScheduledExecutorService renewalExecutor;
+
+  /** Grants permission to run a single monitoring iteration. */
+  @FunctionalInterface
+  public interface Lease {
+    /** Returns {@code true} if this caller now holds the lease. */
+    boolean tryAcquire() throws IOException;
+
+    /**
+     * Extends a lease held by this caller to its full duration. Returns {@code false} if the lease
+     * is no longer held by this caller.
+     */
+    default boolean renew() throws IOException {
+      return true;
+    }
+
+    /**
+     * How long a lease lasts once acquired or renewed. Leases that never expire need no renewal.
+     */
+    default long durationMillis() {
+      return Long.MAX_VALUE;
+    }
+  }
 
   /**
-   * Constructs a new DispatchedMonitor.
+   * Renews a held lease every half of its duration on {@code executor}, independently of the
+   * iteration's thread, so that neither slow page processing nor slow requeues outlast it.
+   */
+  private static final class LeaseRenewer {
+    private final Lease lease;
+    private final ScheduledFuture<?> renewals;
+    private boolean held = true;
+
+    LeaseRenewer(Lease lease, ScheduledExecutorService executor) {
+      this.lease = lease;
+      long periodMillis = Math.max(1, lease.durationMillis() / 2);
+      renewals =
+          executor.scheduleAtFixedRate(
+              this::renew, periodMillis, periodMillis, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Stops periodic renewals and renews once more, so that the next scan starts no sooner than one
+     * lease duration after this one finished.
+     */
+    void finish() {
+      renewals.cancel(/* mayInterruptIfRunning= */ false);
+      renew();
+    }
+
+    /**
+     * Renews the lease. A lease that has been lost is not renewed again, and the iteration runs to
+     * completion either way: an overlapping scan is harmless, while abandoning one would leave
+     * expired dispatches unrequeued. Any failure is contained here, because an exception would
+     * silently end the periodic renewals or escape the monitor's thread and stop it permanently.
+     */
+    synchronized void renew() {
+      if (!held) {
+        return;
+      }
+      try {
+        held = lease.renew();
+        if (!held) {
+          log.log(Level.WARNING, "DispatchedMonitor: lease lost during iteration");
+        }
+      } catch (IOException | RuntimeException e) {
+        log.log(Level.WARNING, "DispatchedMonitor: lease renewal failed", e);
+      }
+    }
+  }
+
+  /**
+   * Constructs a new DispatchedMonitor that runs every iteration.
    *
    * @param shouldStop supplier that returns {@code true} when the monitor should stop running
    * @param location scannable source of dispatched operations to monitor
@@ -67,11 +159,45 @@ public class DispatchedMonitor implements Runnable {
       BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer,
       int intervalSeconds,
       Duration requeueDelay) {
+    this(shouldStop, location, requeuer, intervalSeconds, requeueDelay, () -> true, "");
+  }
+
+  /**
+   * Constructs a new DispatchedMonitor that skips iterations for which {@code lease} is not
+   * acquired.
+   *
+   * @param lease acquired before each iteration; sharing it across servers limits how many of them
+   *     scan the dispatched operations concurrently
+   * @param server the {@code server} label of this monitor's iteration metrics
+   */
+  public DispatchedMonitor(
+      BooleanSupplier shouldStop,
+      Scannable<DispatchedOperation> location,
+      BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer,
+      int intervalSeconds,
+      Duration requeueDelay,
+      Lease lease,
+      String server) {
     this.shouldStop = shouldStop;
     this.location = location;
     this.requeuer = requeuer;
     this.intervalSeconds = intervalSeconds;
     this.requeueDelay = requeueDelay;
+    this.lease = lease;
+    this.server = server;
+    renewalExecutor =
+        lease.durationMillis() == Long.MAX_VALUE
+            ? null
+            : Executors.newSingleThreadScheduledExecutor(
+                r -> {
+                  Thread thread = new Thread(r, "dispatched-monitor-lease-renewal");
+                  thread.setDaemon(true);
+                  return thread;
+                });
+  }
+
+  private void recordIteration(String outcome) {
+    iterations.labels(server, outcome).inc();
   }
 
   /**
@@ -208,13 +334,41 @@ public class DispatchedMonitor implements Runnable {
   /**
    * Performs a single iteration of the monitoring cycle.
    *
-   * <p>This method scans all dispatched operations and waits for all requeue operations to complete
-   * before returning.
+   * <p>If the lease is acquired, this method scans all dispatched operations and waits for all
+   * requeue operations to complete before returning. The lease is renewed while the iteration runs,
+   * so that no other holder starts scanning, and once more when it finishes, so that the next scan
+   * starts no sooner than one lease duration later.
+   *
+   * <p>A failure to acquire the lease, whether the backplane is unreachable or rejects the command,
+   * runs the iteration anyway, without renewals: a redundant scan is harmless, while skipping scans
+   * would leave expired dispatches unrequeued.
    *
    * @throws InterruptedException if the thread is interrupted while waiting for requeue operations
    */
   void iterate() throws InterruptedException {
-    getOnlyInterruptibly(submitAll());
+    boolean held;
+    try {
+      held = lease.tryAcquire();
+      if (!held) {
+        recordIteration(OUTCOME_SKIPPED);
+        return;
+      }
+      recordIteration(OUTCOME_SCANNED);
+    } catch (IOException | RuntimeException e) {
+      log.log(Level.WARNING, "DispatchedMonitor: lease acquisition failed, running anyway", e);
+      recordIteration(OUTCOME_SCANNED_WITHOUT_LEASE);
+      held = false;
+    }
+    if (!held || renewalExecutor == null) {
+      getOnlyInterruptibly(submitAll());
+      return;
+    }
+    LeaseRenewer renewer = new LeaseRenewer(lease, renewalExecutor);
+    try {
+      getOnlyInterruptibly(submitAll());
+    } finally {
+      renewer.finish();
+    }
   }
 
   /**
@@ -254,6 +408,9 @@ public class DispatchedMonitor implements Runnable {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } finally {
+      if (renewalExecutor != null) {
+        renewalExecutor.shutdownNow();
+      }
       log.log(Level.INFO, "DispatchedMonitor: Exiting");
     }
   }

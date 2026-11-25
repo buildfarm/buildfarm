@@ -77,6 +77,18 @@ public interface Backplane {
   /** Indicates whether the backplane has been stopped */
   boolean isStopped();
 
+  /**
+   * Attempts to acquire a named lease that expires after {@code ttlMillis}. Returns {@code true}
+   * only if no lease with this name was held, so at most one caller holds it at a time.
+   */
+  boolean tryAcquireLease(String name, String holder, long ttlMillis) throws IOException;
+
+  /**
+   * Resets the expiry of a lease acquired with {@link #tryAcquireLease} to {@code ttlMillis}.
+   * Returns {@code false}, leaving the lease untouched, if it is not held by {@code holder}.
+   */
+  boolean renewLease(String name, String holder, long ttlMillis) throws IOException;
+
   /** Adds a worker to the set of active workers. */
   void addWorker(ShardWorker shardWorker) throws IOException;
 

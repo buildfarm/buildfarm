@@ -16,6 +16,7 @@ java_test(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/server",
         "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/shard",
         "//src/main/java/build/buildfarm/shard/ac",
         "//src/main/java/build/buildfarm/shard/instance",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",

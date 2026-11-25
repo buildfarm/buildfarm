@@ -320,6 +320,45 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
+  /**
+   * The lease lasts one monitor interval and is renewed while its holder scans, so across all
+   * servers sharing {@code leaseKey} one dispatched scan runs at a time and at most one starts per
+   * interval, and a holder that dies is replaced within an interval. {@code holder} must be unique
+   * to this server, because only the holder may renew the lease.
+   */
+  static DispatchedMonitor.Lease dispatchedMonitorLease(
+      Backplane backplane, boolean useLease, String leaseKey, String holder, int intervalSeconds) {
+    if (!useLease) {
+      return () -> true;
+    }
+    // Redis rejects a zero expiry, and an interval of 0 is valid for the monitor itself.
+    long ttlMillis = SECONDS.toMillis(Math.max(1, intervalSeconds));
+    return new DispatchedMonitor.Lease() {
+      @Override
+      public boolean tryAcquire() throws IOException {
+        return backplane.tryAcquireLease(leaseKey, holder, ttlMillis);
+      }
+
+      @Override
+      public boolean renew() throws IOException {
+        return backplane.renewLease(leaseKey, holder, ttlMillis);
+      }
+
+      @Override
+      public long durationMillis() {
+        return ttlMillis;
+      }
+    };
+  }
+
+  /**
+   * Names this server's pod for metric labels. Kubernetes sets {@code HOSTNAME} to the pod name;
+   * outside of Kubernetes the public name identifies the server instead.
+   */
+  static String podName(@Nullable String hostname, String publicName) {
+    return Strings.isNullOrEmpty(hostname) ? publicName : hostname;
+  }
+
   public ServerInstance(String name, String identifier, Runnable onStop)
       throws InterruptedException, ConfigurationException {
     this(
@@ -544,7 +583,14 @@ public class ServerInstance extends NodeInstance {
                   dispatchedOperations,
                   this::requeueOperation,
                   dispatchedMonitorIntervalSeconds,
-                  Durations.fromSeconds(configs.getServer().getRequeueTimeout())));
+                  Durations.fromSeconds(configs.getServer().getRequeueTimeout()),
+                  dispatchedMonitorLease(
+                      backplane,
+                      configs.getServer().isUseDispatchedMonitorLease(),
+                      configs.getBackplane().getDispatchedMonitorLeaseKey(),
+                      configs.getServer().getPublicName() + ":" + UUID.randomUUID(),
+                      dispatchedMonitorIntervalSeconds),
+                  podName(System.getenv("HOSTNAME"), configs.getServer().getPublicName())));
     } else {
       dispatchedMonitor = null;
     }
